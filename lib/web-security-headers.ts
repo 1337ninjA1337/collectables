@@ -117,7 +117,7 @@ export function buildContentSecurityPolicy(options: CspOptions = {}): string {
   const connectSrc = dedupe([...CSP_CONNECT_SRC, ...(options.extraConnectSrc ?? [])]);
   const imgSrc = dedupe([...CSP_IMG_SRC, ...(options.extraImgSrc ?? [])]);
 
-  const directives: Array<[string, string[]]> = [
+  const directives: [string, string[]][] = [
     ["default-src", ["'self'"]],
     ["base-uri", ["'self'"]],
     ["object-src", ["'none'"]],

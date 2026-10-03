@@ -28,7 +28,7 @@ import { readRepoFile } from "./helpers/repo-file";
  */
 
 /** Every call site, and which of the two shapes its rows are. */
-const WINDOWS: ReadonlyArray<{ file: string; call: RegExp; size: string }> = [
+const WINDOWS: readonly { file: string; call: RegExp; size: string }[] = [
   {
     file: "app/collection/[id].tsx",
     call: /useChunkedList\(items, CHUNK_PAGE_SIZE_CARDS\)/,

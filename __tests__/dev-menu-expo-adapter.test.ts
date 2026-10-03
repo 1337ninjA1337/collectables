@@ -44,9 +44,9 @@ describe("adaptExpoDevMenu", () => {
   });
 
   it("plugs into registerDevMenu so labelled actions reach expo-dev-menu", () => {
-    const captured: Array<{ name: string; callback: () => void }> = [];
+    const captured: { name: string; callback: () => void }[] = [];
     const fakePackage = {
-      registerDevMenuItems: (items: Array<{ name: string; callback: () => void }>) => {
+      registerDevMenuItems: (items: { name: string; callback: () => void }[]) => {
         captured.push(...items);
       },
     };
@@ -89,7 +89,7 @@ describe("expo-dev-menu peer dep + plugin wiring", () => {
   it("registers expo-dev-menu in the app.json plugins array", () => {
     const appJson = JSON.parse(
       readRepoFile("app.json"),
-    ) as { expo?: { plugins?: Array<string | [string, unknown]> } };
+    ) as { expo?: { plugins?: (string | [string, unknown])[] } };
     const plugins = appJson.expo?.plugins ?? [];
     const flat = plugins.map((p) => (Array.isArray(p) ? p[0] : p));
     assert.ok(

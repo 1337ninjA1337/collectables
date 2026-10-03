@@ -5,7 +5,7 @@ import { readRepoFile as read } from "./helpers/repo-file";
 describe("Sentry native sourcemap config (EAS / iOS)", () => {
   it("app.json registers the @sentry/react-native/expo config plugin", () => {
     const appJson = JSON.parse(read("app.json")) as {
-      expo: { plugins?: Array<unknown> };
+      expo: { plugins?: unknown[] };
     };
     const plugins = appJson.expo.plugins ?? [];
     const sentry = plugins.find(
@@ -50,7 +50,7 @@ describe("Sentry native sourcemap config (EAS / iOS)", () => {
   it("app.json plugin org/project match expo.extra.sentry org/project", () => {
     const appJson = JSON.parse(read("app.json")) as {
       expo: {
-        plugins?: Array<unknown>;
+        plugins?: unknown[];
         extra?: { sentry?: { organization?: string; project?: string } };
       };
     };

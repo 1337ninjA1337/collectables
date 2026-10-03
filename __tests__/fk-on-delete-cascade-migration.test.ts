@@ -25,7 +25,7 @@ const MANUAL = readRepoFile("MANUAL-TASKS.md");
 const SQL = MIGRATION.replace(/--.*$/gm, "");
 
 // (table, column, referenced table, constraint name) for each normalised FK.
-const FKS: Array<[string, string, string, string]> = [
+const FKS: [string, string, string, string][] = [
   ["profiles", "id", "auth.users", "profiles_id_fkey"],
   ["collections", "owner_user_id", "auth.users", "collections_owner_user_id_fkey"],
   ["items", "collection_id", "public.collections", "items_collection_id_fkey"],

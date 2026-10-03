@@ -25,10 +25,10 @@ import { stripComments } from "@/lib/strip-comments";
  * rowGap/columnGap audit suggestion in .tasks/.suggestions.md).
  * Extend this table as further geometry anchors gain tokens.
  */
-export const GEOMETRY_RULES: ReadonlyArray<{
+export const GEOMETRY_RULES: readonly {
   pattern: RegExp;
   token: string;
-}> = [
+}[] = [
   { pattern: /borderRadius:\s*999\b/g, token: "RADIUS_PILL" },
   { pattern: /borderRadius:\s*22\b/g, token: "RADIUS_CARD" },
   { pattern: /borderRadius:\s*24\b/g, token: "RADIUS_CARD_LG" },

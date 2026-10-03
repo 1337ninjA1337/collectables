@@ -117,7 +117,7 @@ describe("subscribeShared — fan-out subscriber registry", () => {
 
   it("emit fans out to every registered payload handler", () => {
     const client = createFakeClient();
-    const received: Array<{ owner: string; payload: { id: string } }> = [];
+    const received: { owner: string; payload: { id: string } }[] = [];
     let capturedEmit: ((p: { id: string }) => void) | null = null;
     subscribeShared<{ id: string }>(
       client as never,

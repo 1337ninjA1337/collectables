@@ -26,6 +26,7 @@ import assert from "node:assert/strict";
 
 import {
   GATED_RULES,
+  ZEROED_RULES,
   formatGateReport,
   gateFails,
   partitionFindings,
@@ -179,7 +180,61 @@ describe("the list itself", () => {
     );
   });
 
-  it("leaves the rule it drove to zero OFF the list, which is the bar doing something", () => {
+  it("holds the three style zeros on a second list, and fails the gate on both", () => {
+    // The split and why it is a split rather than three more GATED_RULES is in
+    // `lib/eslint-gate.ts`. What these cases pin is that the second list is
+    // not decoration: a finding from it fails the run exactly like a gated
+    // one, and the only difference a caller sees is the sentence it gets.
+    const ids = ZEROED_RULES.map((r) => r.rule);
+    assert.deepEqual(ids, [
+      "react-hooks/preserve-manual-memoization",
+      "import/no-duplicates",
+      "@typescript-eslint/array-type",
+    ]);
+    for (const rule of ZEROED_RULES) {
+      assert.match(rule.since, /^\d{4}-\d{2}-\d{2}$/);
+      assert.ok(
+        rule.paidFor.length > 80,
+        `${rule.rule}: a zero with no account of what clearing it took is a zero nobody will defend`,
+      );
+    }
+    // No rule on both lists: the two failure messages contradict each other,
+    // and `partitionFindings` would put the finding in `gated` and say nothing
+    // about the other.
+    assert.deepEqual(
+      ids.filter((id) => GATED_RULES.some((gated) => gated.rule === id)),
+      [],
+    );
+  });
+
+  it("fails on a zeroed rule's finding and says it is a regression, not a bug", () => {
+    const partition = partitionFindings([
+      finding({ rule: "@typescript-eslint/array-type", severity: 1 }),
+    ]);
+    assert.equal(partition.gated.length, 0);
+    assert.equal(partition.regressed.length, 1);
+    assert.equal(gateFails(partition), true, "a style zero somebody paid for is still a ratchet");
+
+    const red = formatGateReport(partition, 900);
+    assert.match(red, /this tree was read to zero for/);
+    assert.match(red, /Undo the regression rather than silencing it/);
+    // The gated half must not claim a finding it does not have.
+    assert.match(red, /0 finding\(s\) from \d+ gated rule\(s\)/);
+  });
+
+  it("prints the zeroed list on the GREEN path too", () => {
+    // The reason this list exists at all: `ruleTally` prints only rules that
+    // still have findings, so a rule driven to zero and left ungated vanished
+    // from the report and nothing recorded that it had been read.
+    const green = formatGateReport(partitionFindings([]), 900);
+    assert.match(
+      green,
+      new RegExp(`${String(ZEROED_RULES.length)} rule\\(s\\) read to zero and held there`),
+    );
+    for (const rule of ZEROED_RULES) assert.ok(green.includes(rule.rule));
+  });
+
+  it("leaves the rule it drove to zero off the GATED list, which is the bar doing something", () => {
     // `react-hooks/preserve-manual-memoization` was one of the four unread
     // errors read on 2026-10-03 and the fix was taken: `app/listing/[id].tsx`
     // hoisted one string above a `useMemo`, the compiler could not prove the
@@ -194,8 +249,11 @@ describe("the list itself", () => {
     // describe a cost this build does not pay.
     assert.ok(
       !GATED_RULES.map((r) => r.rule).includes("react-hooks/preserve-manual-memoization"),
-      "a rule whose cost this build does not pay is the report's job, not the gate's",
+      "a rule whose cost this build does not pay does not get a `why` sentence about what breaks",
     );
+    // It is still held at zero — by `ZEROED_RULES`, which is the list for
+    // exactly this: work that was paid for and has no breakage story.
+    assert.ok(ZEROED_RULES.map((r) => r.rule).includes("react-hooks/preserve-manual-memoization"));
     assert.equal(readRepoFile("app.json").includes("reactCompiler"), false);
     assert.equal(readRepoFile("babel.config.js").includes("react-compiler"), false);
   });

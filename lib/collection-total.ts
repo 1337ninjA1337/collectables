@@ -149,7 +149,7 @@ export function portfolioTotalCost(
  * disagreeing about what an unconvertible item is worth.
  */
 function sumEntries(
-  entries: ReadonlyArray<{ amount: number; currency: string }>,
+  entries: readonly { amount: number; currency: string }[],
   target: string,
   rates: UsdRates | null,
 ): CollectionTotalCost {

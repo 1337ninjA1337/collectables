@@ -77,7 +77,7 @@ export function isDevEnvironment(): boolean {
  */
 export interface ExpoDevMenuPackage {
   registerDevMenuItems?: (
-    items: Array<{ name: string; callback: () => void; shouldCollapse?: boolean }>,
+    items: { name: string; callback: () => void; shouldCollapse?: boolean }[],
   ) => unknown;
 }
 

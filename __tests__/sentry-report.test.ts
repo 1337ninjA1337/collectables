@@ -66,7 +66,7 @@ describe("buildAnomalyEnvelope", () => {
 
 describe("reportMirrorAnomaly", () => {
   it("POSTs the envelope to the DSN's envelope endpoint with the sentry auth header", async () => {
-    const calls: Array<{ url: string; init: { method: string; headers: Record<string, string>; body: string } }> = [];
+    const calls: { url: string; init: { method: string; headers: Record<string, string>; body: string } }[] = [];
     const ok = await reportMirrorAnomaly(
       "https://pk@sentry.example/42",
       ANOMALY,

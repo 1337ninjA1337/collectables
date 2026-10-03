@@ -35,7 +35,7 @@ function columnsOf(projection: string): string[] {
  */
 const PK = "id";
 
-const TABLES: Array<{ table: string; columns: string[] }> = [
+const TABLES: { table: string; columns: string[] }[] = [
   { table: "profiles", columns: columnsOf(PROFILE_COLUMNS) },
   { table: "collections", columns: columnsOf(COLLECTION_COLUMNS) },
   { table: "items", columns: columnsOf(ITEM_COLUMNS) },

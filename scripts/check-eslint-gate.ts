@@ -2,7 +2,7 @@
 /**
  * The tenth gate leg: fails on a named subset of ESLint rules, reports the rest.
  *
- * The decision, the six gated rules and the argument for not gating the other
+ * The decision, the six gated rules, the three zeroed rules and the argument for not gating the other
  * twelve live in `lib/eslint-gate.ts`. This wrapper is the part that has to
  * talk to ESLint: run it over the same tree `npm run lint` does, flatten the
  * results, and — the half that keeps the ratchet honest — check that each
@@ -21,6 +21,7 @@ import { ESLint } from "eslint";
 
 import {
   GATED_RULES,
+  ZEROED_RULES,
   type TriagedRule,
   formatGateReport,
   gateFails,
@@ -78,12 +79,16 @@ const TRIAGED_RULES: readonly TriagedRule[] = [
  */
 function disabledGatedRules(config: { rules?: Record<string, unknown> }): readonly string[] {
   const rules = config.rules ?? {};
-  return GATED_RULES.filter((gated) => {
-    const entry = rules[gated.rule];
+  // Both lists: a zero from a rule that is off is not a zero whichever list
+  // the rule is on, and `ZEROED_RULES` holds three rules from two plugins the
+  // gated list does not reach.
+  const held = [...GATED_RULES.map((r) => r.rule), ...ZEROED_RULES.map((r) => r.rule)];
+  return held.filter((rule) => {
+    const entry = rules[rule];
     if (entry === undefined) return true;
     const severity = Array.isArray(entry) ? entry[0] : entry;
     return severity === 0 || severity === "off";
-  }).map((gated) => gated.rule);
+  });
 }
 
 async function main(): Promise<void> {
@@ -141,7 +146,7 @@ async function main(): Promise<void> {
 
   console.error(report);
   if (runningUnderActions()) {
-    for (const finding of partition.gated) {
+    for (const finding of [...partition.gated, ...partition.regressed]) {
       console.log(
         `::error file=${finding.file},line=${finding.line}::${finding.rule ?? "eslint"}: ${finding.message.split("\n")[0]}`,
       );

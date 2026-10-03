@@ -78,7 +78,7 @@ export const SORT_OPTIONS = [
   { mode: "cost-desc", labelKey: "sortCostDesc" },
   { mode: "acquired-desc", labelKey: "sortAcquiredDesc" },
   { mode: "acquired-asc", labelKey: "sortAcquiredAsc" },
-] as const satisfies ReadonlyArray<{ mode: ItemSortMode; labelKey: string }>;
+] as const satisfies readonly { mode: ItemSortMode; labelKey: string }[];
 
 /**
  * Ionicons glyph paired with each non-default sort mode for the removable

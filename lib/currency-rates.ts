@@ -111,7 +111,7 @@ export function isStale(
  * UI surface "partial total" hints when some items couldn't be tallied.
  */
 export function sumConverted(
-  entries: ReadonlyArray<{ amount: number; currency: string }>,
+  entries: readonly { amount: number; currency: string }[],
   displayCurrency: string,
   rates: UsdRates,
 ): { total: number; converted: number; skipped: number } {

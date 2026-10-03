@@ -69,7 +69,7 @@ describe("safe-log: redactForLog", () => {
     const out = redactForLog({
       items: [{ id: "1", title: "secret title" }],
       auth: { authorization: "Bearer xyz" },
-    }) as { items: Array<Record<string, unknown>>; auth: unknown };
+    }) as { items: Record<string, unknown>[]; auth: unknown };
     assert.equal(out.items[0].id, "1");
     assert.equal(out.items[0].title, REDACTED);
     // `auth` key itself is sensitive -> whole subtree redacted

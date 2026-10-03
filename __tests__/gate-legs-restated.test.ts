@@ -161,7 +161,7 @@ interface Claim {
  * that would take a rule for telling the two apart from the words around them,
  * and the pair of them is a smaller thing to state than the rule would be.
  */
-const CLAIM_SHAPES: ReadonlyArray<readonly [Population, RegExp]> = [
+const CLAIM_SHAPES: readonly (readonly [Population, RegExp])[] = [
   ["total", /`verify`'s\s+([a-z]+)\s+(?:legs|steps)\b/gi],
   ["total", /\b([a-z]+)\s+`verify`\s+(?:legs|steps)\b/gi],
   ["total", /\b([a-z]+)\s+(?:legs|steps)\s+CI\s+runs\b/gi],

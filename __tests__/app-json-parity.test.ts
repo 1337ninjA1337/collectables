@@ -21,7 +21,7 @@ import { readRepoFile } from "./helpers/repo-file";
 
 const appJson = JSON.parse(readRepoFile("app.json")) as {
   expo: {
-    plugins?: Array<string | [string, Record<string, unknown>?]>;
+    plugins?: (string | [string, Record<string, unknown>?])[];
     extra?: Record<string, unknown>;
   };
 };
@@ -42,18 +42,18 @@ function pluginEntries(): PluginEntry[] {
  * key (case-insensitive): `sentry` ↔ `@sentry/react-native/expo`,
  * a future `reanimated` ↔ `react-native-reanimated`, etc.
  */
-function parityPairs(): Array<{
+function parityPairs(): {
   key: string;
   extra: Record<string, unknown>;
   plugin: PluginEntry;
-}> {
+}[] {
   const extra = appJson.expo.extra ?? {};
   const plugins = pluginEntries();
-  const pairs: Array<{
+  const pairs: {
     key: string;
     extra: Record<string, unknown>;
     plugin: PluginEntry;
-  }> = [];
+  }[] = [];
   for (const [key, value] of Object.entries(extra)) {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       continue;

@@ -22,9 +22,11 @@
  *
  * ## The populations
  *
- *   1. the COUNT — the four spellings of it the tree uses, which are in
- *      `CLAIM_SHAPES` and nowhere else,
- *   2. the NEXT position, when prose names one: the list's own doc comment
+ *   1. the COUNT of `GATED_RULES` — the spellings of it the tree uses, which
+ *      are in `CLAIM_SHAPES` and nowhere else,
+ *   2. the COUNT of `ZEROED_RULES`, the second list, which is a different
+ *      number stated in the same paragraphs,
+ *   3. the NEXT position, when prose names one: the list's own doc comment
  *      says the one after these would be welcome and names its ordinal.
  *
  * ## What it leaves out
@@ -43,7 +45,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { GATED_RULES } from "@/lib/eslint-gate";
+import { GATED_RULES, ZEROED_RULES } from "@/lib/eslint-gate";
 
 import { markdownFiles } from "./helpers/markdown-files";
 import { readRepoFile } from "./helpers/repo-file";
@@ -51,6 +53,7 @@ import { sourceFiles } from "./helpers/source-files";
 import { suiteFiles } from "./helpers/suite-files";
 
 const TOTAL = GATED_RULES.length;
+const ZEROED = ZEROED_RULES.length;
 
 /** The number words prose actually uses here. */
 const NUMBER_WORDS = [
@@ -108,7 +111,7 @@ function proseFiles(): readonly string[] {
   ];
 }
 
-type Population = "total" | "next";
+type Population = "total" | "zeroed" | "next";
 
 interface Claim {
   readonly file: string;
@@ -129,6 +132,8 @@ const CLAIM_SHAPES: readonly (readonly [Population, RegExp])[] = [
   ["total", /\b([a-z]+)\s+gated rules?\b/gi],
   ["total", /\bfails?(?: the run)? on\s+([a-z]+)\s+rules\b/gi],
   ["total", /\b([a-z]+)\s+rules?\s+fail(?:s)? the run\b/gi],
+  ["zeroed", /\b([a-z]+)\s+zeroed rules?\b/gi],
+  ["zeroed", /\b([a-z]+)\s+rules?\s+held at zero\b/gi],
   ["next", /\bA\s+([a-z]+)\s+is welcome\b/gi],
 ];
 
@@ -155,7 +160,9 @@ function claims(): readonly Claim[] {
 
 /** What each population's claim should say, spelled the way prose spells it. */
 function expected(population: Population): readonly string[] {
-  return population === "total" ? [word(TOTAL)] : [ordinal(TOTAL + 1)];
+  if (population === "total") return [word(TOTAL)];
+  if (population === "zeroed") return [word(ZEROED)];
+  return [ordinal(TOTAL + 1)];
 }
 
 describe("every sentence about the gated subset's size agrees with the list", () => {
@@ -168,6 +175,23 @@ describe("every sentence about the gated subset's size agrees with the list", ()
       wrong.map((claim) => `${claim.file}: "${claim.phrase}" — the list has ${String(TOTAL)}`),
       [],
       "GATED_RULES moved and a sentence about it did not. The list is the fact; these are restatements.",
+    );
+  });
+
+  it("states the count the SECOND list has, which is a different number", () => {
+    // `ZEROED_RULES` arrived on 2026-10-03 with three entries and its own set
+    // of sentences, in the same documents. Two lists in one paragraph is
+    // exactly the shape that gets edited half way.
+    const wrong = claims()
+      .filter((claim) => claim.population === "zeroed")
+      .filter((claim) => !expected("zeroed").includes(claim.said));
+
+    assert.deepEqual(
+      wrong.map(
+        (claim) => `${claim.file}: "${claim.phrase}" — the zeroed list has ${String(ZEROED)}`,
+      ),
+      [],
+      "ZEROED_RULES moved and a sentence about it did not",
     );
   });
 
@@ -201,6 +225,10 @@ describe("every sentence about the gated subset's size agrees with the list", ()
     assert.ok(
       found.some((claim) => claim.population === "next"),
       "the NEXT-position claim in lib/eslint-gate.ts is the one that rots silently",
+    );
+    assert.ok(
+      found.some((claim) => claim.population === "zeroed"),
+      "the second list's size is stated in prose too, and it is a different number from the first's",
     );
   });
 });

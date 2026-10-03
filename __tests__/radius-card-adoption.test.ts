@@ -14,11 +14,11 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * `cardless` marks files that had ONLY 24s (no 22s), so the RADIUS_CARD
  * assertions are skipped there the same way.
  */
-const MIGRATED_FILES: ReadonlyArray<{
+const MIGRATED_FILES: readonly {
   rel: string;
   usesLg: boolean;
   cardless?: boolean;
-}> = [
+}[] = [
   // batch A/4
   { rel: "app/collection/[id].tsx", usesLg: false },
   { rel: "app/item/[id].tsx", usesLg: true },

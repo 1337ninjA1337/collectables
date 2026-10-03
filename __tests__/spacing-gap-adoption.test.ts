@@ -13,12 +13,12 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * actually had — the token-usage (dead-import) guards only run for tokens
  * the file adopted, mirroring radius-card-adoption's usesLg/cardless flags.
  */
-const MIGRATED_FILES: ReadonlyArray<{
+const MIGRATED_FILES: readonly {
   rel: string;
   list: boolean;
   card: boolean;
   inline: boolean;
-}> = [
+}[] = [
   // batch 1/6
   { rel: "app/collection/[id].tsx", list: true, card: true, inline: true },
   { rel: "app/item/[id].tsx", list: true, card: true, inline: true },

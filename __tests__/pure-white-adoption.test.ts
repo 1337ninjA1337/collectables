@@ -9,7 +9,7 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * guard going forward; this per-file list pins the migration history so a
  * revert in any single file fails loudly with the file's name.
  */
-const PURE_WHITE_FILES: ReadonlyArray<string> = [
+const PURE_WHITE_FILES: readonly string[] = [
   "app/collection/[id].tsx",
   "app/wishlist.tsx",
   "app/settings.tsx",

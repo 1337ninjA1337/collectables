@@ -30,6 +30,12 @@
  * counts every other rule on every run so the number stays visible. Which six,
  * and why not the rest, is in `lib/eslint-gate.ts`.
  *
+ * A second list joined it the same day: three zeroed rules, held at zero for
+ * what clearing them cost rather than for anything that breaks. `array-type`
+ * is the largest of the three and the reason the list exists — 26 findings
+ * `eslint --fix` took in one diff, in a population that had grown by one while
+ * the argument about whether to gate it was being written.
+ *
  * `npm run lint` itself stays a report — the whole report, unfiltered, like
  * `bundle:composition` and `bundle:native`. The gate is the part somebody has
  * committed to keeping at zero.

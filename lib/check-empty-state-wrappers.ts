@@ -23,7 +23,7 @@ import { stripComments } from "@/lib/strip-comments";
  */
 
 /** Wrapper backgrounds that stand in for the screen, not the card. */
-export const ALLOWED_WRAPPER_BACKGROUNDS: ReadonlyArray<RegExp> = [
+export const ALLOWED_WRAPPER_BACKGROUNDS: readonly RegExp[] = [
   /^PAGE_BG(_\d+)?$/,
   /^theme\.background$/,
 ];

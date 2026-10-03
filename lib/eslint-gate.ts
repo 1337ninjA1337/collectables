@@ -141,6 +141,75 @@ export const GATED_RULES: readonly GatedRule[] = [
   },
 ];
 
+/**
+ * A single rule this tree is held at zero for, on a reason that is not "what
+ * breaks".
+ *
+ * ## Why this is a second list rather than three more {@link GATED_RULES}
+ *
+ * The bar on that list is deliberate and has now said no three times:
+ * `react-hooks/preserve-manual-memoization` reports a missed optimization for
+ * a compiler this build does not run, `import/no-duplicates` reports two
+ * imports of one module, and `@typescript-eslint/array-type` reports
+ * `Array<T>` where the config prefers `T[]`. Nothing breaks in any of the
+ * three, and a `why` sentence written for them would have to describe a cost
+ * the tree does not pay — which is the exact shape this file exists to refuse.
+ *
+ * And leaving them out had a cost of its own, measured the day `array-type`
+ * was cleared: {@link ruleTally} prints only rules that still have findings,
+ * so a rule driven to zero and not gated DISAPPEARS from the report. There
+ * was then no line anywhere saying it had been read. A report that shrank
+ * because somebody did the work and one that shrank because somebody stopped
+ * looking printed identically.
+ *
+ * So the two halves of "gated" are split apart. A {@link GatedRule} answers
+ * *what breaks*; a {@link ZeroedRule} answers *what the zero cost*, and the
+ * gate ratchets both — because "a ratchet on work that has been paid for" was
+ * always the argument, and tidiness work is paid for in the same hours.
+ *
+ * The difference the split keeps is in the failure text. A gated rule's
+ * finding is a bug to fix. A zeroed rule's finding is a regression to undo,
+ * and a disable comment written to silence one is explicitly the wrong answer:
+ * the zero is worth less than the disable would cost to read.
+ */
+export interface ZeroedRule {
+  /** The ESLint rule id. */
+  readonly rule: string;
+  /** ISO date the tree reached zero findings for it. */
+  readonly since: string;
+  /**
+   * What the zero cost, so a regression is measured against work rather than
+   * against taste — and so the sentence cannot be written without having done
+   * it.
+   */
+  readonly paidFor: string;
+}
+
+/**
+ * The three zeroed rules, each read to zero on 2026-10-03 and none of them a
+ * bug.
+ *
+ * A further one joins the same way: the tree is at zero for it, and somebody
+ * can say what clearing it took. "It would be nicer" is not that sentence.
+ */
+export const ZEROED_RULES: readonly ZeroedRule[] = [
+  {
+    rule: "react-hooks/preserve-manual-memoization",
+    since: "2026-10-03",
+    paidFor: "One finding, and reading it found that the React Compiler's answer to a dependency it cannot prove immutable is to skip compiling the component — `app/listing/[id].tsx` hoisted one string above a `useMemo` and lost a 763-line screen its optimization. The fix was to read the value inside the factory.",
+  },
+  {
+    rule: "import/no-duplicates",
+    since: "2026-10-03",
+    paidFor: "Nine mechanical merges across five files, plus the one site that keeps its duplicate on purpose: `components/gesture-root.tsx` wants a bare `import \"react-native-gesture-handler\";` on line one that a later import sort cannot move, and it carries a block disable arguing that rather than a merge.",
+  },
+  {
+    rule: "@typescript-eslint/array-type",
+    since: "2026-10-03",
+    paidFor: "26 findings in 21 files, every one taken by `eslint --fix` and reviewed as one diff: 31 type annotations, no behaviour, `tsc --noEmit` and 9843 cases unchanged either side of it. The population had been the largest in the report for a week and grew by one while the tooling around it was being written.",
+  },
+];
+
 /** One ESLint message, flattened out of its file result. */
 export interface EslintFinding {
   /** Repo-relative path. */
@@ -156,6 +225,14 @@ export interface EslintFinding {
 export interface GatePartition {
   /** Findings from a gated rule, at any severity. */
   readonly gated: readonly EslintFinding[];
+  /**
+   * Findings from a rule {@link ZEROED_RULES} says the tree is at zero for.
+   *
+   * A separate bucket rather than a second kind of `gated`, because the two
+   * fail for different reasons and a reader meeting the failure needs to know
+   * which: a gated finding is a bug, a regressed one is work being undone.
+   */
+  readonly regressed: readonly EslintFinding[];
   /** Everything else, counted rather than failed on. */
   readonly reported: readonly EslintFinding[];
 }
@@ -171,14 +248,20 @@ export interface GatePartition {
 export function partitionFindings(
   findings: readonly EslintFinding[],
   rules: readonly GatedRule[] = GATED_RULES,
+  zeroed: readonly ZeroedRule[] = ZEROED_RULES,
 ): GatePartition {
   const gatedIds = new Set(rules.map((r) => r.rule));
+  const zeroedIds = new Set(zeroed.map((r) => r.rule));
   const gated: EslintFinding[] = [];
+  const regressed: EslintFinding[] = [];
   const reported: EslintFinding[] = [];
   for (const finding of findings) {
-    (finding.rule !== null && gatedIds.has(finding.rule) ? gated : reported).push(finding);
+    // A directive message has no rule of its own and can be neither.
+    if (finding.rule !== null && gatedIds.has(finding.rule)) gated.push(finding);
+    else if (finding.rule !== null && zeroedIds.has(finding.rule)) regressed.push(finding);
+    else reported.push(finding);
   }
-  return { gated, reported };
+  return { gated, regressed, reported };
 }
 
 /** `[rule, errors, warnings]` per rule, most findings first then by name. */
@@ -198,9 +281,14 @@ export function ruleTally(
     .sort((a, b) => b.errors + b.warnings - (a.errors + a.warnings) || a.rule.localeCompare(b.rule));
 }
 
-/** Whether the gate fails: any finding at all from a gated rule. */
+/**
+ * Whether the gate fails: any finding at all from a gated OR a zeroed rule.
+ *
+ * Both halves, because both are zeros somebody paid for. The split is what the
+ * failure text is for, not what it is conditioned on.
+ */
 export function gateFails(partition: GatePartition): boolean {
-  return partition.gated.length > 0;
+  return partition.gated.length > 0 || partition.regressed.length > 0;
 }
 
 /**
@@ -214,6 +302,7 @@ export function formatGateReport(
   partition: GatePartition,
   fileCount: number,
   rules: readonly GatedRule[] = GATED_RULES,
+  zeroed: readonly ZeroedRule[] = ZEROED_RULES,
 ): string {
   const lines: string[] = [];
   if (partition.gated.length === 0) {
@@ -233,6 +322,31 @@ export function formatGateReport(
     }
     for (const rule of rules) {
       if (partition.gated.some((f) => f.rule === rule.rule)) lines.push(`  ${rule.rule}: ${rule.why}`);
+    }
+  }
+
+  // The zeroed half prints on both paths for the reason the ungated tally
+  // does: a zero nobody is told about is indistinguishable from a rule that
+  // quietly stopped being looked at.
+  if (partition.regressed.length === 0) {
+    lines.push(
+      `check-eslint-gate: ${zeroed.length} rule(s) read to zero and held there, tidiness rather than breakage.`,
+    );
+    for (const rule of zeroed) lines.push(`  ${rule.rule} — zero since ${rule.since}`);
+  } else {
+    lines.push(
+      `check-eslint-gate: ${partition.regressed.length} finding(s) from ${zeroed.length} rule(s) this tree was read to zero for.`,
+    );
+    lines.push(
+      "Nothing breaks here — that is why these are not on the gated list — but the zero was somebody's afternoon. Undo the regression rather than silencing it: an eslint-disable costs a reader more than the finding costs anybody, and a rule nobody will keep at zero belongs off the list in lib/eslint-gate.ts.",
+    );
+    for (const finding of partition.regressed) {
+      lines.push(`  ${finding.file}:${finding.line}  ${finding.rule ?? "(directive)"}`);
+    }
+    for (const rule of zeroed) {
+      if (partition.regressed.some((f) => f.rule === rule.rule)) {
+        lines.push(`  ${rule.rule}: ${rule.paidFor}`);
+      }
     }
   }
 

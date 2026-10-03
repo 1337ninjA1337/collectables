@@ -118,7 +118,7 @@ describe("npm run verify is the whole gate in one command", () => {
 
   it("reaches all four legs of the gate once expanded", () => {
     const expanded = resolveScript("verify");
-    const LEGS: Array<[string, RegExp]> = [
+    const LEGS: [string, RegExp][] = [
       ["typecheck", /\btsc\b[^&]*--noEmit/],
       ["code-style guards", /lint-all\.ts/],
       ["test suites", /--test\b/],
