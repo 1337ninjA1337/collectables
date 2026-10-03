@@ -48,10 +48,14 @@ describe("placeholderColorForId — design-tokens co-location", () => {
     assert.equal(tokens.placeholderColorForId, placeholderColor);
   });
 
-  it("resolves to a 6-digit hex like every static color token", () => {
-    const { placeholderColorForId } = require("@/lib/design-tokens") as {
-      placeholderColorForId: (id: string) => string;
-    };
+  it("resolves to a 6-digit hex like every static color token", async () => {
+    // `await import`, like the case above it, rather than the `require(...) as
+    // { ... }` this used to be: the only thing the `require` bought was a
+    // synchronous case body, and it cost a hand-written type for a module the
+    // sibling case imports properly three lines up. The second of
+    // `no-require-imports`' two findings, and the second that was a spelling
+    // rather than a decision.
+    const { placeholderColorForId } = await import("@/lib/design-tokens");
     assert.match(placeholderColorForId("any-item-id"), /^#[0-9a-fA-F]{6}$/);
   });
 });

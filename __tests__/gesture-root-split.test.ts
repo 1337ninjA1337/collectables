@@ -79,14 +79,19 @@ describe("the native half", () => {
     // side-effect import has to be first in the module", which is true and is
     // not an argument against merging: a merged named import on line one runs
     // the same side effect at the same moment, and the two statements between
-    // them are `import type` and erase completely. The argument that holds is
-    // about a LATER edit — a sort that puts `react` before
-    // `react-native-gesture-handler`, which is the order every other module
-    // here uses, would move a merged import off line one and would leave a
-    // bare `import "x";` alone. That is what the pair buys, and it is why the
-    // `import/no-duplicates` disable in that file is a block around both
-    // rather than a line on one: the rule reports whichever of the two is not
-    // disabled.
+    // them are `import type` and erase completely.
+    //
+    // The argument that holds is about what the bare line IS rather than what
+    // it does — it is the import `react-native-gesture-handler`'s own setup
+    // instructions ask for at the top of the entry file, and it was the first
+    // line of `app/_layout.tsx` until the split moved it here. The case below
+    // pins the other half of that chain. Merging would delete what the library
+    // documents and leave an ordering that holds by accident, and nothing here
+    // could tell the difference: this repository builds no native bundle.
+    //
+    // The `import/no-duplicates` disable in that file is a BLOCK around both
+    // imports rather than a line on one, because the rule reports whichever of
+    // the two is not disabled.
     //
     // First IMPORT rather than first byte, so the block comment carrying that
     // argument does not have to live somewhere else to keep this green.

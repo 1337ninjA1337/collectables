@@ -2,16 +2,25 @@
  * Two imports of `react-native-gesture-handler`, which is what
  * `import/no-duplicates` reports here — and it reports it on whichever of the
  * two is not disabled, so the pair is wrapped rather than one line marked.
+ * `ZEROED_RULES` in `lib/eslint-gate.ts` names this file as the one disable
+ * holding that rule at zero, so this paragraph is the argument the gate points
+ * at.
  *
- * Merging them would be behaviourally identical TODAY: both resolve to one
- * module, ESM evaluates it once at its first import, and the two statements
- * between them are `import type` and erase completely. The reason not to merge
- * is the day somebody sorts this file's imports — `react` before
- * `react-native-gesture-handler` is the order every other module here uses,
- * and under that order a single merged import no longer runs the side effect
- * before anything else. A bare `import "x";` on the first line cannot be moved
- * by a sort that is rearranging named imports, which is the whole of what it is
- * for.
+ * Merging them is behaviourally identical TODAY and this file cannot prove
+ * otherwise: both resolve to one module, ESM evaluates it once at its first
+ * import, the two statements between them are `import type` and erase, and
+ * nothing in this repository builds for native, so no test here can tell the
+ * two spellings apart.
+ *
+ * The reason the bare import stays is what it IS: the line
+ * `react-native-gesture-handler`'s own setup instructions ask for at the top
+ * of the entry file, before any other import. It was literally the first line
+ * of `app/_layout.tsx` until the web-bundle split moved it one module down,
+ * and `gesture-root-split.test.ts` pins the chain that keeps its position —
+ * the layout imports this module before anything else, and this module runs
+ * that line before anything else. Merging it into the named import would
+ * delete the thing the library documents and leave behind an ordering that
+ * holds by accident.
  */
 /* eslint-disable import/no-duplicates */
 import "react-native-gesture-handler";

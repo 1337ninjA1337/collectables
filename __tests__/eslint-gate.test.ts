@@ -21,6 +21,7 @@
  * sit on the gated list while the config has it switched off.
  */
 
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
@@ -39,7 +40,7 @@ import { findingsByFile as setStateByFile } from "@/lib/set-state-in-effect-tria
 import { LINT_ALL_EXEMPT } from "@/lib/lint-guards";
 
 import { GATE_LEG_LABELS, gateLegs } from "./helpers/gate-legs";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 const finding = (over: Partial<EslintFinding> = {}): EslintFinding => ({
   file: "app/index.tsx",
@@ -190,6 +191,7 @@ describe("the list itself", () => {
       "react-hooks/preserve-manual-memoization",
       "import/no-duplicates",
       "@typescript-eslint/array-type",
+      "@typescript-eslint/no-require-imports",
     ]);
     for (const rule of ZEROED_RULES) {
       assert.match(rule.since, /^\d{4}-\d{2}-\d{2}$/);
@@ -205,6 +207,30 @@ describe("the list itself", () => {
       ids.filter((id) => GATED_RULES.some((gated) => gated.rule === id)),
       [],
     );
+  });
+
+  it("says which zeros rest on a disable, and holds that disable to existing", () => {
+    // Two kinds of zero that look identical in the list and are not the same
+    // claim: `array-type` is at zero because every site changed, and
+    // `import/no-duplicates` is at zero because one site argues for its
+    // duplicate behind a block disable. The second is a fact about an
+    // argument, and an argument that has been deleted while the entry stayed
+    // is the one way this list can describe a tree that has moved on.
+    const held = ZEROED_RULES.filter((rule) => rule.heldByDisable !== undefined);
+    assert.deepEqual(
+      held.map((rule) => rule.rule),
+      ["import/no-duplicates"],
+      "a second zero resting on a disable is a decision to write down, not one to notice later",
+    );
+    for (const rule of held) {
+      const file = rule.heldByDisable ?? "";
+      assert.ok(existsSync(repoPath(file)), `${rule.rule}: ${file} is not in the tree`);
+      const source = readRepoFile(file);
+      assert.ok(
+        new RegExp(`eslint-disable[\\w-]*\\s+${rule.rule.replace("/", "\\/")}`).test(source),
+        `${rule.rule}: ${file} no longer disables it, so the zero is a fact about the tree now — drop heldByDisable`,
+      );
+    }
   });
 
   it("fails on a zeroed rule's finding and says it is a regression, not a bug", () => {

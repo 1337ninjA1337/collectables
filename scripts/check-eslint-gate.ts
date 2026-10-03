@@ -2,7 +2,7 @@
 /**
  * The tenth gate leg: fails on a named subset of ESLint rules, reports the rest.
  *
- * The decision, the six gated rules, the three zeroed rules and the argument for not gating the other
+ * The decision, the six gated rules, the four zeroed rules and the argument for not gating the other
  * twelve live in `lib/eslint-gate.ts`. This wrapper is the part that has to
  * talk to ESLint: run it over the same tree `npm run lint` does, flatten the
  * results, and — the half that keeps the ratchet honest — check that each

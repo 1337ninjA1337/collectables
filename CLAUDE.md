@@ -26,7 +26,7 @@ npm run ios        # iOS simulator
 npm run web        # browser
 
 # Lint
-npm run lint       # eslint . over the whole tree (config in eslint.config.js; the full report — 43 findings, 30 of them errors)
+npm run lint       # eslint . over the whole tree (config in eslint.config.js; the full report — 41 findings, 30 of them errors, every one of them read)
 ```
 
 Tests run on the built-in `node:test` runner via `tsx`:
@@ -37,7 +37,7 @@ npm run typecheck  # tsc --noEmit on its own
 npm run test:only  # same suites, skipping the typecheck (tight iteration loop)
 npm run lint:all   # every pure code-style guard in lib/lint-guards.ts
 npm run lint:ci    # typecheck → lint:all → eslint gate → test
-npm run lint:eslint-gate # the gated subset of `lint` — fails on six rules plus three zeroed rules, counts the rest (lib/eslint-gate.ts)
+npm run lint:eslint-gate # the gated subset of `lint` — fails on six rules plus four zeroed rules, counts the rest (lib/eslint-gate.ts)
 npm run verify:dist # the four guards that read dist/ (needs a build first)
 npm run verify     # lint:ci → build → verify:dist, the full gate — run THIS before committing
 ```

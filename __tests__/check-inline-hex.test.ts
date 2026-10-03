@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 
 import {
@@ -425,7 +426,13 @@ describe("check-inline-hex script wiring", () => {
     // PR that adds a stray inline hex fails this test even before CI runs.
     // We use Node fs directly rather than spawning the script to keep the
     // test fast and free of process management.
-    const fs = require("node:fs") as typeof import("node:fs");
+    //
+    // Imported at the top of the file, not `require`d here, which is one of
+    // `@typescript-eslint/no-require-imports`' two findings in this tree and
+    // was never about laziness: nothing in this suite is conditional on it,
+    // the module is `node:fs`, and a test-local `require` of a builtin is a
+    // second way of writing an import that only the `as typeof import(...)`
+    // cast made typesafe.
     const allMatches: { file: string; line: number; column: number; value: string }[] = [];
     const walk = (dir: string): void => {
       let entries: import("node:fs").Dirent[];

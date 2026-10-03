@@ -147,13 +147,14 @@ export const GATED_RULES: readonly GatedRule[] = [
  *
  * ## Why this is a second list rather than three more {@link GATED_RULES}
  *
- * The bar on that list is deliberate and has now said no three times:
+ * The bar on that list is deliberate and has now said no four times:
  * `react-hooks/preserve-manual-memoization` reports a missed optimization for
  * a compiler this build does not run, `import/no-duplicates` reports two
- * imports of one module, and `@typescript-eslint/array-type` reports
- * `Array<T>` where the config prefers `T[]`. Nothing breaks in any of the
- * three, and a `why` sentence written for them would have to describe a cost
- * the tree does not pay — which is the exact shape this file exists to refuse.
+ * imports of one module, `@typescript-eslint/array-type` reports `Array<T>`
+ * where the config prefers `T[]`, and `no-require-imports` reports a second
+ * spelling of an import. Nothing breaks in any of the four, and a `why`
+ * sentence written for them would have to describe a cost the tree does not
+ * pay — which is the exact shape this file exists to refuse.
  *
  * And leaving them out had a cost of its own, measured the day `array-type`
  * was cleared: {@link ruleTally} prints only rules that still have findings,
@@ -183,10 +184,25 @@ export interface ZeroedRule {
    * it.
    */
   readonly paidFor: string;
+  /**
+   * The file whose `eslint-disable` is what holds this rule at zero, when one
+   * does.
+   *
+   * Two kinds of zero look identical in this list and are not the same claim.
+   * `array-type` is at zero because every site was changed; `import/no-duplicates`
+   * is at zero because one site argues for its duplicate behind a block
+   * disable. The first is a fact about the tree. The second is a fact about an
+   * argument, and an argument can be wrong — so it says where it is, and
+   * `eslint-gate.test.ts` holds the path to existing and to still carrying a
+   * disable for this rule.
+   *
+   * Absent means the stronger claim: nothing in the tree is silencing it.
+   */
+  readonly heldByDisable?: string;
 }
 
 /**
- * The three zeroed rules, each read to zero on 2026-10-03 and none of them a
+ * The four zeroed rules, each read to zero on 2026-10-03 and none of them a
  * bug.
  *
  * A further one joins the same way: the tree is at zero for it, and somebody
@@ -201,12 +217,18 @@ export const ZEROED_RULES: readonly ZeroedRule[] = [
   {
     rule: "import/no-duplicates",
     since: "2026-10-03",
-    paidFor: "Nine mechanical merges across five files, plus the one site that keeps its duplicate on purpose: `components/gesture-root.tsx` wants a bare `import \"react-native-gesture-handler\";` on line one that a later import sort cannot move, and it carries a block disable arguing that rather than a merge.",
+    heldByDisable: "components/gesture-root.tsx",
+    paidFor: "Nine mechanical merges across five files, plus the one site that keeps its duplicate on purpose: `components/gesture-root.tsx` carries the bare side-effect import the gesture-handler docs ask for at the top of an entry file, and this module is what `app/_layout.tsx` imports first so that it stays in that position.",
   },
   {
     rule: "@typescript-eslint/array-type",
     since: "2026-10-03",
     paidFor: "26 findings in 21 files, every one taken by `eslint --fix` and reviewed as one diff: 31 type annotations, no behaviour, `tsc --noEmit` and 9843 cases unchanged either side of it. The population had been the largest in the report for a week and grew by one while the tooling around it was being written.",
+  },
+  {
+    rule: "@typescript-eslint/no-require-imports",
+    since: "2026-10-03",
+    paidFor: "Two findings, and reading them found two spellings rather than two decisions: `check-inline-hex.test.ts` required `node:fs` in a case body under an `as typeof import(...)` cast that existed only to make the require typesafe, and `placeholder-color.test.ts` required `@/lib/design-tokens` under a hand-written type three lines below a sibling case that `await import`s the same module. Neither was lazy, neither was conditional, and clearing both closed the last ungated population in the report that had no reading behind it.",
   },
 ];
 
