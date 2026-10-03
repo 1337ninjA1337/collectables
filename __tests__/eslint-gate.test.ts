@@ -3,10 +3,10 @@
  *
  * `npm run lint` arrived as a report on 2026-09-25: 251 findings, gating
  * nothing, with the fourth piece of that task carrying the question of whether
- * it should. The answer is not "yes" and not "no": five rules fail the run
+ * it should. The answer is not "yes" and not "no": six rules fail the run
  * and the rest are counted on every run.
  *
- * What makes that an answer rather than a compromise is which five. Each is a
+ * What makes that an answer rather than a compromise is which six. Each is a
  * violation the tree is at ZERO for, and the first three got there by work
  * that found a real bug on the way: a scroll lock written to a ref and read as
  * a prop, a listing screen that re-fetched a missing listing forever, and the
@@ -168,6 +168,11 @@ describe("the list itself", () => {
     assert.ok(guarded.includes("react-hooks/purity"));
     assert.ok(guarded.includes("react-hooks/globals"));
     assert.ok(guarded.includes("import/export"));
+    assert.ok(guarded.includes("import/first"));
+    assert.ok(
+      !guarded.includes("import/no-duplicates"),
+      "driven to zero the same day and left off: its one live site is a deliberate disable, which is the report's job",
+    );
     assert.ok(
       !guarded.includes("react-hooks/set-state-in-effect"),
       "30 findings the triage calls correct cannot be gated without 26 disables written to make a gate green",
@@ -197,7 +202,7 @@ describe("the list itself", () => {
 
   it("refuses a zero from a rule the config has switched off", () => {
     // The anti-vacuous half, and the way a ratchet becomes decoration: drop
-    // the react-hooks plugin and four of the five gated rules report nothing,
+    // the react-hooks plugin and four of the six gated rules report nothing,
     // forever, green. The wrapper asks ESLint for the resolved config first.
     const wrapper = readRepoFile("scripts/check-eslint-gate.ts");
     assert.match(wrapper, /calculateConfigForFile/);

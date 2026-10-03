@@ -125,7 +125,7 @@ interface Claim {
  * gated rule(s)` — and fall out because `${rules.length}` is not a number
  * word, which is the filter below rather than an exclusion list.
  */
-const CLAIM_SHAPES: ReadonlyArray<readonly [Population, RegExp]> = [
+const CLAIM_SHAPES: readonly (readonly [Population, RegExp])[] = [
   ["total", /\b([a-z]+)\s+gated rules?\b/gi],
   ["total", /\bfails?(?: the run)? on\s+([a-z]+)\s+rules\b/gi],
   ["total", /\b([a-z]+)\s+rules?\s+fail(?:s)? the run\b/gi],

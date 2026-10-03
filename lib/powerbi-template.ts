@@ -11,6 +11,14 @@
  * files remain the documented copy-paste fallback (docs/powerbi/README.md).
  */
 
+// The import this module's own re-export needs, at the top rather than beside
+// that re-export 260 lines down, which is where it sat until 2026-10-03 and
+// was the sixth and last of `import/first`'s findings. The argument for having
+// it there was to keep it next to the paragraph explaining the split; the
+// paragraph is still there, and an import that is not where a reader looks for
+// imports is a module that has one more place to check.
+import { crc32 } from "./zip-archive";
+
 export const POWERBI_TABLE_NAME = "analytics_events";
 
 export const POWERBI_PARAMETER_NAMES = [
@@ -271,9 +279,10 @@ export function buildContentTypesXml(): string {
  * halves of that live in `lib/zip-archive.ts` now — re-exported here because a
  * writer whose round-trip test has to import its reader from somewhere else
  * reads as two unrelated things.
+ *
+ * `crc32` is imported at the top of the file with every other import; this is
+ * the re-export only.
  */
-import { crc32 } from "./zip-archive";
-
 export { crc32, readZipEntries, ZipFormatError } from "./zip-archive";
 
 interface ZipEntry {

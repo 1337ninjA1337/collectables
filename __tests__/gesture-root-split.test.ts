@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { readRepoFile } from "./helpers/repo-file";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -72,10 +73,29 @@ describe("the web half", () => {
 describe("the native half", () => {
   it("keeps the root view AND the side-effect import", () => {
     // `react-native-draggable-flatlist` IS the reorder list on iOS and
-    // Android, and it needs both. The side-effect import has to be first in
-    // the module, which is why it is not merged into the named import below
-    // it.
-    assert.match(NATIVE, /^import "react-native-gesture-handler";/);
+    // Android, and it needs both.
+    //
+    // The reason the two are not merged used to be written here as "the
+    // side-effect import has to be first in the module", which is true and is
+    // not an argument against merging: a merged named import on line one runs
+    // the same side effect at the same moment, and the two statements between
+    // them are `import type` and erase completely. The argument that holds is
+    // about a LATER edit — a sort that puts `react` before
+    // `react-native-gesture-handler`, which is the order every other module
+    // here uses, would move a merged import off line one and would leave a
+    // bare `import "x";` alone. That is what the pair buys, and it is why the
+    // `import/no-duplicates` disable in that file is a block around both
+    // rather than a line on one: the rule reports whichever of the two is not
+    // disabled.
+    //
+    // First IMPORT rather than first byte, so the block comment carrying that
+    // argument does not have to live somewhere else to keep this green.
+    assert.match(NATIVE.slice(NATIVE.indexOf("import ")), /^import "react-native-gesture-handler";/);
+    // Read raw, because `sourceCode` blanks comments and the disable is one.
+    assert.match(
+      readRepoFile("components/gesture-root.tsx"),
+      /eslint-disable import\/no-duplicates/,
+    );
     assert.match(NATIVE, /import \{ GestureHandlerRootView \} from "react-native-gesture-handler"/);
     assert.match(NATIVE, /<GestureHandlerRootView style=\{style\}>/);
   });

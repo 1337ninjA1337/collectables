@@ -6,9 +6,6 @@ import { balancedInner } from "@/lib/balanced-source";
 import { stripComments } from "@/lib/strip-comments";
 
 import { autoUnmount, render } from "./helpers/render";
-
-// Ends every tree a case rendered, including the cases that fail early.
-autoUnmount();
 import {
   drain,
   inertSentryStatus,
@@ -21,6 +18,16 @@ import { declaredMembers, declaredSource } from "./helpers/declared-shape";
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
 import { assertExemptionsHonest, readSuite, topLevelSuites } from "./helpers/suite-files";
+
+// Ends every tree a case rendered, including the cases that fail early.
+//
+// Below the imports, not between two groups of them, which is where it sat
+// until 2026-10-03: five of `import/first`'s six findings in this tree were
+// the five imports underneath it. The position was never load-bearing —
+// ESM evaluates a module's whole import graph before its first statement, so
+// this call has always run after all twelve regardless of where it is written
+// — and every other suite that calls it puts it here.
+autoUnmount();
 
 /**
  * The mounted-provider harness, tested by being used.

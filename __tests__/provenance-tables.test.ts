@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
+import { PRIVACY_BODY_BASELINES, privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 import { PRIVACY_TRANSLATION_SOURCES } from "../lib/privacy-translated-section";
 import {
   HARD_FAILURE_IDS,
@@ -16,7 +16,6 @@ import {
 } from "../lib/provenance-tables";
 
 import { PRIVACY_DEFAULT_LANGUAGE } from "../lib/privacy-languages";
-import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 import { SCRUB_PROMISE_SOURCE_FILE } from "../lib/scrub-promise-provenance";
 import { stripComments } from "../lib/strip-comments";
 

@@ -31,11 +31,9 @@ import assert from "node:assert/strict";
 // under `tsx`, and `optionsPassedBy` below has to replace the methods on the
 // object a call site actually reads — the same live module the bootstrap
 // patches to refuse a spawned network tool.
-import childProcess from "node:child_process";
-import { execFileSync, execSync } from "node:child_process";
+import childProcess, { execFileSync, execSync } from "node:child_process";
 import http from "node:http";
-import https from "node:https";
-import { request } from "node:https";
+import https, { request } from "node:https";
 import { describe, it } from "node:test";
 
 import { arguedFloor, measuredFloor } from "./helpers/coverage-floor";

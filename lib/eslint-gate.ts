@@ -25,8 +25,24 @@
  *    read: the report had carried them since the day it was opened, next to
  *    thirty findings that had verdicts written for them, which is the one
  *    thing a counted report cannot fix about itself.
+ *  - `import/first` joined the same day, from the other end: six WARNINGS, and
+ *    the only one of the import rules with a sentence about what breaks rather
+ *    than about what is untidy. `__tests__/helpers/render.ts` documents the
+ *    hazard in its own header — a static import below
+ *    `installNativeModuleStubs()` is resolved before that call runs, so the
+ *    stubs do not apply and the suite dies resolving react-native's Flow
+ *    source. Five of the six findings were
+ *    `mount-provider-harness.test.ts` writing `autoUnmount()` between two
+ *    import groups, which is harmless and reads exactly like the mistake.
+ *  - `import/no-duplicates` was driven to zero on 2026-10-03 alongside it and
+ *    is NOT gated, which is the second thing that bar has excluded: two
+ *    imports of one module is untidy and nothing more, and the one site left
+ *    in this tree keeps the duplicate ON PURPOSE (`components/gesture-root.tsx`
+ *    wants a bare side-effect import a later sort cannot move off line one).
+ *    A rule whose only live site is a deliberate disable is a rule the report
+ *    should carry.
  *  - Everything else is either a style question with a real answer on both
- *    sides (`array-type`, `import/first`) or a correctness question whose
+ *    sides (`array-type`) or a correctness question whose
  *    answer is per-site (`set-state-in-effect` is 30 findings and
  *    `lib/set-state-in-effect-triage.ts` says 26 of them are correct as
  *    written).
@@ -83,9 +99,9 @@ export interface GatedRule {
 }
 
 /**
- * The five gated rules, and the reason each one is here rather than in the report.
+ * The six gated rules, and the reason each one is here rather than in the report.
  *
- * A sixth is welcome and is a decision, not an addition: a rule joins this
+ * A seventh is welcome and is a decision, not an addition: a rule joins this
  * list when the tree is at zero for it AND somebody can write the {@link
  * GatedRule.why} sentence in terms of what breaks. "It is untidy" is the
  * report's job — and `react-hooks/preserve-manual-memoization`, read to zero
@@ -117,6 +133,11 @@ export const GATED_RULES: readonly GatedRule[] = [
     rule: "import/export",
     since: "2026-10-03",
     why: "Two exports of one name is the second one silently winning for every importer, with no error at the import site — the one place this tree does it is legal TypeScript interface merging, and that site carries a scoped disable with a sentence rather than the rule being left off.",
+  },
+  {
+    rule: "import/first",
+    since: "2026-10-03",
+    why: "An `import` written below a statement reads as running after it and does not: ESM resolves a module's whole import graph before its first line, which is exactly the mistake `installNativeModuleStubs()` exists to be called before — a static import under that call resolves `react-native`'s Flow source for real, and the suite dies on esbuild before a case runs.",
   },
 ];
 
