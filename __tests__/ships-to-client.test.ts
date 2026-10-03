@@ -309,7 +309,9 @@ describe("every fingerprint is a real string in its own package", () => {
 
   it("keeps each fingerprint long enough that a coincidence is unlikely", () => {
     // Not a rule with a principled threshold — a short literal is simply more
-    // likely to be somebody else's. The two in the tree are 14 and 47 chars.
+    // likely to be somebody else's. The shortest in the tree is 14 chars and
+    // the longest 47, which is not a range anybody chose: it is what the five
+    // packages happened to have a distinctive literal of.
     for (const entry of buildTimeEntries) {
       assert.ok(
         (entry.absentFingerprint ?? "").length >= 12,

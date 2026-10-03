@@ -136,19 +136,28 @@ export default function ListingDetailScreen() {
   // the confirm dialog is up — and `priceHistory` excludes the listing it is
   // showing history FOR, which is nothing to exclude when there is no
   // listing.
-  const referenceTitle = item?.title ?? "";
-  const priceHistory = useMemo(
-    () =>
-      referenceTitle
-        ? priceHistoryForTitle(
-            referenceTitle,
-            listings,
-            (id) => getItemById(id)?.title ?? null,
-            { excludeListingId: listing?.id, limit: 10 },
-          )
-        : [],
-    [referenceTitle, listings, getItemById, listing?.id],
-  );
+  //
+  // `referenceTitle` is computed INSIDE the memo rather than hoisted above it,
+  // and that is the whole of what `react-hooks/preserve-manual-memoization`
+  // was reporting here. Hoisted, it was `const referenceTitle = item?.title ??
+  // ""` with `referenceTitle` in the dependency list — and `item` is the return
+  // of `getItemById`, a context function the compiler cannot look inside. So it
+  // could not prove the value it was being asked to key the memo on would not
+  // be mutated after the memo read it, declined to preserve the memoization,
+  // and SKIPPED COMPILING THE WHOLE SCREEN. One hoisted string cost a
+  // 700-line component its optimization. Read inside the factory, the value
+  // never outlives the call and the dependency is `item` itself.
+  const priceHistory = useMemo(() => {
+    const referenceTitle = item?.title ?? "";
+    return referenceTitle
+      ? priceHistoryForTitle(
+          referenceTitle,
+          listings,
+          (id) => getItemById(id)?.title ?? null,
+          { excludeListingId: listing?.id, limit: 10 },
+        )
+      : [];
+  }, [item, listings, getItemById, listing?.id]);
 
   const performClaim = useCallback(async () => {
     if (!listing || !user) return;

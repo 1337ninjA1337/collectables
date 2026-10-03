@@ -119,6 +119,36 @@ describe("listing detail: price history wiring", () => {
     assert.match(src, /limit:\s*10/);
   });
 
+  it("reads the reference title INSIDE the memo rather than hoisting it above", () => {
+    // The whole of `react-hooks/preserve-manual-memoization`'s one finding in
+    // this tree, read on 2026-10-03.
+    //
+    // The title used to be `const referenceTitle = item?.title ?? ""` on the
+    // line above, with `referenceTitle` in the dependency list. `item` is the
+    // return of `getItemById`, a context function the React Compiler cannot
+    // look inside, so it could not prove the hoisted value would not be
+    // mutated after the memo read it — and its answer to that is not a warning
+    // on the memo, it is declining to compile the component at all. One
+    // hoisted string cost a 763-line screen its optimization.
+    //
+    // Read inside the factory the value never outlives the call, and the
+    // dependency is `item` itself. This case is here because the hoist is
+    // exactly the shape a tidy-up re-introduces: a `const` used once, pulled
+    // up to sit beside the other derived values.
+    const src = read("app/listing/[id].tsx");
+    //
+    // Two spaces of indent is the component's own body; four is inside the
+    // factory. The hoisted declaration is the one at two.
+    assert.doesNotMatch(
+      src,
+      /^ {2}const referenceTitle = /m,
+      "referenceTitle belongs inside the useMemo factory — hoisted, the compiler skips the whole screen",
+    );
+    assert.match(src, /useMemo\(\(\) => \{\s*\n\s*const referenceTitle = item\?\.title \?\? "";/);
+    // The dependency list keys on `item`, not on a string derived from it.
+    assert.match(src, /\}, \[item, listings, getItemById, listing\?\.id\]\);/);
+  });
+
   it("declares price-history translations in every language map", () => {
     const src = readI18nSource();
     const requiredKeys = [

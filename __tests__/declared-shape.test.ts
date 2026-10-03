@@ -109,6 +109,16 @@ export type FixtureMembers = {
 
 // Interface merging is legal TypeScript, so "declared twice" is a real module
 // this could be pointed at rather than a hypothetical.
+//
+// It is also the one place in this tree `import/export` fires, and the rule is
+// right about what it sees and wrong about what it means: the rule predates
+// declaration merging and reads two `export interface FixtureMerged` as two
+// exports of one name, which in ES modules is the second one silently winning.
+// In TypeScript it is one interface with three members and `tsc --noEmit` —
+// the gate's first leg — is the thing that would object if it were not. The
+// disable is scoped to the two declarations rather than the file so a genuine
+// duplicate export added below it is still reported.
+/* eslint-disable import/export */
 export interface FixtureMerged {
   readonly first: string;
 }
@@ -116,6 +126,7 @@ export interface FixtureMerged {
 export interface FixtureMerged {
   readonly second: number;
 }
+/* eslint-enable import/export */
 
 const FIXTURES = "__tests__/declared-shape.test.ts";
 

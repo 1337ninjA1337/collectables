@@ -3,17 +3,18 @@
  *
  * `npm run lint` arrived as a report on 2026-09-25: 251 findings, gating
  * nothing, with the fourth piece of that task carrying the question of whether
- * it should. The answer is not "yes" and not "no": three rules fail the run
- * and the other eleven are counted on every run.
+ * it should. The answer is not "yes" and not "no": five rules fail the run
+ * and the rest are counted on every run.
  *
- * What makes that an answer rather than a compromise is which three. Each is a
- * React violation the tree is at ZERO for, and each got there this week by
- * work that found a real bug on the way: a scroll lock written to a ref and
- * read as a prop, a listing screen that re-fetched a missing listing forever,
- * and the hook-order crash on the path that fix made reachable. Gating them is
- * a ratchet on work that has been paid for. Gating `set-state-in-effect` would
- * mean 26 disables written to make a gate green, against a triage that says
- * those 26 are correct as written.
+ * What makes that an answer rather than a compromise is which five. Each is a
+ * violation the tree is at ZERO for, and the first three got there by work
+ * that found a real bug on the way: a scroll lock written to a ref and read as
+ * a prop, a listing screen that re-fetched a missing listing forever, and the
+ * hook-order crash on the path that fix made reachable. `react-hooks/globals`
+ * and `import/export` joined on 2026-10-03, when the four ERRORS nobody had
+ * ever read were read. Gating them is a ratchet on work that has been paid
+ * for. Gating `set-state-in-effect` would mean 26 disables written to make a
+ * gate green, against a triage that says those 26 are correct as written.
  *
  * These cases are about the SHAPE of that: that the gate fails on what it says
  * it fails on, that it counts what it says it counts, and that a rule cannot
@@ -101,7 +102,12 @@ describe("what the gate reports", () => {
       partitionFindings([finding({ rule: "react-hooks/set-state-in-effect", severity: 2 })]),
       900,
     );
-    assert.match(green, /0 finding\(s\) from 3 gated rule\(s\)/);
+    // The count comes from the list rather than a copy of it — a sixth gated
+    // rule should not make this case red for having been added.
+    assert.match(
+      green,
+      new RegExp(`0 finding\\(s\\) from ${String(GATED_RULES.length)} gated rule\\(s\\)`),
+    );
     assert.match(green, /reporting 1 error\(s\) and 0 warning\(s\)/);
     assert.match(green, /react-hooks\/set-state-in-effect {2}1 error\(s\)/);
   });
@@ -160,16 +166,39 @@ describe("the list itself", () => {
     assert.ok(guarded.includes("react-hooks/refs"));
     assert.ok(guarded.includes("react-hooks/rules-of-hooks"));
     assert.ok(guarded.includes("react-hooks/purity"));
+    assert.ok(guarded.includes("react-hooks/globals"));
+    assert.ok(guarded.includes("import/export"));
     assert.ok(
       !guarded.includes("react-hooks/set-state-in-effect"),
       "30 findings the triage calls correct cannot be gated without 26 disables written to make a gate green",
     );
   });
 
+  it("leaves the rule it drove to zero OFF the list, which is the bar doing something", () => {
+    // `react-hooks/preserve-manual-memoization` was one of the four unread
+    // errors read on 2026-10-03 and the fix was taken: `app/listing/[id].tsx`
+    // hoisted one string above a `useMemo`, the compiler could not prove the
+    // hoisted value would not be mutated after the memo read it, and it
+    // declined to compile the 763-line screen at all.
+    //
+    // It is still not gated, and that is the first time the bar in
+    // `lib/eslint-gate.ts` has excluded a rule rather than described one.
+    // What the rule reports is a MISSED OPTIMIZATION, and nothing in this tree
+    // turns React Compiler on — no `reactCompiler` experiment, no compiler
+    // plugin in the Babel config — so a `why` sentence for it would have to
+    // describe a cost this build does not pay.
+    assert.ok(
+      !GATED_RULES.map((r) => r.rule).includes("react-hooks/preserve-manual-memoization"),
+      "a rule whose cost this build does not pay is the report's job, not the gate's",
+    );
+    assert.equal(readRepoFile("app.json").includes("reactCompiler"), false);
+    assert.equal(readRepoFile("babel.config.js").includes("react-compiler"), false);
+  });
+
   it("refuses a zero from a rule the config has switched off", () => {
     // The anti-vacuous half, and the way a ratchet becomes decoration: drop
-    // the react-hooks plugin and all three rules report nothing, forever,
-    // green. The wrapper asks ESLint for the resolved config first.
+    // the react-hooks plugin and four of the five gated rules report nothing,
+    // forever, green. The wrapper asks ESLint for the resolved config first.
     const wrapper = readRepoFile("scripts/check-eslint-gate.ts");
     assert.match(wrapper, /calculateConfigForFile/);
     assert.match(wrapper, /gated but not enabled by the resolved config/);

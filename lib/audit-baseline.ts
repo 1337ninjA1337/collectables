@@ -239,22 +239,33 @@ export interface PinnedFix {
 }
 
 /**
- * Re-triaged 2026-09-01 against `npm audit` on the committed lockfile.
+ * Re-triaged 2026-09-01 against `npm audit` on the committed lockfile, and
+ * extended 2026-10-03 by three advisories the registry published afterwards.
  *
- * TWO roots carrying 4 distinct advisories, down from six roots and 11. The
- * seven that left were not re-argued, they were FIXED: npm reported an
- * in-range fix for `nanoid`, `brace-expansion`, `js-yaml` and `tar`, and
+ * FIVE roots carrying 7 distinct advisories. Two of them — `image-size` and
+ * `postcss` — are the 2026-09-01 pass, down from six roots and 11: the seven
+ * that left were not re-argued, they were FIXED, because npm reported an
+ * in-range fix for `nanoid`, `brace-expansion`, `js-yaml` and `tar` and
  * `npm update` on those four took every one of their advisories out of the
  * report. What remains is what a `npm update` cannot reach.
  *
- * `npm audit` reports 9 high ENTRIES and more `via` objects than that for
- * these 4: the extra entries are Expo/metro packages that merely depend on
- * these two and carry no advisory of their own, and the extra objects are one
- * advisory seen down several dependency paths.
+ * `npm audit` reports far more high ENTRIES than there are advisories here,
+ * and more `via` objects than entries: the extra entries are Expo/metro and
+ * jest packages that merely depend on one of these roots and carry no advisory
+ * of their own, and the extra objects are one advisory seen down several
+ * dependency paths.
  *
- * Both remaining entries are fixed only by `expo@57`, a major, which is why
- * they are still here — and {@link evaluateAudit} now re-checks that claim
- * against npm on every run rather than trusting the sentence.
+ * The three that arrived on 2026-10-03 are the case the gate's own closing
+ * paragraph describes — "a finding may have been published since the last
+ * green run rather than caused by this branch" — and they are here rather than
+ * fixed for the same reason the first two are: npm names a semver-major
+ * (`react-native@0.87`, `expo@44`) or nothing at all as the fix, and
+ * {@link evaluateAudit} re-checks that on every run rather than trusting these
+ * sentences.
+ *
+ * All five are build-, test- or CLI-time tooling, so nothing on this list
+ * reaches the client — which is the claim `absentFingerprint` makes checkable
+ * rather than merely written down.
  */
 export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   {
@@ -278,6 +289,27 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
     shipsToClient: false,
     absentFingerprint: "CssSyntaxError",
     why: "arbitrary file read and source-map path traversal in @expo/metro-config's build-time CSS transform; fix is expo@57, a breaking major",
+  },
+  {
+    package: "braces",
+    advisories: ["GHSA-vfj7-8cjw-p6xm"],
+    shipsToClient: false,
+    absentFingerprint: "expanded array length exceeds range limit",
+    why: "stack-exhaustion DoS on a deeply nested brace pattern, reached only through micromatch under metro-file-map, fast-glob and the jest packages — every caller is a build or test-time glob over this repository's own paths, never a pattern from outside it, and npm names react-native@0.87 as the fix, a breaking major",
+  },
+  {
+    package: "http-cache-semantics",
+    advisories: ["GHSA-ch52-4w7c-c8xp"],
+    shipsToClient: false,
+    absentFingerprint: "Invalid serialization",
+    why: "max-stale handling can disclose a cross-user cached response, in a package reached only as cacheable-request under got under @expo/ngrok — the dev tunnel, which this repository never starts and which has no shared cache to disclose from; npm reports no fix at any version",
+  },
+  {
+    package: "node-forge",
+    advisories: ["GHSA-86w9-cpqp-85rv"],
+    shipsToClient: false,
+    absentFingerprint: "ASN.1 object does not contain an RSAPublicKey.",
+    why: "RSA PKCS#1 v1.5 verification accepts extra nested DigestAlgorithm elements, in @expo/cli and @expo/code-signing-certificates — expo-updates code signing, which this app does not use (there is no codeSigningCertificate in app.json and no EAS Update channel reading one); npm names expo@44 as the fix, a breaking major",
   },
 ];
 

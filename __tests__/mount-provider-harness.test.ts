@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createElement, useEffect, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useMemo, useState } from "react";
 
 import { balancedInner } from "@/lib/balanced-source";
 import { stripComments } from "@/lib/strip-comments";
@@ -123,18 +123,40 @@ describe("drain — waiting for an async hydrate", () => {
 
 type Value = { count: number; bump: () => void };
 
-function makeProvider() {
-  let latest: Value | null = null;
+/**
+ * A stand-in for the six real providers, built the way they are built.
+ *
+ * It used to publish its value by assigning a closure variable from the render
+ * body — `latest = { count, bump }` — which is shorter and is a render-time
+ * side effect: `react-hooks/globals` reported it, and the report was right
+ * about the shape even though this fixture never re-rendered often enough to
+ * be caught by it. The reason to change it is not the lint error. It is that
+ * NO real caller publishes that way: `SocialProvider`, `CollectionsProvider`
+ * and the other four hand a memoized value to a context and their `useX()`
+ * reads it back, so a fixture that wrote to a variable was proving the harness
+ * against a provider shape this repository does not contain — including the
+ * one thing that matters here, that `useValue()` is a hook and must be called
+ * from inside the probe's render.
+ */
+const FixtureContext = createContext<Value | null>(null);
 
+function makeProvider() {
   function Provider({ children }: React.PropsWithChildren) {
     const [count, setCount] = useState(0);
-    latest = { count, bump: () => setCount((previous) => previous + 1) };
-    return createElement("View", null, children);
+    const value = useMemo<Value>(
+      () => ({ count, bump: () => setCount((previous) => previous + 1) }),
+      [count],
+    );
+    return createElement(
+      FixtureContext.Provider,
+      { value },
+      createElement("View", null, children),
+    );
   }
 
   return {
     Provider,
-    useValue: () => latest!,
+    useValue: () => useContext(FixtureContext)!,
   };
 }
 
@@ -253,6 +275,28 @@ describe("the mounted-provider suites share one harness", () => {
       offenders,
       [],
       "use installSpyCapture() from ./helpers/mount-provider — pass extra exports as its argument, since a second mockModule call for one specifier replaces the first",
+    );
+  });
+
+  it("the fixture provider publishes through a context, the way all six real ones do", () => {
+    // The fixture used to publish by assigning a closure variable from its
+    // render body, which `react-hooks/globals` reported — one of the four
+    // ERRORS in `npm run lint` that nobody had read until 2026-10-03.
+    //
+    // The lint error is not the reason this case exists. The reason is that no
+    // real caller publishes that way: every `providerHarness` call site hands
+    // it a provider that memoizes a value into a context and a `useX()` that
+    // reads it back, so a fixture writing to a variable was proving the
+    // harness against a provider shape this repository does not contain — and
+    // in particular was not proving the thing a caller depends on, that
+    // `useValue()` is a HOOK and is called from inside the probe's render.
+    const own = readSuite("mount-provider-harness.test.ts");
+    assert.match(own, /createContext<Value \| null>\(null\)/);
+    assert.match(own, /useValue: \(\) => useContext\(FixtureContext\)!/);
+    assert.doesNotMatch(
+      own,
+      /^ {4}latest = \{/m,
+      "the fixture must not write to a closure variable during render — mount a context like the six real providers",
     );
   });
 

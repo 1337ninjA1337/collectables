@@ -89,7 +89,14 @@ function seedNativeStubs(): void {
   seeded = true;
 }
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+// No `eslint-disable @typescript-eslint/no-require-imports` here, and the
+// block that used to wrap these two functions was reported by ESLint as
+// covering nothing. The rule exempts a `require()` whose result is RETURNED
+// under a declared `typeof import(...)` type, which is exactly what both of
+// these are; the two sites it does report (`check-inline-hex.test.ts`,
+// `placeholder-color.test.ts`) spell it `require(...) as T` inside a function
+// body. A directive that covers nothing is a directive nobody notices going
+// stale, which is why the config reports them.
 
 export function loadMarketplaceWrappers(): typeof import("@/lib/supabase-marketplace") {
   seedNativeStubs();
@@ -100,8 +107,6 @@ export function loadChatWrappers(): typeof import("@/lib/supabase-chat") {
   seedNativeStubs();
   return require("@/lib/supabase-chat");
 }
-
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 export interface FetchCall {
   url: string;

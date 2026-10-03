@@ -20,11 +20,26 @@
  *    three real bugs on the way: a scroll lock that never locked, a listing
  *    screen that re-fetched a missing listing forever, and the hook-order
  *    crash on the path that fix made reachable.
+ *  - `react-hooks/globals` and `import/export` joined on 2026-10-03 and are
+ *    the same kind of fact one site each. Both were single ERRORS nobody had
+ *    read: the report had carried them since the day it was opened, next to
+ *    thirty findings that had verdicts written for them, which is the one
+ *    thing a counted report cannot fix about itself.
  *  - Everything else is either a style question with a real answer on both
  *    sides (`array-type`, `import/first`) or a correctness question whose
  *    answer is per-site (`set-state-in-effect` is 30 findings and
  *    `lib/set-state-in-effect-triage.ts` says 26 of them are correct as
  *    written).
+ *  - `react-hooks/preserve-manual-memoization` is the one that was READ, driven
+ *    to zero, and deliberately NOT gated — the decision the bar below exists
+ *    to force. Its finding was real and worth taking (`app/listing/[id].tsx`
+ *    hoisted one string above a `useMemo` and lost the whole 763-line screen
+ *    its compilation), but what the rule reports is a MISSED OPTIMIZATION, and
+ *    nothing in this tree turns React Compiler on: there is no `reactCompiler`
+ *    experiment in `app.json` and no compiler plugin in the Babel config, so
+ *    the cost it names is not a cost this build pays. A `why` sentence written
+ *    for it would have to describe a toolchain that does not run here, which is
+ *    exactly the "it is untidy" the report is for.
  *
  * Gating the first group is a ratchet on work that has been paid for. Gating
  * the second would mean 26 `eslint-disable` comments written to make a gate
@@ -32,7 +47,7 @@
  *
  * So: a named subset FAILS, and everything else is COUNTED on every run. The
  * count is the half that stops this being a rule that quietly covers less and
- * less of what the linter finds — a gate that reports 34 errors it does not
+ * less of what the linter finds — a gate that reports 30 errors it does not
  * fail on is a gate that keeps asking.
  *
  * ## The third thing it does: keep the two READINGS complete
@@ -68,12 +83,14 @@ export interface GatedRule {
 }
 
 /**
- * The three, and the reason each one is here rather than in the report.
+ * The five gated rules, and the reason each one is here rather than in the report.
  *
- * A fourth is welcome and is a decision, not an addition: a rule joins this
+ * A sixth is welcome and is a decision, not an addition: a rule joins this
  * list when the tree is at zero for it AND somebody can write the {@link
  * GatedRule.why} sentence in terms of what breaks. "It is untidy" is the
- * report's job.
+ * report's job — and `react-hooks/preserve-manual-memoization`, read to zero
+ * on 2026-10-03 and left off this list, is the first rule that bar has
+ * actually excluded rather than described.
  */
 export const GATED_RULES: readonly GatedRule[] = [
   {
@@ -90,6 +107,16 @@ export const GATED_RULES: readonly GatedRule[] = [
     rule: "react-hooks/purity",
     since: "2026-09-27",
     why: "An impure call in a render body is a value React may recompute at a moment nobody chose — `useRef(Date.now())` kept the first answer and paid for a new one every render.",
+  },
+  {
+    rule: "react-hooks/globals",
+    since: "2026-10-03",
+    why: "A write to a variable outside the component from inside its render body is a value whose correctness depends on when React happens to re-render — it is dropped on a discarded pass and duplicated under StrictMode, and neither is a thing the call site can see.",
+  },
+  {
+    rule: "import/export",
+    since: "2026-10-03",
+    why: "Two exports of one name is the second one silently winning for every importer, with no error at the import site — the one place this tree does it is legal TypeScript interface merging, and that site carries a scoped disable with a sentence rather than the rule being left off.",
   },
 ];
 

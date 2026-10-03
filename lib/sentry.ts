@@ -477,7 +477,6 @@ export function triggerSentryTestError(
     // can see which gate is blocking. Useful when the API returns
     // "not-ready" but the user can't tell whether that's "DSN missing",
     // "init still pending", or "user opted out".
-    // eslint-disable-next-line no-console
     console.info("[sentry] smoke test blocked:", status);
     return "not-ready";
   }
