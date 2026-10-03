@@ -27,7 +27,12 @@
  *   2. the COUNT of `ZEROED_RULES`, the second list, which is a different
  *      number stated in the same paragraphs,
  *   3. the NEXT position, when prose names one: the list's own doc comment
- *      says the one after these would be welcome and names its ordinal.
+ *      says the one after these would be welcome and names its ordinal,
+ *   4. and the FINDING count, which is the one number here no suite can
+ *      derive — it comes off a 22-second ESLint run, so it lives in
+ *      `lib/eslint-report-snapshot.ts`, the gate fails when the live run
+ *      disagrees with it, and the two sentences stating it are held against
+ *      that literal.
  *
  * ## What it leaves out
  *
@@ -46,6 +51,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { GATED_RULES, ZEROED_RULES } from "@/lib/eslint-gate";
+import { LINT_REPORT_SNAPSHOT } from "@/lib/eslint-report-snapshot";
 
 import { markdownFiles } from "./helpers/markdown-files";
 import { readRepoFile } from "./helpers/repo-file";
@@ -207,6 +213,37 @@ describe("every sentence about the gated subset's size agrees with the list", ()
       [],
       "a rule joining the list moves the position the next one would take",
     );
+  });
+
+  it("states the FINDING count the snapshot records, in both documents that state it", () => {
+    // The one number in this chain a suite cannot derive for itself: a rule
+    // count comes out of a list in the tree, and a finding count comes out of
+    // a 22-second ESLint run. `lib/eslint-report-snapshot.ts` is the committed
+    // measurement, `check-eslint-gate` fails when the live run disagrees with
+    // it, and these two sentences are held against the literal rather than
+    // against a terminal somebody was looking at.
+    //
+    // Both documents, named rather than swept, because there are exactly two
+    // and a third would be a decision: the floor case below is what notices if
+    // one of these stops matching.
+    const claims: readonly [string, RegExp][] = [
+      ["CLAUDE.md", /(\d+) findings, (\d+) of them errors/],
+      ["lib/lint-guards.ts", /The full report: (\d+) findings on this tree today, of which (\d+) are errors/],
+    ];
+    for (const [file, pattern] of claims) {
+      const match = pattern.exec(prose(file));
+      assert.ok(match, `${file} no longer states the report's size in a shape this reads`);
+      assert.equal(
+        Number(match[1]),
+        LINT_REPORT_SNAPSHOT.findings,
+        `${file} says ${match[1]} findings and the snapshot records ${String(LINT_REPORT_SNAPSHOT.findings)} — re-take the snapshot, then restate it`,
+      );
+      assert.equal(
+        Number(match[2]),
+        LINT_REPORT_SNAPSHOT.errors,
+        `${file} says ${match[2]} errors and the snapshot records ${String(LINT_REPORT_SNAPSHOT.errors)}`,
+      );
+    }
   });
 
   it("is reading a population rather than passing over silence", () => {

@@ -2,6 +2,10 @@
 /**
  * The tenth gate leg: fails on a named subset of ESLint rules, reports the rest.
  *
+ * The snapshot of the whole report's size lives in
+ * `lib/eslint-report-snapshot.ts` and is compared here, because this leg is
+ * already paying for the ESLint run a suite cannot.
+ *
  * The decision, the six gated rules, the four zeroed rules and the argument for not gating the other
  * twelve live in `lib/eslint-gate.ts`. This wrapper is the part that has to
  * talk to ESLint: run it over the same tree `npm run lint` does, flatten the
@@ -29,6 +33,11 @@ import {
   untriagedFindings,
   type EslintFinding,
 } from "../lib/eslint-gate";
+import {
+  LINT_REPORT_SNAPSHOT,
+  formatSnapshotLiteral,
+  snapshotDrift,
+} from "../lib/eslint-report-snapshot";
 import { findingsByFile as exhaustiveDepsByFile } from "../lib/exhaustive-deps-triage";
 import { runningUnderActions } from "../lib/github-annotations";
 import { findingsByFile as setStateByFile } from "../lib/set-state-in-effect-triage";
@@ -129,6 +138,26 @@ async function main(): Promise<void> {
   const partition = partitionFindings(findings);
   const report = formatGateReport(partition, results.length);
 
+  // The whole report's size, held against the committed snapshot.
+  //
+  // This is the only number in the chain a suite cannot derive: the rule
+  // counts come out of lists in the tree, and a finding count comes out of a
+  // 22-second ESLint run that no suite can pay for. The gate is already doing
+  // that run, so it is the one place the comparison is free — and two
+  // documents state the number in prose, which is four hand-edits in one
+  // morning away from being wrong.
+  const byRule: Record<string, number> = {};
+  for (const finding of findings) {
+    const key = finding.rule ?? "(directive)";
+    byRule[key] = (byRule[key] ?? 0) + 1;
+  }
+  const measured = {
+    findings: findings.length,
+    errors: findings.filter((f) => f.severity === 2).length,
+    byRule,
+  };
+  const drift = snapshotDrift(measured, LINT_REPORT_SNAPSHOT);
+
   const untriaged = untriagedFindings(findings, TRIAGED_RULES);
   if (untriaged.length > 0) {
     console.error(report);
@@ -139,20 +168,37 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  if (!gateFails(partition)) {
-    console.log(report);
-    return;
+  // Order matters here, and it is the order a contributor needs rather than
+  // the order the checks were written in. A gated or regressed finding is a
+  // thing to FIX; snapshot drift is a thing to re-take. Reporting the drift
+  // first would answer a real bug with "paste this literal", which is the
+  // wrong instruction and the kind a person follows.
+  if (gateFails(partition)) {
+    console.error(report);
+    if (runningUnderActions()) {
+      for (const finding of [...partition.gated, ...partition.regressed]) {
+        console.log(
+          `::error file=${finding.file},line=${finding.line}::${finding.rule ?? "eslint"}: ${finding.message.split("\n")[0]}`,
+        );
+      }
+    }
+    process.exit(1);
   }
 
-  console.error(report);
-  if (runningUnderActions()) {
-    for (const finding of [...partition.gated, ...partition.regressed]) {
-      console.log(
-        `::error file=${finding.file},line=${finding.line}::${finding.rule ?? "eslint"}: ${finding.message.split("\n")[0]}`,
-      );
-    }
+  if (drift.length > 0) {
+    console.error(report);
+    console.error(
+      `${CHECK_NAME}: the report has moved since the snapshot in lib/eslint-report-snapshot.ts was taken.`,
+    );
+    for (const problem of drift) console.error(`  ${problem}`);
+    console.error(
+      "CLAUDE.md and the lint:eslint-gate row in lib/lint-guards.ts state this number in prose and are held against that literal, so re-take it rather than editing either sentence. Paste all of it:\n",
+    );
+    console.error(formatSnapshotLiteral(measured, new Date().toISOString().slice(0, 10)));
+    process.exit(1);
   }
-  process.exit(1);
+
+  console.log(report);
 }
 
 main().catch((error: unknown) => {
