@@ -153,96 +153,100 @@ export function readNamedFix(lock: unknown, name: string, named: string): NamedF
   return { package: name, named, installed, direction: fixDirection(named, installed) };
 }
 
-/**
- * What one reading says, as a sentence with no leading punctuation.
- *
- * Empty for `forward`, because that is the case the surrounding sentence
- * already states correctly and a line annotating the normal case is a line
- * nobody finishes reading. The other three each name BOTH versions, so a
- * reader can check the claim rather than take it.
- *
- * No leading separator, deliberately. The first version of this returned
- * `" — but npm names …"` and the caller had to strip that back off to put the
- * sentence on its own line; a formatter that owns its own punctuation is a
- * formatter with one caller.
- */
-export function describeDirection(reading: NamedFixReading): string {
-  switch (reading.direction) {
-    case "forward":
-      return "";
-    case "backward":
-      return `npm names ${reading.package}@${reading.named} and the lockfile is on ${String(reading.installed)}, which is BACKWARD — npm found no forward fix and offered an older tree, so this is not an upgrade anybody can take`;
-    case "same":
-      return `npm names ${reading.package}@${reading.named}, which is what the lockfile is already on, so the advisory is not where npm's fix verdict thinks it is`;
-    case "unknown":
-      return reading.installed === undefined
-        ? `npm names ${reading.package}@${reading.named} and package-lock.json has no node_modules/${reading.package} entry, so which way it points is unread`
-        : `npm names ${reading.package}@${reading.named} against a locked ${reading.installed}, and neither reads as an exact version, so which way it points is unread`;
-  }
-}
 
 /**
  * What a committed claim about npm's named fix can be held to.
  *
- * ## Why this is three states and not a version string
- *
- * The obvious check is "the acceptance says `expo@57`, so hold it to what npm
- * names". It was measured on 2026-10-05 and it does not work: two consecutive
- * `npm audit --json` runs on an unchanged tree named two different fixes for
- * `braces` — `expo@44.0.6` and then `gh-pages@6.1.1`. The advisory is reachable
- * through `metro-file-map` → `micromatch` under `expo` and through `globby` →
- * `fast-glob` under `gh-pages`, and npm reports whichever path it resolves
- * first. A committed version would be red about half the time, on a tree
- * nobody had touched.
- *
- * Two readings said the two named versions were both BEHIND the lockfile, so
- * the first version of this held the direction and called it stable. Eleven
- * runs say otherwise: `braces` names `expo@44.0.6` (behind), `gh-pages@6.1.1`
- * (behind) and `react-native@0.87.1` (AHEAD of the locked 0.81.5), five, two
- * and three times respectively. The direction is not stable for a multi-path
- * advisory either, and a claim holding one would have been red about 40% of
- * the time.
- *
- * What the same eleven runs DO say is that the other three accepted entries
- * never moved: `postcss` and `node-forge` named `expo@44.0.6` every time and
- * `image-size` reported a bare `true` every time. So the direction is holdable
- * where npm has one answer and not holdable where it has three, which is a
- * fact about each entry rather than about the field — and `NamedFixClaim`
- * carries `"unstable"` for the second case, with the readings behind it,
- * rather than holding a number that flips.
+ * Three states, read over the whole candidate SET rather than over npm's pick
+ * of one — see the header for the eleven runs that established the pick is not
+ * stable and the three that established the set is.
  */
 export type NamedFixVerdict =
-  /** npm names a version ahead of the lockfile — there is somewhere to go. */
+  /** At least one candidate is ahead of the lockfile — there is somewhere to go. */
   | "forward"
-  /** npm names one at or behind it — no forward route, whichever path it took. */
+  /** Every candidate is at or behind it — no forward route by any path. */
   | "no-forward"
-  /** npm named no version at all: a bare `true` fix, or no fix. */
+  /** npm named no candidate at all: a bare `true` fix, or no fix. */
   | "unnamed";
 
 /**
- * Collapse a reading to the state a claim is held to, or `null` when unread.
+ * The verdict over every candidate, or `null` when none could be read.
  *
- * `null` for the reading itself is npm naming no version. `null` OUT is a
- * direction nothing could decide — an unparseable version, or a package the
- * lockfile has no entry for — and the caller must then say the claim was not
- * checked rather than treat "could not ask" as agreement. That distinction is
- * the one `reportCompleteness` exists for one question over, and for the same
- * reason: a withheld answer that reads as a pass is how this gate was wrong
- * for two months in 2026-08.
+ * **Any forward wins**, and that is the whole semantics: a question like "can
+ * this tree move forward to clear the advisory" is answered yes by one route,
+ * however many dead ends sit beside it. `braces` is the case — three backward
+ * candidates and one forward — and reading it as `no-forward` is what an
+ * acceptance said for a day.
+ *
+ * An unreadable candidate is SKIPPED rather than fatal: npm can name a package
+ * the lockfile has no root entry for, and one such candidate must not withhold
+ * a verdict the other three agree on. `null` is every candidate unreadable, or
+ * the set being empty of readable ones while not being empty — which the
+ * caller reports as "not checked" rather than treating as agreement.
+ *
+ * An empty set is `"unnamed"`: npm named nobody, which is a decided answer and
+ * the state `image-size`'s bare `true` is in.
  */
-export function namedFixVerdict(reading: NamedFixReading | null): NamedFixVerdict | null {
-  if (reading === null) return "unnamed";
-  switch (reading.direction) {
-    case "forward":
-      return "forward";
-    // `same` joins `backward`: npm naming what is already installed is npm
-    // offering nowhere to go, which is what the claim is about. The two are
-    // still printed differently by `describeDirection`, because "npm names
-    // your own version" is a different thing to go and look at.
-    case "backward":
-    case "same":
-      return "no-forward";
-    case "unknown":
-      return null;
+export function verdictAcross(readings: readonly NamedFixReading[]): NamedFixVerdict | null {
+  if (readings.length === 0) return "unnamed";
+  const readable = readings.filter((reading) => reading.direction !== "unknown");
+  if (readable.length === 0) return null;
+  // `same` joins `backward`: npm naming what is already installed is npm
+  // offering nowhere to go, which is what the verdict is about. The two are
+  // still named separately by `describeReadings`, because "npm names your own
+  // version" is a different thing to go and look at from "npm names an older
+  // one".
+  return readable.some((reading) => reading.direction === "forward") ? "forward" : "no-forward";
+}
+
+/**
+ * A group of candidates in one compact sentence, or `""` when one is ahead.
+ *
+ * One formatter for one candidate and for four. The version before this spelled
+ * a reading out in full and the caller applied it per candidate, which gave a
+ * group of four four copies of one paragraph — and the ternary that avoided
+ * that was also the one-versus-many comparison `lib/plural.ts` owns. This
+ * names each candidate once and says the conclusion once, at either size.
+ *
+ * Empty for a group with a forward candidate: the surrounding sentence already
+ * states the normal case, and a line annotating it is a line nobody finishes.
+ */
+export function describeReadings(readings: readonly NamedFixReading[]): string {
+  if (readings.length === 0) return "";
+  if (verdictAcross(readings) === "forward") return "";
+  const placed = readings.filter((reading) => reading.direction !== "unknown");
+  if (placed.length === 0) {
+    // Named per candidate, because the two ways a reading can be unplaceable
+    // are different things to go and look at: a lockfile with no root entry
+    // for the package, and a version string nothing here parsed.
+    const why = readings
+      .map((reading) =>
+        reading.installed === undefined
+          ? `${reading.package}@${reading.named} has no node_modules/${reading.package} entry in package-lock.json`
+          : `${reading.package}@${reading.named} against a locked ${reading.installed}, neither an exact version`,
+      )
+      .join(", ");
+    return `the lockfile placed no candidate npm names, so which way they point is unread — ${why}`;
   }
+  const each = placed
+    .map((reading) =>
+      reading.direction === "same"
+        ? `${reading.package}@${reading.named} is what is installed`
+        : `${reading.package}@${reading.named} is behind ${String(reading.installed)}`,
+    )
+    .join(", ");
+  return `no candidate npm names is ahead of the lockfile — ${each} — so this waits on upstream rather than on a migration here`;
+}
+
+/**
+ * A group's label: the candidates, capped so one line stays one line.
+ *
+ * Two names and a count, rather than all of them. The full list is on the
+ * detail line for a group that has one, and `@sentry/react-native / expo /
+ * expo-auth-session / expo-linking / expo-router (1, up to moderate)` inside a
+ * comma-separated list of four such labels is how the first version read.
+ */
+export function groupLabel(candidates: readonly string[]): string {
+  if (candidates.length <= 2) return candidates.join(" / ");
+  return `${candidates.slice(0, 2).join(" / ")} +${String(candidates.length - 2)}`;
 }

@@ -334,15 +334,22 @@ fix at all" says the wait is on upstream, not on us. `lib/named-fix-direction.ts
 reads the direction on every run and the gate's own green line had been calling
 this group an upgrade for a month.
 
-**`braces` is the entry that says how far this can be held.** `fixAvailable` is
-one answer per run and npm picks whichever dependency path it resolved first,
-so a multi-path advisory does not have a stable answer at all: eleven runs on
-one unchanged tree gave `expo@44.0.6` five times, `react-native@0.87.1` three
-times and `gh-pages@6.1.1` twice — and the middle one is AHEAD of the locked
-`0.81.5` while the other two are behind, so even the DIRECTION flips. Its claim
-is `unstable`, it is exempt from the check, and the gate prints the exemption
-with its readings on every green run. The other three entries did not move
-once across the same eleven runs.
+**`braces` is the entry that says how to read this field at all.**
+`fixAvailable` is one answer per run and npm picks whichever dependency path it
+resolved first, so a multi-path advisory has no stable single answer: eleven
+runs on one unchanged tree gave `expo@44.0.6` five times,
+`react-native@0.87.1` three times and `gh-pages@6.1.1` twice.
+
+The report carries the whole answer anyway, which is the resolution. Every
+package npm could name is itself an entry in the same report, with its own
+`fixAvailable` naming itself, so all four of this advisory's candidates are
+readable deterministically — `@sentry/react-native@5.15.2` (behind `7.5.0`),
+`expo@44.0.6` (behind `54.0.35`), `gh-pages@6.1.1` (behind `6.3.0`),
+`react-native@0.87.1` (**ahead** of `0.81.5`) — identical on three runs. One
+forward route is a route, so `braces` reads `forward`, and the
+`react-native@0.87` this row named before 2026-10-05 was right the whole time.
+`postcss` and `node-forge` have two candidates each and both are behind, so for
+them the original claim of "no forward fix" stands.
 
 `braces` and `node-forge` were **published after the last green run**, which is
 the case this section's opening paragraph warns about and the first time it had
@@ -405,7 +412,7 @@ address is, and an acceptance nobody can locate is one nobody re-reads.
 | --- | --- | --- | --- |
 | `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package); npm's in-range fix is pinned out of reach (see `inRangeFixPinned`) and it names no forward one |
 | `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; npm names `expo@44.0.6` against a locked `54.0.35` — a downgrade, not the `expo@57` this row claimed until 2026-10-05 |
-| `braces` | GHSA-vfj7-8cjw-p6xm | No | Stack-exhaustion DoS on a deeply nested brace pattern, reached through `micromatch` under `metro-file-map`, `fast-glob` and the jest packages — every caller globs this repository's own paths, never a pattern from outside it; npm's named fix for it is NOT stable — eleven runs on one unchanged tree answered `expo@44.0.6` (x5), `react-native@0.87.1` (x3) and `gh-pages@6.1.1` (x2), reachable under all three; it is exempt from the fix-direction check and says so on every run |
+| `braces` | GHSA-vfj7-8cjw-p6xm | No | Stack-exhaustion DoS on a deeply nested brace pattern, reached through `micromatch` under `metro-file-map`, `fast-glob` and the jest packages — every caller globs this repository's own paths, never a pattern from outside it; fix = `react-native@0.87.1`, breaking — one of four candidates npm names for it, and the only one ahead of what is installed |
 | `node-forge` | GHSA-86w9-cpqp-85rv | No | RSA PKCS#1 v1.5 verification accepts extra nested `DigestAlgorithm` elements, in `@expo/cli` and `@expo/code-signing-certificates` — expo-updates code signing, which this app does not use (no `codeSigningCertificate` in `app.json`); npm names `expo@44.0.6` against a locked `54.0.35`, a downgrade |
 
 Severity is read off each **advisory**, not off the package: npm reports a

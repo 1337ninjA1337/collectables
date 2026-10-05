@@ -115,10 +115,11 @@
 
 import { annotation } from "./github-annotations";
 import {
-  describeDirection,
+  describeReadings,
+  groupLabel,
   type NamedFixReading,
   type NamedFixVerdict,
-  namedFixVerdict,
+  verdictAcross,
   readNamedFix,
 } from "./named-fix-direction";
 import { plural } from "./plural";
@@ -269,28 +270,26 @@ export interface PinnedFix {
  * Measured on 2026-10-05, and the measurement is the whole design. Eleven
  * `npm audit --json` runs on an unchanged tree named three different fixes for
  * `braces`: `expo@44.0.6` five times, `react-native@0.87.1` three times,
- * `gh-pages@6.1.1` twice. It is reachable through `metro-file-map` →
- * `micromatch` under `expo`, `globby` → `fast-glob` under `gh-pages`, and
- * `metro-file-map` under `react-native`, and npm reports whichever path it
- * resolved first. A committed version string would be red most of the time on
- * a tree nobody had touched — the one thing a gate must never be, because a
- * check that is red for no reason is a check somebody turns off.
+ * `gh-pages@6.1.1` twice. It is reachable under all three and npm reports
+ * whichever path it resolved first. A committed version string would be red
+ * most of the time on a tree nobody had touched — the one thing a gate must
+ * never be, because a check that is red for no reason is a check somebody
+ * turns off.
  *
- * The same eleven runs say the other three entries never moved: `postcss` and
- * `node-forge` named `expo@44.0.6` every time, `image-size` a bare `true`
- * every time. A direction is one step more stable than a version and for
- * `braces` that is still not enough — `react-native@0.87.1` is AHEAD of the
- * locked 0.81.5 while the other two targets are behind, so even
- * {@link NamedFixVerdict} flips for it.
+ * ## And a direction read off npm's PICK was not stable either
  *
- * ## So `"unstable"` is a verdict, and it is the one that prints
+ * `react-native@0.87.1` is ahead of the locked `0.81.5` while the other two
+ * targets are behind, so a verdict read off one pick flipped too, and for a
+ * day this field carried an `"unstable"` state that exempted `braces` from its
+ * own check.
  *
- * An entry whose claim is `"unstable"` is never compared against a run: there
- * is nothing to compare to. It is reported on the GREEN path instead, with
- * `observed` carrying the readings, which is the same bargain
- * `inRangeFixPinned` makes — an exemption that is loud is the only kind that
- * does not become the silence it replaced. A suite requires such a claim to
- * name more than one version, so "unstable" cannot become the easy answer.
+ * That state is gone, because the report contains the whole answer:
+ * {@link fixCandidates} enumerates every candidate deterministically and each
+ * one's version is on its own entry. `braces` reads four candidates on every
+ * run, one of them forward, so its verdict is `forward` — and the
+ * `react-native@0.87` the acceptance named before 2026-10-05 was right the
+ * whole time. There is no exemption left to make, which is a better place to
+ * be than a loud one.
  *
  * ## Why `observed` is prose and is not checked
  *
@@ -303,10 +302,12 @@ export interface PinnedFix {
  */
 export interface NamedFixClaim {
   /**
-   * The direction npm's named fix pointed, or `"unstable"` when npm's own
-   * answer varies between runs on one tree. See the header.
+   * The verdict over every candidate npm names — see
+   * {@link verdictAcross}. One state, held on every run; there is no exempt
+   * value, because the reading it would have exempted turned out to be
+   * deterministic.
    */
-  readonly verdict: NamedFixVerdict | "unstable";
+  readonly verdict: NamedFixVerdict;
   /** When it was read off a real `npm audit --json`, `YYYY-MM-DD`. */
   readonly read: string;
   /**
@@ -351,7 +352,7 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
       verdict: "unnamed",
       read: "2026-10-05",
       observed:
-        "npm reports fixAvailable: true for it — an in-range fix, named by no version, which is the case inRangeFixPinned already measures",
+        "no candidates at all: npm reports fixAvailable: true for it, an in-range fix named by no version, which is the case inRangeFixPinned already measures",
     },
     advisories: ["GHSA-5p2g-fcmc-qvqq", "GHSA-w3rx-r6r6-pgpr"],
     shipsToClient: false,
@@ -372,7 +373,7 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
       verdict: "no-forward",
       read: "2026-10-05",
       observed:
-        "expo@44.0.6 against a locked 54.0.35 — ten majors behind, and the version this entry claimed until today was expo@57",
+        "two candidates, identical on three runs: @sentry/react-native@5.15.2 (behind 7.5.0) and expo@44.0.6 (behind 54.0.35). No forward route by either, and the version this entry claimed until today was expo@57",
     },
     advisories: ["GHSA-6g55-p6wh-862q", "GHSA-r28c-9q8g-f849"],
     shipsToClient: false,
@@ -382,10 +383,10 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   {
     package: "braces",
     namedFix: {
-      verdict: "unstable",
+      verdict: "forward",
       read: "2026-10-05",
       observed:
-        "eleven runs, one unchanged tree, three answers: expo@44.0.6 (x5, behind 54.0.35), react-native@0.87.1 (x3, AHEAD of 0.81.5), gh-pages@6.1.1 (x2, behind 6.3.0). Reachable under all three, and npm reports whichever path it resolved first — so not even the direction is holdable for this entry, which is why `unstable` exists",
+        "four candidates, identical on three runs: @sentry/react-native@5.15.2 (behind 7.5.0), expo@44.0.6 (behind 54.0.35), gh-pages@6.1.1 (behind 6.3.0), react-native@0.87.1 (AHEAD of 0.81.5). npm's single pick rotated between three of these across eleven runs, which is why the verdict is read over the set — and the forward one is the react-native@0.87 this entry named before 2026-10-05",
     },
     advisories: ["GHSA-vfj7-8cjw-p6xm"],
     shipsToClient: false,
@@ -398,7 +399,7 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
       verdict: "no-forward",
       read: "2026-10-05",
       observed:
-        "expo@44.0.6 against a locked 54.0.35 — the same group as postcss, and read as a breaking major until today",
+        "two candidates, identical on three runs: @sentry/react-native@5.15.2 (behind 7.5.0) and expo@44.0.6 (behind 54.0.35). The same pair as postcss, and read as a breaking major until today",
     },
     advisories: ["GHSA-86w9-cpqp-85rv"],
     shipsToClient: false,
@@ -937,6 +938,94 @@ export function fixVersion(fixAvailable: unknown): string | null {
 }
 
 /**
+ * Every direct dependency npm could install something for to clear an advisory.
+ *
+ * ## Why this exists beside {@link fixPackage}
+ *
+ * `fixPackage` answers "what do I type after `npm update`" and takes npm's own
+ * `fixAvailable.name` as its strongest source. That answer is not stable: for
+ * an advisory reachable under several direct dependencies, npm reports
+ * whichever path it resolved first, and eleven runs on one unchanged tree gave
+ * `braces` three different names — `expo`, `react-native`, `gh-pages`.
+ *
+ * This answers the other question, "which direct dependencies could carry a
+ * fix", and it is deterministic: the `effects` walk is breadth-first and
+ * sorted, and the filter below is a property of the report rather than of
+ * npm's resolution order. Three runs give the identical four for `braces`.
+ *
+ * ## The filter, which is the whole of the difference from a bare walk
+ *
+ * A direct dependent qualifies only when its OWN `fixAvailable` names ITSELF.
+ * Without that, the walk reaches every direct package above the advisory —
+ * `react-native-reanimated` is above `braces` and npm never named it, because
+ * reanimated's own fix is somebody else's upgrade. Self-naming is npm's way of
+ * saying "this is a thing you install", and it is exactly the pool npm's
+ * single pick comes out of: all three names it gave `braces` are in this set.
+ *
+ * `@sentry/react-native` is in `postcss`' set and looks like a red herring
+ * until you read its entry — npm really does name `@sentry/react-native@5.15.2`
+ * as an install that clears it. Including it is reporting npm's judgement
+ * rather than second-guessing it; the direction reading then says that
+ * particular route is a downgrade.
+ */
+/**
+ * How {@link ObservedAdvisory.updateGroup} joins its candidates.
+ *
+ * A separator that cannot appear in an npm package name, so the group can be
+ * split back apart — `" / "` rather than `","`, because a scoped name contains
+ * `/` but never a space.
+ */
+export const GROUP_SEPARATOR = " / ";
+
+export function fixCandidates(report: AuditReport, vulnerablePackage: string): readonly string[] {
+  const entries = report.vulnerabilities ?? {};
+  const selfNamed = (name: string): boolean =>
+    entries[name]?.isDirect === true && namedFix(entries[name]?.fixAvailable) === name;
+  const found = new Set<string>();
+  if (selfNamed(vulnerablePackage)) found.add(vulnerablePackage);
+  const seen = new Set([vulnerablePackage]);
+  let frontier = [vulnerablePackage];
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const name of frontier) {
+      for (const effect of [...(entries[name]?.effects ?? [])].sort()) {
+        if (seen.has(effect)) continue;
+        seen.add(effect);
+        if (selfNamed(effect)) found.add(effect);
+        next.push(effect);
+      }
+    }
+    frontier = next;
+  }
+  // The visited set is load-bearing rather than defensive: `effects` is cyclic
+  // in this tree (`metro` and `metro-config` list each other), and a walk
+  // without it does not terminate.
+  return [...found].sort();
+}
+
+/**
+ * Each candidate paired with the version npm names for IT, from the same report.
+ *
+ * This is the reading `fixAvailable` looked like it could not give: every
+ * candidate is itself a vulnerability entry whose `fixAvailable` names itself,
+ * so the version is in the report and does not depend on which path npm
+ * resolved first. `braces` reads `@sentry/react-native@5.15.2`,
+ * `expo@44.0.6`, `gh-pages@6.1.1`, `react-native@0.87.1` on every run.
+ */
+export function candidateFixes(
+  report: AuditReport,
+  vulnerablePackage: string,
+): readonly { readonly package: string; readonly version: string }[] {
+  const entries = report.vulnerabilities ?? {};
+  const found: { package: string; version: string }[] = [];
+  for (const name of fixCandidates(report, vulnerablePackage)) {
+    const version = fixVersion(entries[name]?.fixAvailable);
+    if (version !== null) found.push({ package: name, version });
+  }
+  return found;
+}
+
+/**
  * The severities a baseline entry is required for.
  *
  * npm reports five (`info`, `low`, `moderate`, `high`, `critical`) and this
@@ -970,6 +1059,20 @@ export interface FixableAdvisory {
   readonly updatePackage: string;
   /** The version npm named, or `null`. See {@link fixVersion}. */
   readonly updateVersion: string | null;
+  /**
+   * The STABLE identity of this advisory's fix: every candidate, sorted.
+   *
+   * {@link updatePackage} is npm's own pick and it MOVES — eleven runs named
+   * three different packages for `braces` on one unchanged tree — so anything
+   * that groups or dedupes by it reshuffles between runs. `bySeverityThenKey`'s
+   * header spells out why that is unacceptable one function away, and the
+   * summary below it had been doing exactly that since it was written.
+   *
+   * Falls back to {@link updatePackage} when there are no candidates, which is
+   * a bare `true` fix: npm named nobody, so the only identity available is the
+   * one it did not commit to.
+   */
+  readonly updateGroup: string;
 }
 
 export interface AuditVerdict {
@@ -1105,14 +1208,18 @@ export interface AuditVerdict {
    */
   readonly backwardNamedFixes: readonly string[];
   /**
-   * Accepted entries whose `namedFix` is `"unstable"`, one line each.
+   * Every candidate npm names, with the version from its OWN entry.
    *
-   * Printed on the green path and never failed on. The point is that an
-   * exemption from the direction check is visible on every run: `braces` is
-   * the only one today, and the day a second appears somebody should have to
-   * see it rather than find it by reading the list.
+   * On the verdict rather than re-walked by the formatter, because the walk
+   * needs the report and {@link formatAuditVerdict} is handed a verdict. It is
+   * what lets a group's direction be read over all of its candidates instead
+   * of off npm's single pick — the field that answered `braces` three
+   * different ways across eleven runs.
+   *
+   * Empty when no lockfile reached {@link evaluateAudit}, with the rest of the
+   * named-fix reading.
    */
-  readonly unstableNamedFixes: readonly string[];
+  readonly candidateVersions: Readonly<Record<string, string>>;
 }
 
 /** `package#id`, the form every list in {@link AuditVerdict} carries. */
@@ -1189,6 +1296,8 @@ export interface ObservedAdvisory {
    * object. `null` is a bare `true` fix, which names no version at all.
    */
   readonly updateVersion: string | null;
+  /** Every candidate, sorted — the stable identity. See {@link fixCandidates}. */
+  readonly updateGroup: string;
 }
 
 /**
@@ -1220,6 +1329,8 @@ export function observedAdvisoryDetails(
     const fix = fixKind(entry.fixAvailable);
     const updatePackage = fixPackage(report, name);
     const updateVersion = fixVersion(entry.fixAvailable);
+    const candidates = fixCandidates(report, name);
+    const updateGroup = candidates.length > 0 ? candidates.join(GROUP_SEPARATOR) : updatePackage;
     for (const via of entry.via ?? []) {
       if (typeof via !== "object" || via === null) continue;
       const advisory = via as { source?: unknown; url?: unknown; severity?: unknown };
@@ -1230,6 +1341,7 @@ export function observedAdvisoryDetails(
         fix,
         updatePackage,
         updateVersion,
+        updateGroup,
       });
     }
   }
@@ -1413,6 +1525,7 @@ export function evaluateAudit(
         severity: detail.severity,
         updatePackage: detail.updatePackage,
         updateVersion: detail.updateVersion,
+        updateGroup: detail.updateGroup,
       }))
       .sort(bySeverityThenKey);
   // The keys whose entry has measured that npm's in-range fix cannot be taken.
@@ -1443,10 +1556,7 @@ export function evaluateAudit(
       : [],
     ...namedFixLists(report, accepted, lock),
     backwardNamedFixes: backwardNamedFixes(report, lock),
-    unstableNamedFixes: accepted
-      .filter((entry) => entry.namedFix?.verdict === "unstable")
-      .map((entry) => `${entry.package}: ${entry.namedFix?.observed ?? ""} (read ${entry.namedFix?.read ?? ""})`)
-      .sort(),
+    candidateVersions: lock === undefined ? {} : selfNamedVersions(report),
   };
 }
 
@@ -1489,25 +1599,21 @@ function namedFixLists(
   const unread: string[] = [];
   let namedForAClaim = 0;
   for (const entry of accepted) {
-    const reading = readEntryNamedFix(report, entry, lock);
-    const live = namedFixVerdict(reading);
+    const readings = readEntryCandidates(report, entry, lock);
+    const live = verdictAcross(readings);
     if (entry.namedFix === undefined) {
       unclaimed.push(
         `${entry.package} — npm's fix verdict for it reads ${live ?? "unread"} today and the entry claims nothing. Add a namedFix: { verdict, read, observed }.`,
       );
       continue;
     }
-    // Never compared, because there is nothing stable to compare against.
-    // Reported on the green path by `formatAuditVerdict` so the exemption is
-    // loud rather than silent, which is the whole of the bargain.
-    if (entry.namedFix.verdict === "unstable") continue;
-    if (reading !== null) namedForAClaim += 1;
-    // A direction nothing could read is not a disagreement. Saying so beats
-    // both alternatives: treating it as a pass hides a claim nobody checked,
-    // and failing on it makes the gate red for a lockfile shape.
+    if (readings.length > 0) namedForAClaim += 1;
+    // A verdict nothing could read is not a disagreement. Saying so beats both
+    // alternatives: treating it as a pass hides a claim nobody checked, and
+    // failing on it makes the gate red for a lockfile shape.
     if (live === null) {
       unread.push(
-        `${entry.package} — claims ${entry.namedFix.verdict} and ${describeDirection(reading ?? NOTHING_NAMED)}`,
+        `${entry.package} — claims ${entry.namedFix.verdict} and none of its ${String(readings.length)} candidate(s) could be placed against the lockfile: ${readings.map((reading) => `${reading.package}@${reading.named}`).join(", ")}`,
       );
       continue;
     }
@@ -1525,19 +1631,25 @@ function namedFixLists(
   return { namedFixStale: stale.sort(), namedFixUnclaimed: unclaimed.sort(), namedFixUnread: unread.sort() };
 }
 
+
 /**
- * The reading for "npm named nothing", so the unread line has one shape.
+ * Every self-named direct package in the report, with the version it names.
  *
- * `namedFixVerdict(null)` is `unnamed`, which is a decided verdict and never
- * reaches the unread branch — so this stands only for the impossible case, and
- * exists because the alternative is a second sentence spelled inline.
+ * The pool {@link fixCandidates} draws from, flattened once per run so the
+ * formatter does not re-walk the report per group. Self-naming is npm's way of
+ * saying "this is a thing you install", which is the same filter the walk
+ * applies and the reason both read the same field.
  */
-const NOTHING_NAMED: NamedFixReading = {
-  package: "(none)",
-  named: "(none)",
-  installed: undefined,
-  direction: "unknown",
-};
+function selfNamedVersions(report: AuditReport): Record<string, string> {
+  const versions: Record<string, string> = {};
+  for (const [name, entry] of Object.entries(report.vulnerabilities ?? {})) {
+    if (entry.isDirect !== true) continue;
+    if (namedFix(entry.fixAvailable) !== name) continue;
+    const version = fixVersion(entry.fixAvailable);
+    if (version !== null) versions[name] = version;
+  }
+  return versions;
+}
 
 /**
  * Every package npm names a backward fix for, at ANY severity, one line each.
@@ -1564,24 +1676,22 @@ function backwardNamedFixes(report: AuditReport, lock: unknown): readonly string
 }
 
 /**
- * One accepted entry's named fix, read against the lockfile.
+ * One accepted entry's candidate fixes, each read against the lockfile.
  *
  * Keyed on the PACKAGE rather than on each advisory id: `fixAvailable` is a
  * field on the vulnerability root, so every advisory under one package shares
  * it, and asking per advisory would be asking the same question twice for
- * `image-size` and `postcss`. `null` is npm naming no version — a bare `true`
- * fix, a `false`, or a package the report does not mention at all.
+ * `image-size` and `postcss`. An empty result is npm naming no candidate — a
+ * bare `true` fix, a `false`, or a package the report does not mention.
  */
-function readEntryNamedFix(
+function readEntryCandidates(
   report: AuditReport,
   entry: AcceptedAdvisory,
   lock: unknown,
-): NamedFixReading | null {
-  const vulnerability = (report.vulnerabilities ?? {})[entry.package];
-  if (vulnerability === undefined) return null;
-  const version = fixVersion(vulnerability.fixAvailable);
-  if (version === null) return null;
-  return readNamedFix(lock, fixPackage(report, entry.package), version);
+): readonly NamedFixReading[] {
+  return candidateFixes(report, entry.package).map((candidate) =>
+    readNamedFix(lock, candidate.package, candidate.version),
+  );
 }
 
 /**
@@ -1685,9 +1795,19 @@ function counted(count: number, one: string, many: string): string {
  * upgrade buy?"). The advisory ids do not: they are what a FAILING run prints,
  * and a reader who wants them on a green run wants `npm audit`.
  */
-function majorOnlySummary(majorOnly: readonly FixableAdvisory[], lock?: unknown): string {
+function majorOnlySummary(
+  majorOnly: readonly FixableAdvisory[],
+  lock?: unknown,
+  /**
+   * Each candidate's own named version, so a group's verdict is read over all
+   * of them rather than off npm's one pick. Built by {@link formatAuditVerdict}
+   * from the same walk; empty means "read npm's pick", which is what a caller
+   * with no report to walk can offer.
+   */
+  candidateVersions: ReadonlyMap<string, string> = new Map(),
+): string {
   if (majorOnly.length === 0) return "";
-  const groups = [...groupByPackage(majorOnly, (found) => found.updatePackage)]
+  const groups = [...groupByPackage(majorOnly, (found) => found.updateGroup)]
     // Most severe group first, then the one that buys the most, then by name:
     // an OK line that reshuffles between runs is one nobody can diff, same
     // reason `bySeverityThenKey` exists for the findings.
@@ -1706,22 +1826,31 @@ function majorOnlySummary(majorOnly: readonly FixableAdvisory[], lock?: unknown)
         b.found.length - a.found.length ||
         a.name.localeCompare(b.name),
     )
-    .map((group) => ({ ...group, reading: namedFixReading(group.found, lock) }));
+    .map((group) => {
+      // Every candidate in the group's own key, when their versions are in
+      // hand; npm's single pick otherwise. The first is deterministic and the
+      // second is the field that moved three times on one tree.
+      const readings = groupCandidates(group.found, candidateVersions, lock);
+      const single = namedFixReading(group.found, lock);
+      return {
+        ...group,
+        readings: readings.length > 0 ? readings : single === null ? [] : [single],
+        verdict: readings.length > 0 ? verdictAcross(readings) : single === null ? null : verdictAcross([single]),
+      };
+    });
   // The headline only claims "upgrades" when every group that could be read IS
   // one. Before the direction was read it claimed it unconditionally, and on
   // 2026-10-05 the biggest group on this tree was a ten-major downgrade: a
   // summary that says "cleared by" about a version nobody can install is worse
   // than a summary that says nothing, because a reader acts on it.
-  const notForward = groups.filter((group) => group.reading !== null && group.reading.direction !== "forward");
+  const notForward = groups.filter((group) => group.verdict !== null && group.verdict !== "forward");
   const label = notForward.length === 0
     ? `cleared by ${counted(groups.length, "upgrade", "upgrades")}`
     : `named by ${counted(groups.length, "update", "updates")}, ${String(notForward.length)} of which npm cannot point forward`;
   const named = groups
     .map((group) => {
-      const marker = group.reading === null || group.reading.direction === "forward"
-        ? ""
-        : `, ${group.reading.direction.toUpperCase()}`;
-      return `${group.name} (${String(group.found.length)}, up to ${group.worst}${marker})`;
+      const marker = group.verdict === null || group.verdict === "forward" ? "" : ", NO FORWARD FIX";
+      return `${groupLabel(group.name.split(GROUP_SEPARATOR))} (${String(group.found.length)}, up to ${group.worst}${marker})`;
     })
     .join(", ");
   // The detail goes BELOW rather than inline. Inline it read as one sentence
@@ -1729,7 +1858,13 @@ function majorOnlySummary(majorOnly: readonly FixableAdvisory[], lock?: unknown)
   // is how the first version of this came out and is unreadable at three
   // groups.
   const detail = notForward.map((group) =>
-    group.reading === null ? "" : `\n  ${group.name}: ${describeDirection(group.reading)}`,
+    group.readings.length === 0
+      ? ""
+      // One formatter for one and for four. A ternary on the count here was
+      // both a second wording to keep in step and the one-versus-many
+      // comparison `lib/plural.ts` owns — `describeReadings` reads correctly
+      // at either size, which is the reason it can be the only path.
+      : `\n  ${groupLabel(group.name.split(GROUP_SEPARATOR))}: ${describeReadings(group.readings)}`,
   );
   return `; and npm offers no fix short of a semver-major for ${counted(majorOnly.length, "advisory", "advisories")}, ${label}: ${named}${detail.join("")}`;
 }
@@ -1755,6 +1890,31 @@ function namedFixReading(group: readonly FixableAdvisory[], lock: unknown): Name
   const named = group[0]?.updateVersion;
   if (named === null || named === undefined) return null;
   return readNamedFix(lock, group[0].updatePackage, named);
+}
+
+/**
+ * A group's own candidates, read against the lockfile.
+ *
+ * The group's key IS the candidate list joined by {@link GROUP_SEPARATOR}, so
+ * it is split back apart here rather than re-walked: the walk needs the report
+ * and this function is handed a group. A key that fell back to
+ * {@link FixableAdvisory.updatePackage} (a bare `true` fix, no candidates) has
+ * no version in the map and comes back empty, which the caller answers with
+ * npm's single pick.
+ */
+function groupCandidates(
+  group: readonly FixableAdvisory[],
+  candidateVersions: ReadonlyMap<string, string>,
+  lock: unknown,
+): readonly NamedFixReading[] {
+  if (lock === undefined) return [];
+  const readings: NamedFixReading[] = [];
+  for (const name of (group[0]?.updateGroup ?? "").split(GROUP_SEPARATOR)) {
+    const version = candidateVersions.get(name);
+    if (version === undefined) continue;
+    readings.push(readNamedFix(lock, name, version));
+  }
+  return readings;
 }
 
 /**
@@ -1918,7 +2078,7 @@ export function formatAuditVerdict(
       // Semicolons between them because two of the three END in a
       // comma-separated list of packages, and a comma joining the clauses put
       // the list's last entry and the next clause in the same punctuation.
-      `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly, lock)}.`,
+      `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly, lock, new Map(Object.entries(verdict.candidateVersions)))}.`,
     );
     // Only the packages the major-only summary did not already name. That
     // summary reads high and critical; this list reads every severity, so what
@@ -1933,12 +2093,6 @@ export function formatAuditVerdict(
         `${checkName}: npm also names no forward fix for ${counted(unsaid.length, "package", "packages")} below the triaged severities — a version behind the lockfile is not an upgrade, so these wait on upstream rather than on a migration here:`,
       );
       for (const line of unsaid) lines.push(`  ${line}`);
-    }
-    if (verdict.unstableNamedFixes.length > 0) {
-      lines.push(
-        `${checkName}: ${counted(verdict.unstableNamedFixes.length, "accepted entry", "accepted entries")} exempt from the fix-direction check because npm's own answer varies between runs:`,
-      );
-      for (const line of verdict.unstableNamedFixes) lines.push(`  ${line}`);
     }
     if (verdict.namedFixUnread.length > 0) {
       // The floor's informational half. All of them at once is a failure; one
@@ -2108,9 +2262,9 @@ export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): Audit
     // Unioned: an entry with no claim has no claim on either read, and the
     // second read cannot make one appear.
     namedFixUnclaimed: [...new Set([...first.namedFixUnclaimed, ...second.namedFixUnclaimed])].sort(),
-    // Read off the accepted list rather than off a report, so the two reads
-    // cannot disagree; the first is as good as the second.
-    unstableNamedFixes: first.unstableNamedFixes,
+    // The first read's, not a merge: both reads walked the same tree and the
+    // walk is deterministic, so a merge would be two copies of one answer.
+    candidateVersions: first.candidateVersions,
     // Both informational, both unioned: each is a thing one of the reads
     // observed, and a reader wants everything either read saw rather than the
     // intersection of two accounts of the same tree.

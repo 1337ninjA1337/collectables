@@ -15,18 +15,24 @@
  * a committed version would be red about half the time for nothing.
  *
  * Two runs said both named versions were BEHIND the lockfile, so the first
- * version of this held the direction. Eleven runs say that is not enough
- * either: `braces` names `expo@44.0.6` (x5, behind), `react-native@0.87.1`
- * (x3, AHEAD of the locked 0.81.5) and `gh-pages@6.1.1` (x2, behind). A held
- * direction would have been red about 40% of the time.
+ * version of this held the direction off npm's pick. Eleven runs said that was
+ * not enough either: `braces` names `expo@44.0.6` (x5, behind),
+ * `react-native@0.87.1` (x3, AHEAD of the locked 0.81.5) and `gh-pages@6.1.1`
+ * (x2, behind), so the direction flipped too and the entry was exempted as
+ * "unstable" for a day.
  *
- * The other three entries never moved across the same eleven runs, so a
- * direction IS holdable per entry and is not holdable for `braces` — which is
- * what `"unstable"` records, with the readings in `observed` and a line on
- * every green run so the exemption cannot go quiet. These cases are about the
- * collapse, the four lists it feeds, the floor on a lockfile that answered
- * nothing, and the two states that must NOT fail.
- */
+ * Then the report turned out to carry the whole answer. Every package npm
+ * could name is itself a vulnerability entry whose `fixAvailable` names
+ * itself, so `fixCandidates` enumerates all four of `braces`' candidates
+ * deterministically — identical on three runs — and `verdictAcross` reads the
+ * verdict over the set. `braces` is `forward`, because `react-native@0.87.1`
+ * is one of them; the exemption is gone, and the `react-native@0.87` the
+ * acceptance named before 2026-10-05 was right the whole time.
+ *
+ * These cases are about the candidate walk, the any-forward rule, the four
+ * lists it feeds, the floor on a lockfile that answered nothing, and the state
+ * that must NOT fail: a verdict nothing could read.
+  */
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -34,20 +40,31 @@ import { describe, it } from "node:test";
 import {
   ACCEPTED_HIGH_ADVISORIES,
   type AuditReport,
+  candidateFixes,
   evaluateAudit,
+  fixCandidates,
   formatAuditVerdict,
   isClean,
 } from "@/lib/audit-baseline";
-import { namedFixVerdict, readNamedFix } from "@/lib/named-fix-direction";
+import { readNamedFix, verdictAcross } from "@/lib/named-fix-direction";
 
 import { readRepoFile } from "./helpers/repo-file";
 
-/** A one-package report, in the shape npm emits. */
+/**
+ * A one-package report, in the shape npm emits.
+ *
+ * `isDirect: true`, so the package is its own fix candidate when its
+ * `fixAvailable` names itself — which is how npm reports a direct dependency
+ * with an advisory, and the shape {@link fixCandidates} walks. A fixture
+ * without it has no candidates at all and every verdict over it is `unnamed`,
+ * which is a different case and has its own fixture below.
+ */
 function report(pkg: string, fixAvailable: unknown, ghsa: string): AuditReport {
   return {
     vulnerabilities: {
       [pkg]: {
         severity: "high",
+        isDirect: true,
         fixAvailable,
         effects: [],
         via: [{ source: 1, url: `https://github.com/advisories/${ghsa}`, severity: "high" }],
@@ -57,51 +74,191 @@ function report(pkg: string, fixAvailable: unknown, ghsa: string): AuditReport {
   } as unknown as AuditReport;
 }
 
+/**
+ * One advisory whose only candidate is a direct package the lockfile lacks.
+ *
+ * The unreadable-candidate case, which needs a candidate that EXISTS and
+ * cannot be placed — a fixture naming a package npm does not report is a
+ * fixture with no candidates, and that reads `unnamed`.
+ */
+function unplaceableCandidate(): AuditReport {
+  return {
+    vulnerabilities: {
+      nowhere: {
+        severity: "high",
+        isDirect: true,
+        fixAvailable: { name: "nowhere", version: "1.0.0", isSemVerMajor: true },
+        effects: [],
+        via: ["vulnerable"],
+      },
+      vulnerable: {
+        severity: "high",
+        isDirect: false,
+        fixAvailable: { name: "nowhere", version: "1.0.0", isSemVerMajor: true },
+        effects: ["nowhere"],
+        via: [{ source: 1, url: `https://github.com/advisories/${GHSA}`, severity: "high" }],
+      },
+    },
+    metadata: { vulnerabilities: { high: 2 } },
+  } as unknown as AuditReport;
+}
+
 const LOCK = { packages: { "node_modules/expo": { version: "54.0.35" } } };
+const MULTI_LOCK = {
+  packages: {
+    "node_modules/expo": { version: "54.0.35" },
+    "node_modules/react-native": { version: "0.81.5" },
+  },
+};
 const GHSA = "GHSA-aaaa-bbbb-cccc";
 
-describe("namedFixVerdict", () => {
-  it("is forward only when npm points ahead of the lockfile", () => {
-    assert.equal(namedFixVerdict(readNamedFix(LOCK, "expo", "57.0.0")), "forward");
-  });
+/**
+ * `braces`' shape: one advisory under two direct dependencies, each naming
+ * itself, with `picked` standing for whichever one npm reported this run.
+ *
+ * `versions` overrides a candidate's own named version, which is how the
+ * all-behind case is built without a second fixture.
+ */
+function multiCandidate(picked: string, versions: Record<string, string> = {}): AuditReport {
+  const named = (name: string, version: string) => ({ name, version, isSemVerMajor: true });
+  return {
+    vulnerabilities: {
+      expo: {
+        severity: "high",
+        isDirect: true,
+        fixAvailable: named("expo", versions.expo ?? "44.0.6"),
+        effects: [],
+        via: ["vulnerable"],
+      },
+      "react-native": {
+        severity: "high",
+        isDirect: true,
+        fixAvailable: named("react-native", versions["react-native"] ?? "0.87.1"),
+        effects: [],
+        via: ["vulnerable"],
+      },
+      vulnerable: {
+        severity: "high",
+        isDirect: false,
+        fixAvailable: named(picked, picked === "expo" ? "44.0.6" : "0.87.1"),
+        effects: ["expo", "react-native"],
+        via: [{ source: 1, url: `https://github.com/advisories/${GHSA}`, severity: "high" }],
+      },
+    },
+    metadata: { vulnerabilities: { high: 3 } },
+  } as unknown as AuditReport;
+}
 
-  it("folds backward and same into no-forward, which is what a claim is about", () => {
-    // `same` is npm naming the installed version: nowhere to go, same as
-    // behind. They still PRINT differently, because "npm names your own
-    // version" is a different thing to go and look at.
-    assert.equal(namedFixVerdict(readNamedFix(LOCK, "expo", "44.0.6")), "no-forward");
-    assert.equal(namedFixVerdict(readNamedFix(LOCK, "expo", "54.0.35")), "no-forward");
-  });
+describe("verdictAcross", () => {
+  const read = (pkg: string, version: string, lock: unknown = LOCK) => readNamedFix(lock, pkg, version);
 
-  it("is unnamed when npm named no version", () => {
-    assert.equal(namedFixVerdict(null), "unnamed");
-  });
-
-  it("is null — unread — when the direction cannot be decided", () => {
-    // Not a verdict and not a disagreement. Treating it as a pass would hide a
-    // claim nobody checked; failing on it would make the gate red for a
-    // lockfile shape.
-    assert.equal(namedFixVerdict(readNamedFix(LOCK, "absent", "1.0.0")), null);
-    assert.equal(namedFixVerdict(readNamedFix(LOCK, "expo", "not-a-version")), null);
-  });
-
-  it("survives the braces flip, which is the whole reason it exists", () => {
-    // The two readings npm gave on one unchanged tree, 2026-10-05.
+  it("is forward when ANY candidate is ahead, which is the braces answer", () => {
+    // Three dead ends and one route is still a route. Reading this as
+    // no-forward is what the acceptance said for a day.
     const lock = {
       packages: {
+        "node_modules/@sentry/react-native": { version: "7.5.0" },
         "node_modules/expo": { version: "54.0.35" },
         "node_modules/gh-pages": { version: "6.3.0" },
+        "node_modules/react-native": { version: "0.81.5" },
       },
     };
-    assert.equal(namedFixVerdict(readNamedFix(lock, "expo", "44.0.6")), "no-forward");
-    assert.equal(namedFixVerdict(readNamedFix(lock, "gh-pages", "6.1.1")), "no-forward");
+    assert.equal(
+      verdictAcross([
+        read("@sentry/react-native", "5.15.2", lock),
+        read("expo", "44.0.6", lock),
+        read("gh-pages", "6.1.1", lock),
+        read("react-native", "0.87.1", lock),
+      ]),
+      "forward",
+    );
+  });
+
+  it("is no-forward only when every candidate is at or behind", () => {
+    // `same` joins `backward`: npm naming the installed version is npm
+    // offering nowhere to go. They still PRINT differently.
+    assert.equal(verdictAcross([read("expo", "44.0.6")]), "no-forward");
+    assert.equal(verdictAcross([read("expo", "54.0.35")]), "no-forward");
+  });
+
+  it("is unnamed for an empty set, which is a bare `true` fix", () => {
+    assert.equal(verdictAcross([]), "unnamed");
+  });
+
+  it("skips an unreadable candidate rather than withholding the verdict", () => {
+    // One candidate the lockfile has no entry for must not silence three that
+    // agree — the gate would then report "not checked" for a question the
+    // report answered.
+    assert.equal(verdictAcross([read("absent", "1.0.0"), read("expo", "57.0.0")]), "forward");
+  });
+
+  it("is null — unread — only when no candidate could be placed", () => {
+    assert.equal(verdictAcross([read("absent", "1.0.0")]), null);
+    assert.equal(verdictAcross([read("expo", "not-a-version")]), null);
+  });
+});
+
+describe("fixCandidates", () => {
+  it("finds every direct dependency whose own fix names itself", () => {
+    assert.deepEqual(fixCandidates(multiCandidate("expo"), "vulnerable"), ["expo", "react-native"]);
+  });
+
+  it("is the same set whichever candidate npm picked this run", () => {
+    // The determinism the whole change rests on: npm's pick rotated between
+    // three names for `braces` across eleven runs and this walk did not move
+    // across three.
+    assert.deepEqual(
+      fixCandidates(multiCandidate("expo"), "vulnerable"),
+      fixCandidates(multiCandidate("react-native"), "vulnerable"),
+    );
+  });
+
+  it("leaves out a direct dependent whose fix is somebody else's upgrade", () => {
+    // `react-native-reanimated` sits above `braces` and npm never named it,
+    // because its own `fixAvailable` names `expo` rather than itself. A bare
+    // effects walk would report it as a fix target.
+    const withPassenger = multiCandidate("expo") as unknown as {
+      vulnerabilities: Record<string, unknown>;
+    };
+    withPassenger.vulnerabilities["passenger"] = {
+      severity: "high",
+      isDirect: true,
+      fixAvailable: { name: "expo", version: "44.0.6", isSemVerMajor: true },
+      effects: [],
+      via: ["vulnerable"],
+    };
+    (withPassenger.vulnerabilities.vulnerable as { effects: string[] }).effects.push("passenger");
+    assert.deepEqual(fixCandidates(withPassenger as unknown as AuditReport, "vulnerable"), [
+      "expo",
+      "react-native",
+    ]);
+  });
+
+  it("pairs each candidate with the version from its OWN entry", () => {
+    // Which is the reading `fixAvailable` looked like it could not give.
+    assert.deepEqual(candidateFixes(multiCandidate("expo"), "vulnerable"), [
+      { package: "expo", version: "44.0.6" },
+      { package: "react-native", version: "0.87.1" },
+    ]);
+  });
+
+  it("terminates on the cyclic effects this tree really has", () => {
+    // `metro` and `metro-config` list each other, so the visited set is
+    // load-bearing rather than defensive.
+    const cyclic = {
+      vulnerabilities: {
+        a: { severity: "high", isDirect: false, fixAvailable: true, effects: ["b"], via: ["x"] },
+        b: { severity: "high", isDirect: false, fixAvailable: true, effects: ["a"], via: ["x"] },
+      },
+    } as unknown as AuditReport;
+    assert.deepEqual(fixCandidates(cyclic, "a"), []);
   });
 });
 
 describe("the verdict's two named-fix lists", () => {
-  const accepted = (verdict: "forward" | "no-forward" | "unnamed" | "unstable") => [
+  const accepted = (verdict: "forward" | "no-forward" | "unnamed", pkg = "expo") => [
     {
-      package: "expo",
+      package: pkg,
       advisories: [GHSA],
       shipsToClient: false,
       absentFingerprint: "x",
@@ -145,53 +302,44 @@ describe("the verdict's two named-fix lists", () => {
     assert.deepEqual(verdict.namedFixStale, []);
   });
 
-  it("reports a direction nothing could read rather than treating it as agreement", () => {
-    // npm names a package the lockfile has no entry for. The claim is not
-    // compared — a disagreement needs two readings — and it does not go
-    // quiet either: it lands in `namedFixUnread`, which prints.
+  it("reports a verdict nothing could read rather than treating it as agreement", () => {
+    // The only candidate is a direct package the lockfile has no entry for, so
+    // the claim is not compared — a disagreement needs two readings — and it
+    // does not go quiet either: it lands in `namedFixUnread`, which prints.
     //
     // The floor fires here as well, and that is the point rather than a side
     // effect: this fixture has ONE claimed package and the lockfile answered
     // for none of them, which is indistinguishable from a lockfile that
     // answers nothing at all. The case below is the same reading with a second
     // package the lockfile does answer for, and there it stays green.
-    const verdict = evaluateAudit(
-      report("expo", { name: "nowhere", version: "1.0.0", isSemVerMajor: true }, GHSA),
-      accepted("forward"),
-      LOCK,
-    );
+    const verdict = evaluateAudit(unplaceableCandidate(), accepted("forward", "vulnerable"), LOCK);
     assert.equal(verdict.namedFixUnread.length, 1);
-    assert.match(verdict.namedFixUnread[0], /no node_modules\/nowhere entry/);
+    assert.match(verdict.namedFixUnread[0], /nowhere@1\.0\.0/);
     assert.equal(verdict.namedFixStale.length, 1, "every claim unread is the floor");
   });
 
-  it("never compares an unstable claim, whichever way the run points", () => {
-    // The `braces` case. npm answered three ways across eleven runs on one
-    // tree, so there is nothing to compare against; a claim that held one of
-    // the three would be red about 40% of the time.
-    for (const version of ["44.0.6", "57.0.0", "54.0.35"]) {
-      const verdict = evaluateAudit(
-        report("expo", { name: "expo", version, isSemVerMajor: true }, GHSA),
-        accepted("unstable"),
-        LOCK,
-      );
-      assert.deepEqual(verdict.namedFixStale, [], version);
-      assert.deepEqual(verdict.namedFixUnread, [], version);
+  it("reads the verdict over every candidate, not over npm's pick", () => {
+    // Two candidates, one forward. npm's pick on any given run is one of them,
+    // and the verdict must not depend on which.
+    const verdict = evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable"), MULTI_LOCK);
+    assert.deepEqual(verdict.namedFixStale, [], "any forward candidate means forward");
+    const wrong = evaluateAudit(multiCandidate("expo"), accepted("no-forward", "vulnerable"), MULTI_LOCK);
+    assert.equal(wrong.namedFixStale.length, 1);
+    assert.match(wrong.namedFixStale[0], /reads forward today/);
+  });
+
+  it("gives the same verdict whichever candidate npm happened to pick", () => {
+    // The `braces` instability, as a case: npm named three different packages
+    // across eleven runs on one tree, and the verdict has to be identical.
+    for (const picked of ["expo", "react-native"]) {
+      const verdict = evaluateAudit(multiCandidate(picked), accepted("forward", "vulnerable"), MULTI_LOCK);
+      assert.deepEqual(verdict.namedFixStale, [], picked);
     }
   });
 
-  it("prints every unstable exemption on the green path", () => {
-    const printed = formatAuditVerdict(
-      evaluateAudit(
-        report("expo", { name: "expo", version: "44.0.6", isSemVerMajor: true }, GHSA),
-        accepted("unstable"),
-        LOCK,
-      ),
-      "check",
-      LOCK,
-    );
-    assert.match(printed, /1 accepted entry exempt from the fix-direction check because npm's own answer varies/);
-    assert.match(printed, /expo: read off a fixture \(read 2026-10-05\)/);
+  it("is no-forward only when EVERY candidate is behind", () => {
+    const verdict = evaluateAudit(multiCandidate("expo", { "react-native": "0.70.0" }), accepted("no-forward", "vulnerable"), MULTI_LOCK);
+    assert.deepEqual(verdict.namedFixStale, []);
   });
 
   it("fails when the lockfile answered for none of the claimed packages", () => {
@@ -214,18 +362,27 @@ describe("the verdict's two named-fix lists", () => {
         vulnerabilities: {
           expo: {
             severity: "high",
+            isDirect: true,
             fixAvailable: { name: "expo", version: "44.0.6", isSemVerMajor: true },
             effects: [],
             via: [{ source: 1, url: `https://github.com/advisories/${GHSA}`, severity: "high" }],
           },
-          other: {
+          nowhere: {
             severity: "high",
+            isDirect: true,
             fixAvailable: { name: "nowhere", version: "1.0.0", isSemVerMajor: true },
             effects: [],
+            via: ["other"],
+          },
+          other: {
+            severity: "high",
+            isDirect: false,
+            fixAvailable: { name: "nowhere", version: "1.0.0", isSemVerMajor: true },
+            effects: ["nowhere"],
             via: [{ source: 2, url: "https://github.com/advisories/GHSA-dddd-eeee-ffff", severity: "high" }],
           },
         },
-        metadata: { vulnerabilities: { high: 2 } },
+        metadata: { vulnerabilities: { high: 3 } },
       } as unknown as AuditReport,
       [
         ...accepted("no-forward"),
@@ -295,16 +452,19 @@ describe("this repository's own baseline", () => {
     }
   });
 
-  it("makes an unstable claim name more than one version, so it cannot be the easy answer", () => {
-    // `unstable` exempts an entry from the only check this field has, so the
-    // evidence for it is the whole of its cost. One version is one reading,
-    // and one reading cannot establish that an answer varies.
+  it("makes every claim's observed reading name what it was derived from", () => {
+    // `observed` is the evidence for a verdict a gate re-derives, and the one
+    // thing that makes it evidence is that it names the candidates. A claim
+    // with a verdict and no reading behind it is the state all four entries
+    // were in before 2026-10-05.
     for (const entry of ACCEPTED_HIGH_ADVISORIES) {
-      if (entry.namedFix?.verdict !== "unstable") continue;
-      const versions = new Set(entry.namedFix.observed.match(/@\d+\.\d+\.\d+/g) ?? []);
-      assert.ok(
-        versions.size > 1,
-        `${entry.package} claims unstable and its observed reading names ${String(versions.size)} version(s) — that is not a measurement of an answer varying`,
+      const claim = entry.namedFix;
+      assert.ok(claim);
+      if (claim.verdict === "unnamed") continue;
+      assert.match(
+        claim.observed,
+        /@\d+\.\d+\.\d+/,
+        `${entry.package}: observed names no candidate version, so it is a label rather than a reading`,
       );
     }
   });

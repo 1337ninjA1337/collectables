@@ -24,7 +24,8 @@ import { describe, it } from "node:test";
 import { type AuditVerdict, type FixableAdvisory, formatAuditVerdict, fixVersion } from "@/lib/audit-baseline";
 import {
   compareVersions,
-  describeDirection,
+  describeReadings,
+  groupLabel,
   fixDirection,
   lockedVersion,
   readNamedFix,
@@ -117,38 +118,6 @@ describe("lockedVersion", () => {
   });
 });
 
-describe("describeDirection", () => {
-  it("says nothing about a forward fix, which the sentence already states", () => {
-    assert.equal(describeDirection(readNamedFix({ packages: { "node_modules/a": { version: "1.0.0" } } }, "a", "2.0.0")), "");
-  });
-
-  it("names both versions for a backward one, so the claim is checkable", () => {
-    const sentence = describeDirection(
-      readNamedFix({ packages: { "node_modules/expo": { version: "54.0.35" } } }, "expo", "44.0.6"),
-    );
-    assert.match(sentence, /expo@44\.0\.6/);
-    assert.match(sentence, /54\.0\.35/);
-    assert.match(sentence, /BACKWARD/);
-  });
-
-  it("distinguishes the two unknowns, because they are different gaps", () => {
-    const noEntry = describeDirection(readNamedFix({ packages: {} }, "a", "1.0.0"));
-    assert.match(noEntry, /no node_modules\/a entry/);
-    const unparseable = describeDirection(
-      readNamedFix({ packages: { "node_modules/a": { version: "weird" } } }, "a", "1.0.0"),
-    );
-    assert.match(unparseable, /neither reads as an exact version/);
-  });
-
-  it("carries no leading punctuation, so a caller can put it on a line", () => {
-    const sentence = describeDirection(
-      readNamedFix({ packages: { "node_modules/a": { version: "2.0.0" } } }, "a", "1.0.0"),
-    );
-    assert.ok(!sentence.startsWith(" "), sentence);
-    assert.ok(!sentence.startsWith("—"), sentence);
-  });
-});
-
 describe("fixVersion", () => {
   it("reads npm's object shape and nothing else", () => {
     assert.equal(fixVersion({ name: "expo", version: "44.0.6", isSemVerMajor: true }), "44.0.6");
@@ -176,12 +145,12 @@ describe("the green line's claim", () => {
     namedFixUnclaimed: [],
     namedFixUnread: [],
     backwardNamedFixes: [],
-    unstableNamedFixes: [],
+    candidateVersions: {},
     majorOnly,
   });
 
   const backward = clean([
-    { key: "postcss#GHSA-aaaa-aaaa-aaa1", severity: "high", updatePackage: "expo", updateVersion: "44.0.6" },
+    { key: "postcss#GHSA-aaaa-aaaa-aaa1", severity: "high", updatePackage: "expo", updateVersion: "44.0.6", updateGroup: "expo" },
   ]);
   const lock = { packages: { "node_modules/expo": { version: "54.0.35" } } };
 
@@ -195,7 +164,10 @@ describe("the green line's claim", () => {
     const printed = formatAuditVerdict(backward, "check", lock);
     assert.ok(!printed.includes("cleared by"), printed);
     assert.match(printed, /named by 1 update, 1 of which npm cannot point forward/);
-    assert.match(printed, /expo \(1, up to high, BACKWARD\)/);
+    // The marker is the VERDICT over the candidates, not one reading's
+    // direction: "backward" is a fact about one version and "no forward fix"
+    // is the thing a reader acts on.
+    assert.match(printed, /expo \(1, up to high, NO FORWARD FIX\)/);
   });
 
   it("puts the detail on its own line rather than inside the list", () => {
@@ -203,22 +175,22 @@ describe("the green line's claim", () => {
     // which is unreadable at three groups and was the first version of this.
     const printed = formatAuditVerdict(
       clean([
-        { key: "postcss#GHSA-aaaa-aaaa-aaa1", severity: "high", updatePackage: "expo", updateVersion: "44.0.6" },
-        { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13" },
+        { key: "postcss#GHSA-aaaa-aaaa-aaa1", severity: "high", updatePackage: "expo", updateVersion: "44.0.6", updateGroup: "expo" },
+        { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13", updateGroup: "expo-router" },
       ]),
       "check",
       { packages: { ...lock.packages, "node_modules/expo-router": { version: "56.2.11" } } },
     );
     const lines = printed.split("\n");
-    assert.match(lines[0], /expo \(1, up to high, BACKWARD\), expo-router \(1, up to moderate\)/);
-    assert.match(lines[1], /^ {2}expo: npm names expo@44\.0\.6/);
+    assert.match(lines[0], /expo \(1, up to high, NO FORWARD FIX\), expo-router \(1, up to moderate\)/);
+    assert.match(lines[1], /^ {2}expo: no candidate npm names is ahead of the lockfile — expo@44\.0\.6 is behind 54\.0\.35/);
     assert.equal(lines.length, 2, "a forward group must not get a detail line");
   });
 
   it("annotates nothing when every group points forward", () => {
     const printed = formatAuditVerdict(
       clean([
-        { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13" },
+        { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13", updateGroup: "expo-router" },
       ]),
       "check",
       { packages: { "node_modules/expo-router": { version: "56.2.11" } } },
@@ -228,10 +200,133 @@ describe("the green line's claim", () => {
 
   it("makes no claim about a bare `true` fix, which names no version", () => {
     const printed = formatAuditVerdict(
-      clean([{ key: "x#GHSA-aaaa-aaaa-aaa3", severity: "high", updatePackage: "x", updateVersion: null }]),
+      clean([{ key: "x#GHSA-aaaa-aaaa-aaa3", severity: "high", updatePackage: "x", updateVersion: null, updateGroup: "x" }]),
       "check",
       lock,
     );
     assert.match(printed, /cleared by 1 upgrade: x \(1, up to high\)/);
+  });
+});
+
+describe("describeReadings", () => {
+  const lock = {
+    packages: {
+      "node_modules/@sentry/react-native": { version: "7.5.0" },
+      "node_modules/expo": { version: "54.0.35" },
+      "node_modules/react-native": { version: "0.81.5" },
+    },
+  };
+  const read = (pkg: string, version: string) => readNamedFix(lock, pkg, version);
+
+  it("says nothing when one candidate is ahead", () => {
+    // The group line already states the normal case, and a four-candidate
+    // group with a route is not a group to explain.
+    assert.equal(describeReadings([read("expo", "44.0.6"), read("react-native", "0.87.1")]), "");
+  });
+
+  it("names each candidate once and the conclusion once", () => {
+    // The version before this spelled one reading out in full and the caller
+    // applied it per candidate, so a group of four printed four copies of one
+    // paragraph — which the group line really did.
+    const sentence = describeReadings([read("@sentry/react-native", "5.15.2"), read("expo", "44.0.6")]);
+    assert.match(sentence, /no candidate npm names is ahead of the lockfile/);
+    assert.match(sentence, /@sentry\/react-native@5\.15\.2 is behind 7\.5\.0/);
+    assert.match(sentence, /expo@44\.0\.6 is behind 54\.0\.35/);
+    assert.equal(sentence.match(/waits on upstream/g)?.length, 1);
+  });
+
+  it("distinguishes a candidate npm names at the installed version", () => {
+    assert.match(describeReadings([read("expo", "54.0.35")]), /expo@54\.0\.35 is what is installed/);
+  });
+
+  it("says so when the lockfile placed none of them", () => {
+    // Named per candidate: a lockfile with no entry and a version nothing
+    // parsed are different things to go and look at.
+    assert.match(
+      describeReadings([readNamedFix({ packages: {} }, "expo", "44.0.6")]),
+      /the lockfile placed no candidate npm names, so which way they point is unread — expo@44\.0\.6 has no node_modules\/expo entry/,
+    );
+    assert.match(
+      describeReadings([readNamedFix({ packages: { "node_modules/expo": { version: "weird" } } }, "expo", "44.0.6")]),
+      /against a locked weird, neither an exact version/,
+    );
+  });
+
+  it("is empty for an empty set", () => {
+    assert.equal(describeReadings([]), "");
+  });
+});
+
+describe("groupLabel", () => {
+  it("names one or two candidates in full", () => {
+    assert.equal(groupLabel(["expo"]), "expo");
+    assert.equal(groupLabel(["@sentry/react-native", "expo"]), "@sentry/react-native / expo");
+  });
+
+  it("caps at two and counts the rest, so one line stays one line", () => {
+    // Four such labels in a comma-separated list is what the first version
+    // printed, and one of them was five scoped package names.
+    assert.equal(
+      groupLabel(["@sentry/react-native", "expo", "expo-auth-session", "expo-linking", "expo-router"]),
+      "@sentry/react-native / expo +3",
+    );
+  });
+
+  it("is empty for no candidates", () => {
+    assert.equal(groupLabel([]), "");
+  });
+});
+
+describe("the green line is the same on every run", () => {
+  it("groups by the candidate set rather than by npm's pick", () => {
+    // The defect this set out to fix: `updatePackage` is npm's pick and it
+    // moved three times on one tree, so two advisories of one group landed in
+    // different buckets depending on which path npm resolved first. Grouping
+    // by `updateGroup` puts them together whichever name npm gave.
+    const clean = (majorOnly: readonly FixableAdvisory[]): AuditVerdict => ({
+      unexpected: [],
+      stillPresent: [],
+      stale: [],
+      completeness: { complete: true, claimed: 0, carried: 0, underReported: [] },
+      fixableInRange: [],
+      pinnedFix: [],
+      pinnedFixUnused: [],
+      namedFixStale: [],
+      namedFixUnclaimed: [],
+      namedFixUnread: [],
+      backwardNamedFixes: [],
+      candidateVersions: { expo: "44.0.6", "react-native": "0.87.1" },
+      majorOnly,
+    });
+    const lock = {
+      packages: {
+        "node_modules/expo": { version: "54.0.35" },
+        "node_modules/react-native": { version: "0.81.5" },
+      },
+    };
+    // Two advisories, one candidate set, npm picking differently for each.
+    const printed = formatAuditVerdict(
+      clean([
+        {
+          key: "a#GHSA-aaaa-aaaa-aaa1",
+          severity: "high",
+          updatePackage: "expo",
+          updateVersion: "44.0.6",
+          updateGroup: "expo / react-native",
+        },
+        {
+          key: "b#GHSA-aaaa-aaaa-aaa2",
+          severity: "high",
+          updatePackage: "react-native",
+          updateVersion: "0.87.1",
+          updateGroup: "expo / react-native",
+        },
+      ]),
+      "check",
+      lock,
+    );
+    assert.match(printed, /cleared by 1 upgrade: expo \/ react-native \(2, up to high\)/);
+    // And the forward candidate decides it, so no detail line.
+    assert.equal(printed.split("\n").length, 1, printed);
   });
 });
