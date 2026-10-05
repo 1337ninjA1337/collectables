@@ -180,3 +180,59 @@ export function describeDirection(reading: NamedFixReading): string {
         : `npm names ${reading.package}@${reading.named} against a locked ${reading.installed}, and neither reads as an exact version, so which way it points is unread`;
   }
 }
+
+/**
+ * What a committed claim about npm's named fix can be held to.
+ *
+ * ## Why this is three states and not a version string
+ *
+ * The obvious check is "the acceptance says `expo@57`, so hold it to what npm
+ * names". It was measured on 2026-10-05 and it does not work: two consecutive
+ * `npm audit --json` runs on an unchanged tree named two different fixes for
+ * `braces` — `expo@44.0.6` and then `gh-pages@6.1.1`. The advisory is reachable
+ * through `metro-file-map` → `micromatch` under `expo` and through `globby` →
+ * `fast-glob` under `gh-pages`, and npm reports whichever path it resolves
+ * first. A committed version would be red about half the time, on a tree
+ * nobody had touched.
+ *
+ * What was the SAME in both readings is the only thing worth committing: both
+ * named versions are behind what the lockfile has, so npm has nowhere forward
+ * to send this tree either way. That survives the flip, it is the fact an
+ * acceptance actually rests on, and it is what four sentences got wrong by
+ * naming a version instead.
+ */
+export type NamedFixVerdict =
+  /** npm names a version ahead of the lockfile — there is somewhere to go. */
+  | "forward"
+  /** npm names one at or behind it — no forward route, whichever path it took. */
+  | "no-forward"
+  /** npm named no version at all: a bare `true` fix, or no fix. */
+  | "unnamed";
+
+/**
+ * Collapse a reading to the state a claim is held to, or `null` when unread.
+ *
+ * `null` for the reading itself is npm naming no version. `null` OUT is a
+ * direction nothing could decide — an unparseable version, or a package the
+ * lockfile has no entry for — and the caller must then say the claim was not
+ * checked rather than treat "could not ask" as agreement. That distinction is
+ * the one `reportCompleteness` exists for one question over, and for the same
+ * reason: a withheld answer that reads as a pass is how this gate was wrong
+ * for two months in 2026-08.
+ */
+export function namedFixVerdict(reading: NamedFixReading | null): NamedFixVerdict | null {
+  if (reading === null) return "unnamed";
+  switch (reading.direction) {
+    case "forward":
+      return "forward";
+    // `same` joins `backward`: npm naming what is already installed is npm
+    // offering nowhere to go, which is what the claim is about. The two are
+    // still printed differently by `describeDirection`, because "npm names
+    // your own version" is a different thing to go and look at.
+    case "backward":
+    case "same":
+      return "no-forward";
+    case "unknown":
+      return null;
+  }
+}

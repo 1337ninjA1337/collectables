@@ -114,7 +114,13 @@
  */
 
 import { annotation } from "./github-annotations";
-import { describeDirection, type NamedFixReading, readNamedFix } from "./named-fix-direction";
+import {
+  describeDirection,
+  type NamedFixReading,
+  type NamedFixVerdict,
+  namedFixVerdict,
+  readNamedFix,
+} from "./named-fix-direction";
 import { plural } from "./plural";
 
 /** One triaged advisory root. Transitive dependents are not listed. */
@@ -210,6 +216,22 @@ export interface AcceptedAdvisory {
    * `audit-baseline-pin.test.ts` checks them; the last is a build somebody ran.
    */
   readonly inRangeFixPinned?: PinnedFix;
+  /**
+   * What npm's fix verdict said about this advisory, last time anybody read it.
+   *
+   * Required in practice: an accepted entry without one is reported by
+   * {@link AuditVerdict.namedFixUnclaimed}, the same way a finding without a
+   * triage verdict is reported one gate over. Optional in the TYPE because a
+   * suite's fixture decides its own exemptions, and because the check is
+   * skipped entirely when no lockfile reaches the evaluator.
+   *
+   * This is the field four `why` sentences should have been. On 2026-10-05
+   * `postcss` and `image-size` said "fix = expo@57", `braces` said
+   * "react-native@0.87" and `node-forge` said "expo@44" — one of them matched
+   * npm literally and still described a downgrade as a fix, and none of them
+   * had ever been held to anything.
+   */
+  readonly namedFix?: NamedFixClaim;
   /** Why these are accepted rather than fixed. One sentence. */
   readonly why: string;
 }
@@ -237,6 +259,45 @@ export interface PinnedFix {
   readonly whenForced: string;
   /** The date {@link whenForced} was measured, `YYYY-MM-DD`. */
   readonly measured: string;
+}
+
+/**
+ * A committed reading of what `npm audit` says a fix would be.
+ *
+ * ## Why the held field is a direction and not a version
+ *
+ * Measured on 2026-10-05, and the measurement is the whole design. Two
+ * consecutive `npm audit --json` runs on an unchanged tree named two different
+ * fixes for `braces`: `expo@44.0.6`, then `gh-pages@6.1.1`. The advisory is
+ * reachable through `metro-file-map` → `micromatch` under `expo` and through
+ * `globby` → `fast-glob` under `gh-pages`, and npm reports whichever path it
+ * resolved first. A committed version string would be red about half the time
+ * on a tree nobody had touched — which is the one thing a gate must never do,
+ * because a check that is red for no reason is a check somebody turns off.
+ *
+ * Both readings agree about the thing an acceptance actually rests on: every
+ * version npm named is behind what the lockfile has, so there is nowhere
+ * forward to send this tree. {@link NamedFixVerdict} is that, and it survives
+ * the flip.
+ *
+ * ## Why `observed` is prose and is not checked
+ *
+ * It is the reading a person did, kept so the next person can see what the
+ * verdict was derived from. It names versions, so it goes stale by
+ * construction — which is fine for a dated note and is exactly why it must not
+ * be the held field. `PinnedFix.whenForced` is the same shape for the same
+ * reason: a measurement somebody took, with the date it was taken, beside a
+ * verdict a gate can re-derive.
+ */
+export interface NamedFixClaim {
+  /** The direction npm's named fix pointed, which is the part held. */
+  readonly verdict: NamedFixVerdict;
+  /** When it was read off a real `npm audit --json`, `YYYY-MM-DD`. */
+  readonly read: string;
+  /**
+   * What npm named that day, for a reader. Not held to — see the header.
+   */
+  readonly observed: string;
 }
 
 /**
@@ -271,6 +332,12 @@ export interface PinnedFix {
 export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   {
     package: "image-size",
+    namedFix: {
+      verdict: "unnamed",
+      read: "2026-10-05",
+      observed:
+        "npm reports fixAvailable: true for it — an in-range fix, named by no version, which is the case inRangeFixPinned already measures",
+    },
     advisories: ["GHSA-5p2g-fcmc-qvqq", "GHSA-w3rx-r6r6-pgpr"],
     shipsToClient: false,
     absentFingerprint: "invalid invocation. input should be a Uint8Array",
@@ -286,6 +353,12 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   },
   {
     package: "postcss",
+    namedFix: {
+      verdict: "no-forward",
+      read: "2026-10-05",
+      observed:
+        "expo@44.0.6 against a locked 54.0.35 — ten majors behind, and the version this entry claimed until today was expo@57",
+    },
     advisories: ["GHSA-6g55-p6wh-862q", "GHSA-r28c-9q8g-f849"],
     shipsToClient: false,
     absentFingerprint: "CssSyntaxError",
@@ -293,6 +366,12 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   },
   {
     package: "braces",
+    namedFix: {
+      verdict: "no-forward",
+      read: "2026-10-05",
+      observed:
+        "expo@44.0.6 on one run and gh-pages@6.1.1 on the next, unchanged tree: reachable under both, and BOTH behind the lockfile (54.0.35 and 6.3.0). This entry is why the held field is a direction",
+    },
     advisories: ["GHSA-vfj7-8cjw-p6xm"],
     shipsToClient: false,
     absentFingerprint: "expanded array length exceeds range limit",
@@ -300,6 +379,12 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   },
   {
     package: "node-forge",
+    namedFix: {
+      verdict: "no-forward",
+      read: "2026-10-05",
+      observed:
+        "expo@44.0.6 against a locked 54.0.35 — the same group as postcss, and read as a breaking major until today",
+    },
     advisories: ["GHSA-86w9-cpqp-85rv"],
     shipsToClient: false,
     absentFingerprint: "ASN.1 object does not contain an RSAPublicKey.",
@@ -941,6 +1026,32 @@ export interface AuditVerdict {
    * it is built the same way out of what npm did NOT say.
    */
   readonly pinnedFixUnused: readonly string[];
+  /**
+   * Baseline entries whose `namedFix` verdict disagrees with the live report —
+   * one edit to fix, which is why this one FAILS.
+   *
+   * Unlike the direction the green line reports, a stale claim is actionable:
+   * somebody re-reads the field and commits a word. That is the whole of the
+   * difference, and it is the line this gate draws everywhere else too — the
+   * report is for what a reader cannot act on, the failure is for what they
+   * can.
+   *
+   * Empty when no lockfile reached {@link evaluateAudit}: a direction cannot be
+   * read without one, and a check that could not ask must not read as a pass.
+   */
+  readonly namedFixStale: readonly string[];
+  /**
+   * Accepted packages with no `namedFix` claim at all.
+   *
+   * The completeness half, and the one that would have caught the four stale
+   * sentences: an acceptance that says nothing about npm's fix verdict is an
+   * acceptance resting on a reading nobody wrote down. Same ask as a triage
+   * verdict in `lib/set-state-in-effect-triage.ts` — much smaller than a fix,
+   * and the thing that stops a list describing the day it was written.
+   *
+   * Withheld with the above when there is no lockfile, for the same reason.
+   */
+  readonly namedFixUnclaimed: readonly string[];
 }
 
 /** `package#id`, the form every list in {@link AuditVerdict} carries. */
@@ -1214,6 +1325,15 @@ export function reportCompleteness(report: AuditReport): ReportCompleteness {
 export function evaluateAudit(
   report: AuditReport,
   accepted: readonly AcceptedAdvisory[] = ACCEPTED_HIGH_ADVISORIES,
+  /**
+   * Parsed `package-lock.json`, for the `namedFix` half of the verdict.
+   *
+   * Omitted means the two named-fix lists come back empty and the gate says
+   * nothing about them — which is right for a fixture with no tree behind it,
+   * and is why every existing caller is unaffected. A direction needs an
+   * installed version, and there is no installed version without this.
+   */
+  lock?: unknown,
 ): AuditVerdict {
   const acceptedKeys = new Set(
     accepted.flatMap((entry) => entry.advisories.map((id) => advisoryKey(entry.package, id))),
@@ -1260,7 +1380,68 @@ export function evaluateAudit(
     pinnedFixUnused: completeness.complete
       ? [...pinnedKeys].filter((key) => !inRange.some((found) => found.key === key)).sort()
       : [],
+    ...namedFixLists(report, accepted, lock),
   };
+}
+
+/**
+ * The two `namedFix` lists, or both empty when there is no lockfile to read.
+ *
+ * Not withheld on an incomplete report, unlike `stale` and `pinnedFixUnused`:
+ * those are built out of what npm did NOT say, and a short report cannot tell
+ * silence from withdrawal. This is built out of what npm DID say about an
+ * advisory it reported, so a report missing entries simply has fewer of them
+ * to check — and an advisory it did not report is not in `named` at all, which
+ * reads as `unnamed` and is the honest answer for "npm said nothing about it".
+ */
+function namedFixLists(
+  report: AuditReport,
+  accepted: readonly AcceptedAdvisory[],
+  lock: unknown,
+): Pick<AuditVerdict, "namedFixStale" | "namedFixUnclaimed"> {
+  if (lock === undefined) return { namedFixStale: [], namedFixUnclaimed: [] };
+  const stale: string[] = [];
+  const unclaimed: string[] = [];
+  for (const entry of accepted) {
+    const live = namedFixVerdict(readEntryNamedFix(report, entry, lock));
+    if (entry.namedFix === undefined) {
+      unclaimed.push(
+        `${entry.package} — npm's fix verdict for it reads ${live ?? "unread"} today and the entry claims nothing. Add a namedFix: { verdict, read, observed }.`,
+      );
+      continue;
+    }
+    // A direction nothing could read is not a disagreement. Saying so beats
+    // both alternatives: treating it as a pass hides a claim nobody checked,
+    // and failing on it makes the gate red for a lockfile shape.
+    if (live === null) continue;
+    if (live !== entry.namedFix.verdict) {
+      stale.push(
+        `${entry.package} — claims ${entry.namedFix.verdict} (read ${entry.namedFix.read}) and npm's fix verdict reads ${live} today. Re-read it and update namedFix; the version npm names is not stable for a multi-path advisory, so re-read the DIRECTION.`,
+      );
+    }
+  }
+  return { namedFixStale: stale.sort(), namedFixUnclaimed: unclaimed.sort() };
+}
+
+/**
+ * One accepted entry's named fix, read against the lockfile.
+ *
+ * Keyed on the PACKAGE rather than on each advisory id: `fixAvailable` is a
+ * field on the vulnerability root, so every advisory under one package shares
+ * it, and asking per advisory would be asking the same question twice for
+ * `image-size` and `postcss`. `null` is npm naming no version — a bare `true`
+ * fix, a `false`, or a package the report does not mention at all.
+ */
+function readEntryNamedFix(
+  report: AuditReport,
+  entry: AcceptedAdvisory,
+  lock: unknown,
+): NamedFixReading | null {
+  const vulnerability = (report.vulnerabilities ?? {})[entry.package];
+  if (vulnerability === undefined) return null;
+  const version = fixVersion(vulnerability.fixAvailable);
+  if (version === null) return null;
+  return readNamedFix(lock, fixPackage(report, entry.package), version);
 }
 
 /**
@@ -1544,6 +1725,24 @@ export function formatAuditVerdict(
       "Each has an inRangeFixPinned measurement in lib/audit-baseline.ts naming the dependent that pins the vulnerable range and what forcing it past that pin actually did. npm's fixAvailable is a judgement about direct dependencies only, so it cannot see a transitive range — re-take the measurement rather than the sentence if the tree moves.",
     );
   }
+  if (verdict.namedFixUnclaimed.length > 0) {
+    lines.push(
+      `${checkName}: ${counted(verdict.namedFixUnclaimed.length, "accepted package", "accepted packages")} with nothing said about npm's fix verdict:`,
+    );
+    for (const problem of verdict.namedFixUnclaimed) lines.push(`  ${problem}`);
+    lines.push(
+      "An acceptance that does not say what npm offers is an acceptance resting on a reading nobody wrote down — which is how `fix = expo@57` survived on two entries until 2026-10-05, when npm had been naming a ten-major downgrade.",
+    );
+  }
+  if (verdict.namedFixStale.length > 0) {
+    lines.push(
+      `${checkName}: ${counted(verdict.namedFixStale.length, "baseline entry", "baseline entries")} with a namedFix direction npm no longer reports:`,
+    );
+    for (const problem of verdict.namedFixStale) lines.push(`  ${problem}`);
+    lines.push(
+      "This is one edit, which is why it fails rather than printing: re-read the direction and commit the word. `npm audit --json` names the version and `lib/named-fix-direction.ts` compares it against package-lock.json — the green line below prints the same reading for every major-only group.",
+    );
+  }
   if (verdict.pinnedFixUnused.length > 0) {
     lines.push(
       `${checkName}: ${counted(verdict.pinnedFixUnused.length, "baseline entry", "baseline entries")} claim an in-range fix is pinned and npm no longer reports one: ${verdict.pinnedFixUnused.join(", ")}`,
@@ -1642,7 +1841,9 @@ export function isClean(verdict: AuditVerdict): boolean {
     verdict.unexpected.length === 0 &&
     verdict.fixableInRange.length === 0 &&
     verdict.stale.length === 0 &&
-    verdict.pinnedFixUnused.length === 0
+    verdict.pinnedFixUnused.length === 0 &&
+    verdict.namedFixStale.length === 0 &&
+    verdict.namedFixUnclaimed.length === 0
   );
 }
 
@@ -1729,6 +1930,15 @@ export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): Audit
     // above, and for the same reason.
     pinnedFix: byKey(first.pinnedFix, second.pinnedFix),
     pinnedFixUnused: [...intersect((verdict) => verdict.pinnedFixUnused)].sort(),
+    // Intersected, like every other list here built from an absence. A claim
+    // that disagrees with ONE read is the `braces` case exactly: the named
+    // version flips between consecutive runs, and the direction is supposed to
+    // survive that. If the direction itself disagrees on only one read, that
+    // is npm moving under us and not a sentence to re-write.
+    namedFixStale: [...intersect((verdict) => verdict.namedFixStale)].sort(),
+    // Unioned: an entry with no claim has no claim on either read, and the
+    // second read cannot make one appear.
+    namedFixUnclaimed: [...new Set([...first.namedFixUnclaimed, ...second.namedFixUnclaimed])].sort(),
   };
 }
 
@@ -2008,11 +2218,12 @@ export function runAuditGate(options: {
     return skippedGate(lines);
   }
   const answered = answerWithSecondRead({
-    first: evaluateAudit(read.report, accepted),
+    first: evaluateAudit(read.report, accepted, lock),
     readAgain: reader,
     checkName,
     underActions,
     accepted,
+    lock,
   });
   const verdict = answered.verdict;
   const lines = [...answered.lines, formatAuditVerdict(verdict, checkName, lock)];
@@ -2081,8 +2292,10 @@ export function answerWithSecondRead(options: {
   readonly checkName: string;
   readonly underActions: boolean;
   readonly accepted?: readonly AcceptedAdvisory[];
+  /** Parsed `package-lock.json`, so the second read evaluates the same way. */
+  readonly lock?: unknown;
 }): AnsweredAudit {
-  const { first, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
+  const { first, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, lock } = options;
   if (!worthAsking(first)) return { verdict: first, lines: [] };
   const lines = [
     `${checkName}: this answer rests on what npm did NOT report, so asking once more before acting on it.`,
@@ -2102,7 +2315,7 @@ export function answerWithSecondRead(options: {
     );
     return { verdict: first, lines };
   }
-  const second = evaluateAudit(again.report, accepted);
+  const second = evaluateAudit(again.report, accepted, lock);
   // The line the log was missing: it announced a second call and then printed a
   // verdict, so a reader could not tell whether the second read landed, agreed,
   // or was the one that changed the answer.

@@ -172,6 +172,8 @@ describe("the green line's claim", () => {
     fixableInRange: [],
     pinnedFix: [],
     pinnedFixUnused: [],
+    namedFixStale: [],
+    namedFixUnclaimed: [],
     majorOnly,
   });
 

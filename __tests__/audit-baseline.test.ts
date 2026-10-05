@@ -920,6 +920,8 @@ describe("the OK line — upgrades, never advisories", () => {
         fixableInRange: [],
         pinnedFix: [],
         pinnedFixUnused: [],
+    namedFixStale: [],
+    namedFixUnclaimed: [],
         majorOnly: [
           { key: `mild#${A1}`, severity: "low", updatePackage: "one-root", updateVersion: null },
           { key: `severe#${A2}`, severity: "high", updatePackage: "one-root", updateVersion: null },
@@ -970,6 +972,8 @@ describe("the OK line — upgrades, never advisories", () => {
         fixableInRange: [],
         pinnedFix: [],
         pinnedFixUnused: [],
+    namedFixStale: [],
+    namedFixUnclaimed: [],
         majorOnly: [],
       },
       "check",
