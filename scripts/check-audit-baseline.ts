@@ -33,11 +33,32 @@
  */
 
 import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { auditReader, runAuditGate } from "../lib/audit-baseline";
 import { runningUnderActions } from "../lib/github-annotations";
 
 const CHECK_NAME = "check-audit-baseline";
+const REPO_ROOT = path.join(__dirname, "..");
+
+/**
+ * The lockfile, for the one question the audit report cannot answer about
+ * itself: whether the version npm names as a fix is ahead of the one installed.
+ *
+ * Read here rather than in the module, the same split
+ * `scripts/check-sentry-version.ts` uses. An unreadable or unparseable
+ * lockfile is `undefined` and the green line simply does not make the claim —
+ * a gate that died on a missing lockfile would be a gate that fails for a
+ * reason it is not about.
+ */
+function readLock(): unknown {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8"));
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * The two things only a process can do: read the registry, and exit.
@@ -53,6 +74,7 @@ function main(): void {
     read: auditReader((options) => execFileSync("npm", ["audit", "--json"], options)),
     checkName: CHECK_NAME,
     underActions: runningUnderActions(),
+    lock: readLock(),
   });
   for (const line of run.lines) console.log(line);
   if (!run.clean) process.exit(1);

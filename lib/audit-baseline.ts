@@ -114,6 +114,7 @@
  */
 
 import { annotation } from "./github-annotations";
+import { describeDirection, type NamedFixReading, readNamedFix } from "./named-fix-direction";
 import { plural } from "./plural";
 
 /** One triaged advisory root. Transitive dependents are not listed. */
@@ -281,28 +282,28 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
         "an overrides entry for ^2.0.4 installs, and `npm run build` then dies on the first image asset — image-size@2 dropped its default export and metro's Assets.js calls `_interopRequireDefault(require(\"image-size\")).default(content)`, so the export the web bundle needs is not there: `SyntaxError: node_modules/expo-router/assets/file.png: The \"list\" argument must be an instance of SharedArrayBuffer, ArrayBuffer or ArrayBufferView`",
       measured: "2026-09-25",
     },
-    why: "JXL/HEIF and ICNS parser DoS in metro's asset pipeline, build-time only (the string in the bundle is the icon name image-size-select-actual, not this package); npm now reports an in-range fix and the tree cannot take it — see inRangeFixPinned — so the real fix is still expo@57, a breaking major",
+    why: "JXL/HEIF and ICNS parser DoS in metro's asset pipeline, build-time only (the string in the bundle is the icon name image-size-select-actual, not this package); npm now reports an in-range fix and the tree cannot take it — see inRangeFixPinned — and names no forward fix at all: on 2026-10-05 its fixAvailable for the expo group was expo@44.0.6 against a locked 54.0.35, which is ten majors BACKWARD, so there is no version to move to today rather than one this tree declines",
   },
   {
     package: "postcss",
     advisories: ["GHSA-6g55-p6wh-862q", "GHSA-r28c-9q8g-f849"],
     shipsToClient: false,
     absentFingerprint: "CssSyntaxError",
-    why: "arbitrary file read and source-map path traversal in @expo/metro-config's build-time CSS transform; fix is expo@57, a breaking major",
+    why: "arbitrary file read and source-map path traversal in @expo/metro-config's build-time CSS transform; npm names expo@44.0.6 as the fix and the lockfile is on 54.0.35, so what it offers is a ten-major DOWNGRADE rather than the expo@57 this sentence claimed until 2026-10-05 — npm has no forward fix for it, which is a stronger reason to hold the exemption than the one it replaces",
   },
   {
     package: "braces",
     advisories: ["GHSA-vfj7-8cjw-p6xm"],
     shipsToClient: false,
     absentFingerprint: "expanded array length exceeds range limit",
-    why: "stack-exhaustion DoS on a deeply nested brace pattern, reached only through micromatch under metro-file-map, fast-glob and the jest packages — every caller is a build or test-time glob over this repository's own paths, never a pattern from outside it, and npm names react-native@0.87 as the fix, a breaking major",
+    why: "stack-exhaustion DoS on a deeply nested brace pattern, reached only through micromatch under metro-file-map, fast-glob and the jest packages — every caller is a build or test-time glob over this repository's own paths, never a pattern from outside it, and npm names expo@44.0.6 as the fix against a locked 54.0.35, a DOWNGRADE — it named react-native@0.87 when this was triaged on 2026-10-03 and names neither a forward expo nor a react-native today",
   },
   {
     package: "node-forge",
     advisories: ["GHSA-86w9-cpqp-85rv"],
     shipsToClient: false,
     absentFingerprint: "ASN.1 object does not contain an RSAPublicKey.",
-    why: "RSA PKCS#1 v1.5 verification accepts extra nested DigestAlgorithm elements, in @expo/cli and @expo/code-signing-certificates — expo-updates code signing, which this app does not use (there is no codeSigningCertificate in app.json and no EAS Update channel reading one); npm names expo@44 as the fix, a breaking major",
+    why: "RSA PKCS#1 v1.5 verification accepts extra nested DigestAlgorithm elements, in @expo/cli and @expo/code-signing-certificates — expo-updates code signing, which this app does not use (there is no codeSigningCertificate in app.json and no EAS Update channel reading one); npm names expo@44.0.6 as the fix against a locked 54.0.35, which is a DOWNGRADE rather than the breaking major this sentence read as until 2026-10-05",
   },
 ];
 
@@ -821,6 +822,21 @@ function namedFix(fixAvailable: unknown): string | null {
 }
 
 /**
+ * The VERSION npm named, or `null` when it named none.
+ *
+ * Only the object shape of `fixAvailable` carries one; a bare `true` says a fix
+ * resolves inside the declared ranges and names nothing. There is no fallback
+ * and there must not be — `lib/named-fix-direction.ts` compares this against
+ * the lockfile, and a guessed version would produce a direction the report
+ * never claimed. Same rule as {@link fixKind} on an unrecognised shape.
+ */
+export function fixVersion(fixAvailable: unknown): string | null {
+  if (typeof fixAvailable !== "object" || fixAvailable === null) return null;
+  const version = (fixAvailable as { version?: unknown }).version;
+  return typeof version === "string" && version !== "" ? version : null;
+}
+
+/**
  * The severities a baseline entry is required for.
  *
  * npm reports five (`info`, `low`, `moderate`, `high`, `critical`) and this
@@ -852,6 +868,8 @@ export interface FixableAdvisory {
    * one, the vulnerable package otherwise. See {@link fixPackage}.
    */
   readonly updatePackage: string;
+  /** The version npm named, or `null`. See {@link fixVersion}. */
+  readonly updateVersion: string | null;
 }
 
 export interface AuditVerdict {
@@ -991,6 +1009,14 @@ export interface ObservedAdvisory {
    * verdict came from and inherited the same way. See {@link fixPackage}.
    */
   readonly updatePackage: string;
+  /**
+   * The version npm named, when it named one. See {@link fixVersion}.
+   *
+   * Separate from {@link updatePackage} because the package has three sources
+   * and a fallback while the version has exactly one and none: npm's own
+   * object. `null` is a bare `true` fix, which names no version at all.
+   */
+  readonly updateVersion: string | null;
 }
 
 /**
@@ -1021,6 +1047,7 @@ export function observedAdvisoryDetails(
   for (const [name, entry] of Object.entries(report.vulnerabilities ?? {})) {
     const fix = fixKind(entry.fixAvailable);
     const updatePackage = fixPackage(report, name);
+    const updateVersion = fixVersion(entry.fixAvailable);
     for (const via of entry.via ?? []) {
       if (typeof via !== "object" || via === null) continue;
       const advisory = via as { source?: unknown; url?: unknown; severity?: unknown };
@@ -1030,6 +1057,7 @@ export function observedAdvisoryDetails(
         severity: String(advisory.severity ?? ""),
         fix,
         updatePackage,
+        updateVersion,
       });
     }
   }
@@ -1203,6 +1231,7 @@ export function evaluateAudit(
         key,
         severity: detail.severity,
         updatePackage: detail.updatePackage,
+        updateVersion: detail.updateVersion,
       }))
       .sort(bySeverityThenKey);
   // The keys whose entry has measured that npm's in-range fix cannot be taken.
@@ -1335,7 +1364,7 @@ function counted(count: number, one: string, many: string): string {
  * upgrade buy?"). The advisory ids do not: they are what a FAILING run prints,
  * and a reader who wants them on a green run wants `npm audit`.
  */
-function majorOnlySummary(majorOnly: readonly FixableAdvisory[]): string {
+function majorOnlySummary(majorOnly: readonly FixableAdvisory[], lock?: unknown): string {
   if (majorOnly.length === 0) return "";
   const groups = [...groupByPackage(majorOnly, (found) => found.updatePackage)]
     // Most severe group first, then the one that buys the most, then by name:
@@ -1356,8 +1385,55 @@ function majorOnlySummary(majorOnly: readonly FixableAdvisory[]): string {
         b.found.length - a.found.length ||
         a.name.localeCompare(b.name),
     )
-    .map((group) => `${group.name} (${String(group.found.length)}, up to ${group.worst})`);
-  return `; and npm offers no fix short of a semver-major for ${counted(majorOnly.length, "advisory", "advisories")}, cleared by ${counted(groups.length, "upgrade", "upgrades")}: ${groups.join(", ")}`;
+    .map((group) => ({ ...group, reading: namedFixReading(group.found, lock) }));
+  // The headline only claims "upgrades" when every group that could be read IS
+  // one. Before the direction was read it claimed it unconditionally, and on
+  // 2026-10-05 the biggest group on this tree was a ten-major downgrade: a
+  // summary that says "cleared by" about a version nobody can install is worse
+  // than a summary that says nothing, because a reader acts on it.
+  const notForward = groups.filter((group) => group.reading !== null && group.reading.direction !== "forward");
+  const label = notForward.length === 0
+    ? `cleared by ${counted(groups.length, "upgrade", "upgrades")}`
+    : `named by ${counted(groups.length, "update", "updates")}, ${String(notForward.length)} of which npm cannot point forward`;
+  const named = groups
+    .map((group) => {
+      const marker = group.reading === null || group.reading.direction === "forward"
+        ? ""
+        : `, ${group.reading.direction.toUpperCase()}`;
+      return `${group.name} (${String(group.found.length)}, up to ${group.worst}${marker})`;
+    })
+    .join(", ");
+  // The detail goes BELOW rather than inline. Inline it read as one sentence
+  // with a paragraph wedged into the middle of a comma-separated list, which
+  // is how the first version of this came out and is unreadable at three
+  // groups.
+  const detail = notForward.map((group) =>
+    group.reading === null ? "" : `\n  ${group.name}: ${describeDirection(group.reading)}`,
+  );
+  return `; and npm offers no fix short of a semver-major for ${counted(majorOnly.length, "advisory", "advisories")}, ${label}: ${named}${detail.join("")}`;
+}
+
+/**
+ * A group's named fix, placed against the lockfile — or `null` when it cannot be.
+ *
+ * Two different `null`s and neither is a problem. `lock === undefined` is
+ * "nobody asked": the caller that hands no lockfile in gets the sentence this
+ * gate printed for a month, which is right for a fixture with no tree behind
+ * it. A `null` `updateVersion` is npm's bare `true` fix, which names no
+ * version to compare. The GATE always hands a lockfile in, because on
+ * 2026-10-05 the sentence was false on this very repository — see
+ * `lib/named-fix-direction.ts`.
+ *
+ * Read off the first entry in the group. Every advisory in a group shares an
+ * `updatePackage` by construction, and `updateVersion` rides the same
+ * `fixAvailable` object, so the group has one named version or none; a group
+ * whose entries disagreed would be a group that was not grouped.
+ */
+function namedFixReading(group: readonly FixableAdvisory[], lock: unknown): NamedFixReading | null {
+  if (lock === undefined) return null;
+  const named = group[0]?.updateVersion;
+  if (named === null || named === undefined) return null;
+  return readNamedFix(lock, group[0].updatePackage, named);
 }
 
 /**
@@ -1410,7 +1486,16 @@ function groupByPackage<T>(items: readonly T[], name: (item: T) => string): Map<
 }
 
 /** Human-readable report; the CLI prints this and nothing else. */
-export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): string {
+export function formatAuditVerdict(
+  verdict: AuditVerdict,
+  checkName: string,
+  /**
+   * Parsed `package-lock.json`, so the major-only summary can say which way
+   * npm's named fix points. Omitted means the question is not asked and the
+   * line reads as it always did; see {@link directionClause}.
+   */
+  lock?: unknown,
+): string {
   const lines: string[] = [];
   if (verdict.unexpected.length > 0) {
     lines.push(
@@ -1494,7 +1579,7 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
       // Semicolons between them because two of the three END in a
       // comma-separated list of packages, and a comma joining the clauses put
       // the list's last entry and the next clause in the same punctuation.
-      `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly)}.`,
+      `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly, lock)}.`,
     );
   } else {
     lines.push("", PUBLISHED_ELSEWHERE_NOTE);
@@ -1891,8 +1976,16 @@ export function runAuditGate(options: {
   readonly checkName: string;
   readonly underActions: boolean;
   readonly accepted?: readonly AcceptedAdvisory[];
+  /**
+   * Parsed `package-lock.json`, for the direction half of the green line.
+   *
+   * Optional and read-only: the gate's verdict does not depend on it, because
+   * a named fix pointing backward is not something a contributor can act on.
+   * What it changes is whether the run's own sentence is true.
+   */
+  readonly lock?: unknown;
 }): AuditGateRun {
-  const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
+  const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, lock } = options;
   const read = reader();
   if (isSkippedRead(read)) {
     // The headline is who gave up, which the sentence alone does not carry: a
@@ -1922,7 +2015,7 @@ export function runAuditGate(options: {
     accepted,
   });
   const verdict = answered.verdict;
-  const lines = [...answered.lines, formatAuditVerdict(verdict, checkName)];
+  const lines = [...answered.lines, formatAuditVerdict(verdict, checkName, lock)];
   // A withheld staleness check is a half-answered run, and the half it did not
   // answer exits 0. The same argument the skip's annotation makes: without a
   // mark on the run summary, "we could not ask" is only ever visible in a log

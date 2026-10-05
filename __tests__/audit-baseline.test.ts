@@ -325,7 +325,7 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
     assert.deepEqual(verdict.unexpected, [], "it is on the list, so it is not new");
     assert.deepEqual(verdict.stillPresent, [`nanoid#${A1}`], "and the exemption is still matched");
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `nanoid#${A1}`, severity: "high", updatePackage: "nanoid" },
+      { key: `nanoid#${A1}`, severity: "high", updatePackage: "nanoid", updateVersion: null },
     ]);
     assert.equal(isClean(verdict), false, "being on the baseline must not excuse an available fix");
   });
@@ -348,8 +348,8 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
     );
     assert.deepEqual(verdict.fixableInRange, []);
     assert.deepEqual(verdict.majorOnly, [
-      { key: `postcss#${A2}`, severity: "high", updatePackage: "expo" },
-      { key: `postcss#${A3}`, severity: "high", updatePackage: "expo" },
+      { key: `postcss#${A2}`, severity: "high", updatePackage: "expo", updateVersion: "57.0.19" },
+      { key: `postcss#${A3}`, severity: "high", updatePackage: "expo", updateVersion: "57.0.19" },
     ]);
     assert.equal(isClean(verdict), true);
     assert.match(formatAuditVerdict(verdict, "check"), /no fix short of a semver-major/);
@@ -370,7 +370,7 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
     );
     assert.deepEqual(verdict.unexpected, ["browserslist#GHSA-73wf-gq98-2v4g"]);
     assert.deepEqual(verdict.fixableInRange, [
-      { key: "browserslist#GHSA-73wf-gq98-2v4g", severity: "high", updatePackage: "browserslist" },
+      { key: "browserslist#GHSA-73wf-gq98-2v4g", severity: "high", updatePackage: "browserslist", updateVersion: null },
     ]);
   });
 
@@ -478,8 +478,8 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
       FIXTURE,
     );
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `undici#${A1}`, severity: "moderate", updatePackage: "undici" },
-      { key: `undici#${A2}`, severity: "moderate", updatePackage: "undici" },
+      { key: `undici#${A1}`, severity: "moderate", updatePackage: "undici", updateVersion: null },
+      { key: `undici#${A2}`, severity: "moderate", updatePackage: "undici", updateVersion: null },
     ]);
     assert.equal(isClean(verdict), false);
     assert.deepEqual(
@@ -497,7 +497,7 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
       FIXTURE,
     );
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `esbuild#${A3}`, severity: "low", updatePackage: "esbuild" },
+      { key: `esbuild#${A3}`, severity: "low", updatePackage: "esbuild", updateVersion: null },
     ]);
     assert.equal(isClean(verdict), false);
   });
@@ -520,7 +520,7 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
     assert.deepEqual(verdict.unexpected, []);
     assert.deepEqual(verdict.fixableInRange, []);
     assert.deepEqual(verdict.majorOnly, [
-      { key: `decode-uri-component#${A1}`, severity: "moderate", updatePackage: "expo-router" },
+      { key: `decode-uri-component#${A1}`, severity: "moderate", updatePackage: "expo-router", updateVersion: "5.1.11" },
     ]);
     assert.equal(isClean(verdict), true);
   });
@@ -548,8 +548,8 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
       "the baseline still matches on the high one alone",
     );
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `postcss#${A2}`, severity: "high", updatePackage: "postcss" },
-      { key: `postcss#${A3}`, severity: "moderate", updatePackage: "postcss" },
+      { key: `postcss#${A2}`, severity: "high", updatePackage: "postcss", updateVersion: null },
+      { key: `postcss#${A3}`, severity: "moderate", updatePackage: "postcss", updateVersion: null },
     ]);
   });
 
@@ -606,9 +606,9 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
   it("names each package once in the update command, whatever the severity", () => {
     assert.deepEqual(
       fixCommandPackages([
-        { key: `undici#${A1}`, severity: "moderate", updatePackage: "undici" },
-        { key: `undici#${A2}`, severity: "moderate", updatePackage: "undici" },
-        { key: `esbuild#${A3}`, severity: "low", updatePackage: "esbuild" },
+        { key: `undici#${A1}`, severity: "moderate", updatePackage: "undici", updateVersion: null },
+        { key: `undici#${A2}`, severity: "moderate", updatePackage: "undici", updateVersion: null },
+        { key: `esbuild#${A3}`, severity: "low", updatePackage: "esbuild", updateVersion: null },
       ]),
       ["undici", "esbuild"],
     );
@@ -644,7 +644,7 @@ describe("the package the command names — npm's report, not the vulnerable one
       [],
     );
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `postcss#${A2}`, severity: "high", updatePackage: "expo" },
+      { key: `postcss#${A2}`, severity: "high", updatePackage: "expo", updateVersion: "57.0.19" },
     ]);
     assert.deepEqual(fixCommandPackages(verdict.fixableInRange), ["expo"]);
   });
@@ -665,7 +665,7 @@ describe("the package the command names — npm's report, not the vulnerable one
       [],
     );
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `esbuild#${A3}`, severity: "low", updatePackage: "tsx" },
+      { key: `esbuild#${A3}`, severity: "low", updatePackage: "tsx", updateVersion: null },
     ]);
     assert.deepEqual(fixCommandPackages(verdict.fixableInRange), ["tsx"]);
   });
@@ -921,8 +921,8 @@ describe("the OK line — upgrades, never advisories", () => {
         pinnedFix: [],
         pinnedFixUnused: [],
         majorOnly: [
-          { key: `mild#${A1}`, severity: "low", updatePackage: "one-root" },
-          { key: `severe#${A2}`, severity: "high", updatePackage: "one-root" },
+          { key: `mild#${A1}`, severity: "low", updatePackage: "one-root", updateVersion: null },
+          { key: `severe#${A2}`, severity: "high", updatePackage: "one-root", updateVersion: null },
         ],
       },
       "check",
@@ -1140,12 +1140,12 @@ describe("isClean — the one place that decides the exit code", () => {
     assert.equal(isClean(clean), true);
     assert.equal(isClean({ ...clean, unexpected: ["x#y"] }), false);
     assert.equal(
-      isClean({ ...clean, fixableInRange: [{ key: "x#y", severity: "low", updatePackage: "x" }] }),
+      isClean({ ...clean, fixableInRange: [{ key: "x#y", severity: "low", updatePackage: "x", updateVersion: null }] }),
       false,
     );
     assert.equal(isClean({ ...clean, stale: ["x#y"] }), false);
     assert.equal(
-      isClean({ ...clean, majorOnly: [{ key: "x#y", severity: "critical", updatePackage: "x" }] }),
+      isClean({ ...clean, majorOnly: [{ key: "x#y", severity: "critical", updatePackage: "x", updateVersion: null }] }),
       true,
       "npm restating a `why` sentence is not a finding",
     );

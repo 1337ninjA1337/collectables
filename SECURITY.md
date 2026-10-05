@@ -320,9 +320,19 @@ extra entries are Expo/metro and jest packages that merely depend on one of
 these roots and carry no advisory of their own, and one advisory is seen down
 several dependency paths.
 
-`image-size` and `postcss` are the 2026-09-01 pass and are fixed only by
-`expo@57`, a major — which is the whole reason they are still on this list, and
-npm now restates it on every run rather than this sentence standing in for it.
+`image-size` and `postcss` are the 2026-09-01 pass and were accepted as "fixed
+only by `expo@57`, a major". On 2026-10-05 that version was read against npm's
+own report for the first time and it is not what npm says: its `fixAvailable`
+for the whole `expo` group names **`expo@44.0.6`**, against a lockfile on
+`54.0.35` — ten majors backward. npm answers "is there a version of a direct
+dependency whose tree lacks this advisory", and an old release qualifies, so
+`isSemVerMajor: true` is true of a downgrade as well as an upgrade.
+
+That changes the acceptance rather than weakening it. "There is a fix and it is
+a breaking major" invites somebody to schedule the major; "npm names no forward
+fix at all" says the wait is on upstream, not on us. `lib/named-fix-direction.ts`
+reads the direction on every run and the gate's own green line had been calling
+this group an upgrade for a month.
 
 `braces` and `node-forge` were **published after the last green run**, which is
 the case this section's opening paragraph warns about and the first time it had
@@ -383,10 +393,10 @@ address is, and an acceptance nobody can locate is one nobody re-reads.
 
 | Package | Advisories | Ships to client? | Why accepted |
 | --- | --- | --- | --- |
-| `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package); fix = `expo@57`, breaking |
-| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; fix = `expo@57`, breaking |
-| `braces` | GHSA-vfj7-8cjw-p6xm | No | Stack-exhaustion DoS on a deeply nested brace pattern, reached through `micromatch` under `metro-file-map`, `fast-glob` and the jest packages — every caller globs this repository's own paths, never a pattern from outside it; fix = `react-native@0.87`, breaking |
-| `node-forge` | GHSA-86w9-cpqp-85rv | No | RSA PKCS#1 v1.5 verification accepts extra nested `DigestAlgorithm` elements, in `@expo/cli` and `@expo/code-signing-certificates` — expo-updates code signing, which this app does not use (no `codeSigningCertificate` in `app.json`); fix = `expo@44`, breaking |
+| `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package); npm's in-range fix is pinned out of reach (see `inRangeFixPinned`) and it names no forward one |
+| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; npm names `expo@44.0.6` against a locked `54.0.35` — a downgrade, not the `expo@57` this row claimed until 2026-10-05 |
+| `braces` | GHSA-vfj7-8cjw-p6xm | No | Stack-exhaustion DoS on a deeply nested brace pattern, reached through `micromatch` under `metro-file-map`, `fast-glob` and the jest packages — every caller globs this repository's own paths, never a pattern from outside it; npm named `react-native@0.87` on 2026-10-03 and names `expo@44.0.6` today, a downgrade |
+| `node-forge` | GHSA-86w9-cpqp-85rv | No | RSA PKCS#1 v1.5 verification accepts extra nested `DigestAlgorithm` elements, in `@expo/cli` and `@expo/code-signing-certificates` — expo-updates code signing, which this app does not use (no `codeSigningCertificate` in `app.json`); npm names `expo@44.0.6` against a locked `54.0.35`, a downgrade |
 
 Severity is read off each **advisory**, not off the package: npm reports a
 package at the highest severity among its advisories, so `postcss` shows "high"
