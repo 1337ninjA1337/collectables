@@ -88,6 +88,17 @@ export type SetStateInEffectShape =
   /** The effect's own state variable is in its dependency list. */
   | "self-feeding-dep";
 
+/**
+ * The rule this registry reads, declared here rather than where the registry
+ * is wired up.
+ *
+ * `lib/triaged-rules.ts` builds its list from this field and
+ * {@link findingsByFile}, so a registry cannot be attached to the wrong rule
+ * id — which was true for as long as the pairing was a literal in
+ * `scripts/check-eslint-gate.ts` and nothing checked it.
+ */
+export const RULE = "react-hooks/set-state-in-effect";
+
 export type SetStateInEffectVerdict =
   /** Correct as written; the rule cannot decide it and a change would be a regression. */
   | "keep"

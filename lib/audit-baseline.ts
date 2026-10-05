@@ -298,13 +298,6 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
     why: "stack-exhaustion DoS on a deeply nested brace pattern, reached only through micromatch under metro-file-map, fast-glob and the jest packages — every caller is a build or test-time glob over this repository's own paths, never a pattern from outside it, and npm names react-native@0.87 as the fix, a breaking major",
   },
   {
-    package: "http-cache-semantics",
-    advisories: ["GHSA-ch52-4w7c-c8xp"],
-    shipsToClient: false,
-    absentFingerprint: "Invalid serialization",
-    why: "max-stale handling can disclose a cross-user cached response, in a package reached only as cacheable-request under got under @expo/ngrok — the dev tunnel, which this repository never starts and which has no shared cache to disclose from; npm reports no fix at any version",
-  },
-  {
     package: "node-forge",
     advisories: ["GHSA-86w9-cpqp-85rv"],
     shipsToClient: false,

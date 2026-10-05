@@ -313,7 +313,7 @@ of them, and `evaluateAudit` now FAILS on an advisory npm can clear without a
 major, so an exemption one command away from gone cannot sit on the list being
 read as triage again.
 
-### Accepted high/critical — 5 roots, 7 advisories (2026-09-01, extended 2026-10-03)
+### Accepted high/critical — 4 roots, 6 advisories (2026-09-01, extended 2026-10-03, trimmed 2026-10-05)
 
 `npm audit` reports far more high *entries* than there are advisories here: the
 extra entries are Expo/metro and jest packages that merely depend on one of
@@ -324,16 +324,24 @@ several dependency paths.
 `expo@57`, a major — which is the whole reason they are still on this list, and
 npm now restates it on every run rather than this sentence standing in for it.
 
-`braces`, `http-cache-semantics` and `node-forge` were **published after the
-last green run**, which is the case this section's opening paragraph warns
-about and the first time it has actually happened: the three turned the gate red
-on a branch whose diff was four ESLint findings and a test file. They are
-accepted on the same terms — npm names a semver-major (`react-native@0.87`,
-`expo@44`) or no fix at all — and each one's reach is narrower than its
-advisory text, which is what the `Why accepted` column has to say rather than
-repeat the title.
+`braces` and `node-forge` were **published after the last green run**, which is
+the case this section's opening paragraph warns about and the first time it had
+actually happened: they turned the gate red on a branch whose diff was four
+ESLint findings and a test file. They are accepted on the same terms — npm
+names a semver-major (`react-native@0.87`, `expo@44`) — and each one's reach is
+narrower than its advisory text, which is what the `Why accepted` column has to
+say rather than repeat the title.
 
-All five are build-, test- or CLI-time tooling, so nothing on this list reaches
+`http-cache-semantics` arrived with those two and left on 2026-10-05, which is
+the half of this section nothing had exercised yet. Its row said "npm reports
+no fix at any version"; on 2026-10-05 npm reported one, in range, and
+`npm update http-cache-semantics` took it. An accepted advisory is accepted
+against the fix npm offered on the day it was read, and that is a measurement
+with a shelf life — the gate's own rule is that a lockfile bump clearing an
+advisory is never a triage decision, so the entry came off the list rather than
+having its reason rewritten.
+
+All four are build-, test- or CLI-time tooling, so nothing on this list reaches
 the client.
 
 The baseline keys on the **GHSA id**. It took three versions and each wrong one
@@ -378,7 +386,6 @@ address is, and an acceptance nobody can locate is one nobody re-reads.
 | `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package); fix = `expo@57`, breaking |
 | `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; fix = `expo@57`, breaking |
 | `braces` | GHSA-vfj7-8cjw-p6xm | No | Stack-exhaustion DoS on a deeply nested brace pattern, reached through `micromatch` under `metro-file-map`, `fast-glob` and the jest packages — every caller globs this repository's own paths, never a pattern from outside it; fix = `react-native@0.87`, breaking |
-| `http-cache-semantics` | GHSA-ch52-4w7c-c8xp | No | `max-stale` handling can disclose a cross-user cached response, under `got` under `@expo/ngrok` — the dev tunnel, which nothing here starts and which has no shared cache to disclose from; npm reports no fix at any version |
 | `node-forge` | GHSA-86w9-cpqp-85rv | No | RSA PKCS#1 v1.5 verification accepts extra nested `DigestAlgorithm` elements, in `@expo/cli` and `@expo/code-signing-certificates` — expo-updates code signing, which this app does not use (no `codeSigningCertificate` in `app.json`); fix = `expo@44`, breaking |
 
 Severity is read off each **advisory**, not off the package: npm reports a

@@ -4,7 +4,9 @@
  *
  * The snapshot of the whole report's size lives in
  * `lib/eslint-report-snapshot.ts` and is compared here, because this leg is
- * already paying for the ESLint run a suite cannot.
+ * already paying for the ESLint run a suite cannot. The two READ rules and
+ * their registries live in `lib/triaged-rules.ts`, which is also where the
+ * snapshot's per-rule totals are summed from.
  *
  * The decision, the six gated rules, the four zeroed rules and the argument for not gating the other
  * twelve live in `lib/eslint-gate.ts`. This wrapper is the part that has to
@@ -26,7 +28,6 @@ import { ESLint } from "eslint";
 import {
   GATED_RULES,
   ZEROED_RULES,
-  type TriagedRule,
   formatGateReport,
   gateFails,
   partitionFindings,
@@ -36,11 +37,11 @@ import {
 import {
   LINT_REPORT_SNAPSHOT,
   formatSnapshotLiteral,
+  snapshotArithmetic,
   snapshotDrift,
 } from "../lib/eslint-report-snapshot";
-import { findingsByFile as exhaustiveDepsByFile } from "../lib/exhaustive-deps-triage";
 import { runningUnderActions } from "../lib/github-annotations";
-import { findingsByFile as setStateByFile } from "../lib/set-state-in-effect-triage";
+import { TRIAGED_RULES, registryTotals } from "../lib/triaged-rules";
 
 const CHECK_NAME = "check-eslint-gate";
 const REPO_ROOT = path.join(__dirname, "..");
@@ -54,29 +55,6 @@ const REPO_ROOT = path.join(__dirname, "..");
  * passing on a `.tsx` file it still reaches.
  */
 const CONFIG_PROBE = "lib/use-latest-ref.ts";
-
-/**
- * The two ungated rules whose every finding has been read and decided.
- *
- * Neither is gated and neither should be: 26 of the 30 `set-state-in-effect`
- * findings are correct as written, and gating would mean 26 eslint-disable
- * comments written to make a gate green. What IS gated is that the readings
- * stay complete — a new finding of either rule fails this leg until somebody
- * writes a verdict for it, which is a much smaller ask than a fix and is the
- * one that keeps a registry from describing the day it was written.
- */
-const TRIAGED_RULES: readonly TriagedRule[] = [
-  {
-    rule: "react-hooks/set-state-in-effect",
-    registry: "lib/set-state-in-effect-triage.ts",
-    expected: setStateByFile(),
-  },
-  {
-    rule: "react-hooks/exhaustive-deps",
-    registry: "lib/exhaustive-deps-triage.ts",
-    expected: exhaustiveDepsByFile(),
-  },
-];
 
 /**
  * Rules the resolved config does not turn on.
@@ -156,7 +134,13 @@ async function main(): Promise<void> {
     errors: findings.filter((f) => f.severity === 2).length,
     byRule,
   };
-  const drift = snapshotDrift(measured, LINT_REPORT_SNAPSHOT);
+  // The read rules' per-rule totals come out of their registries rather than
+  // out of the snapshot, so a verdict written into one moves ONE number. What
+  // the snapshot still owns is the total and the error count, which nothing
+  // else in the chain can derive.
+  const totals = registryTotals(TRIAGED_RULES);
+  const arithmetic = snapshotArithmetic(totals, LINT_REPORT_SNAPSHOT);
+  const drift = snapshotDrift(measured, totals, LINT_REPORT_SNAPSHOT);
 
   const untriaged = untriagedFindings(findings, TRIAGED_RULES);
   if (untriaged.length > 0) {
@@ -185,16 +169,19 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  if (drift.length > 0) {
+  if (arithmetic.length > 0 || drift.length > 0) {
     console.error(report);
     console.error(
       `${CHECK_NAME}: the report has moved since the snapshot in lib/eslint-report-snapshot.ts was taken.`,
     );
-    for (const problem of drift) console.error(`  ${problem}`);
+    // Arithmetic first: a snapshot that disagrees with the registries is
+    // wrong about the tree whatever the run said, and `eslint-report-snapshot.test.ts`
+    // reports the same thing without waiting 22 seconds for this leg.
+    for (const problem of [...arithmetic, ...drift]) console.error(`  ${problem}`);
     console.error(
       "CLAUDE.md and the lint:eslint-gate row in lib/lint-guards.ts state this number in prose and are held against that literal, so re-take it rather than editing either sentence. Paste all of it:\n",
     );
-    console.error(formatSnapshotLiteral(measured, new Date().toISOString().slice(0, 10)));
+    console.error(formatSnapshotLiteral(measured, new Date().toISOString().slice(0, 10), totals));
     process.exit(1);
   }
 

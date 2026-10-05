@@ -80,6 +80,15 @@ export type ExhaustiveDepsShape =
 
 export type ExhaustiveDepsVerdict = "keep" | "fixed" | "open";
 
+/**
+ * The rule this registry reads, declared here rather than where the registry
+ * is wired up. Same reason as its sibling's: `lib/triaged-rules.ts` reads
+ * this field, so the pairing of a registry to a rule id is no longer a
+ * literal somebody could mistype.
+ */
+export const RULE = "react-hooks/exhaustive-deps";
+
+
 /** One `react-hooks/exhaustive-deps` finding. */
 export interface ExhaustiveDepsSite {
   /** Repo-relative path. */
