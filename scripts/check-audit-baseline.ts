@@ -52,11 +52,19 @@ const REPO_ROOT = path.join(__dirname, "..");
  * a gate that died on a missing lockfile would be a gate that fails for a
  * reason it is not about.
  */
-function readLock(): unknown {
+function readLock(): { readonly lock?: unknown; readonly note?: string } {
   try {
-    return JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8"));
-  } catch {
-    return undefined;
+    return { lock: JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8")) };
+  } catch (error: unknown) {
+    // Named, not swallowed. Two of this gate's failing lists need a direction
+    // and a direction needs an installed version, so an unread lockfile makes
+    // them empty for the same reason a healthy tree does — and a check that
+    // could not ask must not read as a pass. The gate's own floor catches a
+    // lockfile that PARSED and answered nothing; this is the half only the
+    // process can see.
+    return {
+      note: `${CHECK_NAME}: package-lock.json could not be read (${error instanceof Error ? error.message : String(error)}), so no fix direction and no namedFix claim was checked on this run.`,
+    };
   }
 }
 
@@ -70,11 +78,13 @@ function readLock(): unknown {
  * bounds the read is {@link auditReader}, for the same reason.
  */
 function main(): void {
+  const { lock, note } = readLock();
+  if (note !== undefined) console.log(note);
   const run = runAuditGate({
     read: auditReader((options) => execFileSync("npm", ["audit", "--json"], options)),
     checkName: CHECK_NAME,
     underActions: runningUnderActions(),
-    lock: readLock(),
+    lock,
   });
   for (const line of run.lines) console.log(line);
   if (!run.clean) process.exit(1);

@@ -266,19 +266,31 @@ export interface PinnedFix {
  *
  * ## Why the held field is a direction and not a version
  *
- * Measured on 2026-10-05, and the measurement is the whole design. Two
- * consecutive `npm audit --json` runs on an unchanged tree named two different
- * fixes for `braces`: `expo@44.0.6`, then `gh-pages@6.1.1`. The advisory is
- * reachable through `metro-file-map` → `micromatch` under `expo` and through
- * `globby` → `fast-glob` under `gh-pages`, and npm reports whichever path it
- * resolved first. A committed version string would be red about half the time
- * on a tree nobody had touched — which is the one thing a gate must never do,
- * because a check that is red for no reason is a check somebody turns off.
+ * Measured on 2026-10-05, and the measurement is the whole design. Eleven
+ * `npm audit --json` runs on an unchanged tree named three different fixes for
+ * `braces`: `expo@44.0.6` five times, `react-native@0.87.1` three times,
+ * `gh-pages@6.1.1` twice. It is reachable through `metro-file-map` →
+ * `micromatch` under `expo`, `globby` → `fast-glob` under `gh-pages`, and
+ * `metro-file-map` under `react-native`, and npm reports whichever path it
+ * resolved first. A committed version string would be red most of the time on
+ * a tree nobody had touched — the one thing a gate must never be, because a
+ * check that is red for no reason is a check somebody turns off.
  *
- * Both readings agree about the thing an acceptance actually rests on: every
- * version npm named is behind what the lockfile has, so there is nowhere
- * forward to send this tree. {@link NamedFixVerdict} is that, and it survives
- * the flip.
+ * The same eleven runs say the other three entries never moved: `postcss` and
+ * `node-forge` named `expo@44.0.6` every time, `image-size` a bare `true`
+ * every time. A direction is one step more stable than a version and for
+ * `braces` that is still not enough — `react-native@0.87.1` is AHEAD of the
+ * locked 0.81.5 while the other two targets are behind, so even
+ * {@link NamedFixVerdict} flips for it.
+ *
+ * ## So `"unstable"` is a verdict, and it is the one that prints
+ *
+ * An entry whose claim is `"unstable"` is never compared against a run: there
+ * is nothing to compare to. It is reported on the GREEN path instead, with
+ * `observed` carrying the readings, which is the same bargain
+ * `inRangeFixPinned` makes — an exemption that is loud is the only kind that
+ * does not become the silence it replaced. A suite requires such a claim to
+ * name more than one version, so "unstable" cannot become the easy answer.
  *
  * ## Why `observed` is prose and is not checked
  *
@@ -290,8 +302,11 @@ export interface PinnedFix {
  * verdict a gate can re-derive.
  */
 export interface NamedFixClaim {
-  /** The direction npm's named fix pointed, which is the part held. */
-  readonly verdict: NamedFixVerdict;
+  /**
+   * The direction npm's named fix pointed, or `"unstable"` when npm's own
+   * answer varies between runs on one tree. See the header.
+   */
+  readonly verdict: NamedFixVerdict | "unstable";
   /** When it was read off a real `npm audit --json`, `YYYY-MM-DD`. */
   readonly read: string;
   /**
@@ -367,10 +382,10 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   {
     package: "braces",
     namedFix: {
-      verdict: "no-forward",
+      verdict: "unstable",
       read: "2026-10-05",
       observed:
-        "expo@44.0.6 on one run and gh-pages@6.1.1 on the next, unchanged tree: reachable under both, and BOTH behind the lockfile (54.0.35 and 6.3.0). This entry is why the held field is a direction",
+        "eleven runs, one unchanged tree, three answers: expo@44.0.6 (x5, behind 54.0.35), react-native@0.87.1 (x3, AHEAD of 0.81.5), gh-pages@6.1.1 (x2, behind 6.3.0). Reachable under all three, and npm reports whichever path it resolved first — so not even the direction is holdable for this entry, which is why `unstable` exists",
     },
     advisories: ["GHSA-vfj7-8cjw-p6xm"],
     shipsToClient: false,
@@ -1052,6 +1067,52 @@ export interface AuditVerdict {
    * Withheld with the above when there is no lockfile, for the same reason.
    */
   readonly namedFixUnclaimed: readonly string[];
+  /**
+   * Claims whose direction could not be read on this run, one sentence each.
+   *
+   * Printed, not failed on: npm can name a package the lockfile has no root
+   * entry for, and a gate red for a lockfile shape is red for a reason it is
+   * not about. What IS failed on is all of them at once — see
+   * {@link namedFixLists}, where a lockfile that answered nothing for any
+   * package becomes one entry in {@link namedFixStale}.
+   *
+   * This list is the floor every scanner in this repository keeps, moved one
+   * question over: without it, a `package-lock.json` that parsed and contains
+   * no `packages` makes both lists above empty for exactly the same reason a
+   * healthy tree does, and the gate passes having checked nothing.
+   */
+  readonly namedFixUnread: readonly string[];
+  /**
+   * Every package npm names a BACKWARD fix for, at ANY severity.
+   *
+   * ## What this was written for, and what reading it actually found
+   *
+   * The major-only summary reads the triaged severities (high and critical),
+   * so a moderate advisory whose named fix points backward would be invisible
+   * to it. `@sentry/react-native` looked like exactly that case — npm names
+   * 5.15.2 against a locked 7.5.0 — and it is not one: its `via` is the bare
+   * string `"expo"`, so it carries no advisory of its own and is a package
+   * that merely DEPENDS on a vulnerable one. The sweep that suggested it had
+   * printed the package's inherited severity as though it were an advisory's.
+   *
+   * `observedAdvisoryDetails`' first rule is the one that gets this right, and
+   * this list is severity-blind on the other axis so that a real instance of
+   * the case is reported the day one exists. Today it returns the same two
+   * packages the major-only summary names, which is why
+   * {@link formatAuditVerdict} prints only the DIFFERENCE: two lines saying
+   * one thing on the green path is how the previous version of this gate
+   * stopped being read.
+   */
+  readonly backwardNamedFixes: readonly string[];
+  /**
+   * Accepted entries whose `namedFix` is `"unstable"`, one line each.
+   *
+   * Printed on the green path and never failed on. The point is that an
+   * exemption from the direction check is visible on every run: `braces` is
+   * the only one today, and the day a second appears somebody should have to
+   * see it rather than find it by reading the list.
+   */
+  readonly unstableNamedFixes: readonly string[];
 }
 
 /** `package#id`, the form every list in {@link AuditVerdict} carries. */
@@ -1381,11 +1442,16 @@ export function evaluateAudit(
       ? [...pinnedKeys].filter((key) => !inRange.some((found) => found.key === key)).sort()
       : [],
     ...namedFixLists(report, accepted, lock),
+    backwardNamedFixes: backwardNamedFixes(report, lock),
+    unstableNamedFixes: accepted
+      .filter((entry) => entry.namedFix?.verdict === "unstable")
+      .map((entry) => `${entry.package}: ${entry.namedFix?.observed ?? ""} (read ${entry.namedFix?.read ?? ""})`)
+      .sort(),
   };
 }
 
 /**
- * The two `namedFix` lists, or both empty when there is no lockfile to read.
+ * The three `namedFix` lists, or all empty when there is no lockfile to read.
  *
  * Not withheld on an incomplete report, unlike `stale` and `pinnedFixUnused`:
  * those are built out of what npm did NOT say, and a short report cannot tell
@@ -1393,34 +1459,108 @@ export function evaluateAudit(
  * advisory it reported, so a report missing entries simply has fewer of them
  * to check — and an advisory it did not report is not in `named` at all, which
  * reads as `unnamed` and is the honest answer for "npm said nothing about it".
+ *
+ * ## The floor, which this needed from the day it could fail
+ *
+ * A direction needs an installed version. `readLock()` in the wrapper returns
+ * `undefined` for a lockfile it could not read, which disables the whole
+ * check — correct, and printed by the wrapper. The case it does NOT cover is a
+ * lockfile that PARSED and answered nothing: no `packages` key, a renamed
+ * structure, a v1 lockfile. Every direction then reads `unknown`, every claim
+ * is skipped, both lists come back empty, and the gate passes having checked
+ * nothing — which is exactly the vacuous pass twenty-six guards in `lib/` have
+ * a floor against.
+ *
+ * So: a run where npm named a version for at least one claimed package and the
+ * lockfile answered for NONE of them is a failure, stated as such. One
+ * claimed package whose own direction is unread is not — see
+ * {@link AuditVerdict.namedFixUnread}.
  */
 function namedFixLists(
   report: AuditReport,
   accepted: readonly AcceptedAdvisory[],
   lock: unknown,
-): Pick<AuditVerdict, "namedFixStale" | "namedFixUnclaimed"> {
-  if (lock === undefined) return { namedFixStale: [], namedFixUnclaimed: [] };
+): Pick<AuditVerdict, "namedFixStale" | "namedFixUnclaimed" | "namedFixUnread"> {
+  if (lock === undefined) {
+    return { namedFixStale: [], namedFixUnclaimed: [], namedFixUnread: [] };
+  }
   const stale: string[] = [];
   const unclaimed: string[] = [];
+  const unread: string[] = [];
+  let namedForAClaim = 0;
   for (const entry of accepted) {
-    const live = namedFixVerdict(readEntryNamedFix(report, entry, lock));
+    const reading = readEntryNamedFix(report, entry, lock);
+    const live = namedFixVerdict(reading);
     if (entry.namedFix === undefined) {
       unclaimed.push(
         `${entry.package} — npm's fix verdict for it reads ${live ?? "unread"} today and the entry claims nothing. Add a namedFix: { verdict, read, observed }.`,
       );
       continue;
     }
+    // Never compared, because there is nothing stable to compare against.
+    // Reported on the green path by `formatAuditVerdict` so the exemption is
+    // loud rather than silent, which is the whole of the bargain.
+    if (entry.namedFix.verdict === "unstable") continue;
+    if (reading !== null) namedForAClaim += 1;
     // A direction nothing could read is not a disagreement. Saying so beats
     // both alternatives: treating it as a pass hides a claim nobody checked,
     // and failing on it makes the gate red for a lockfile shape.
-    if (live === null) continue;
+    if (live === null) {
+      unread.push(
+        `${entry.package} — claims ${entry.namedFix.verdict} and ${describeDirection(reading ?? NOTHING_NAMED)}`,
+      );
+      continue;
+    }
     if (live !== entry.namedFix.verdict) {
       stale.push(
         `${entry.package} — claims ${entry.namedFix.verdict} (read ${entry.namedFix.read}) and npm's fix verdict reads ${live} today. Re-read it and update namedFix; the version npm names is not stable for a multi-path advisory, so re-read the DIRECTION.`,
       );
     }
   }
-  return { namedFixStale: stale.sort(), namedFixUnclaimed: unclaimed.sort() };
+  if (namedForAClaim > 0 && unread.length === namedForAClaim) {
+    stale.push(
+      `the lockfile answered for none of the ${String(namedForAClaim)} claimed package(s) npm named a version for, so no claim was checked on this run — package-lock.json parsed and produced no node_modules/<package> version. A check that cannot ask must not read as a pass.`,
+    );
+  }
+  return { namedFixStale: stale.sort(), namedFixUnclaimed: unclaimed.sort(), namedFixUnread: unread.sort() };
+}
+
+/**
+ * The reading for "npm named nothing", so the unread line has one shape.
+ *
+ * `namedFixVerdict(null)` is `unnamed`, which is a decided verdict and never
+ * reaches the unread branch — so this stands only for the impossible case, and
+ * exists because the alternative is a second sentence spelled inline.
+ */
+const NOTHING_NAMED: NamedFixReading = {
+  package: "(none)",
+  named: "(none)",
+  installed: undefined,
+  direction: "unknown",
+};
+
+/**
+ * Every package npm names a backward fix for, at ANY severity, one line each.
+ *
+ * `observedAdvisoryDetails` is the one walk and it is severity-blind, which is
+ * what this needs: the major-only summary reads the triaged severities and so
+ * cannot see `@sentry/react-native` (moderate, names 5.15.2 against a locked
+ * 7.5.0). Deduplicated by package, because one backward-pointing dependency is
+ * one fact however many advisories ride it.
+ */
+function backwardNamedFixes(report: AuditReport, lock: unknown): readonly string[] {
+  if (lock === undefined) return [];
+  const byPackage = new Map<string, NamedFixReading>();
+  for (const detail of observedAdvisoryDetails(report).values()) {
+    if (detail.updateVersion === null) continue;
+    if (byPackage.has(detail.updatePackage)) continue;
+    const reading = readNamedFix(lock, detail.updatePackage, detail.updateVersion);
+    if (reading.direction !== "backward" && reading.direction !== "same") continue;
+    byPackage.set(detail.updatePackage, reading);
+  }
+  return [...byPackage.values()]
+    .map((reading) => `${reading.package}: npm names ${reading.named}, the lockfile is on ${String(reading.installed)}`)
+    .sort();
 }
 
 /**
@@ -1780,6 +1920,35 @@ export function formatAuditVerdict(
       // the list's last entry and the next clause in the same punctuation.
       `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly, lock)}.`,
     );
+    // Only the packages the major-only summary did not already name. That
+    // summary reads high and critical; this list reads every severity, so what
+    // is left over is a backward-pointing fix for an advisory the baseline
+    // does not triage — a real case the day one exists, and empty today.
+    const alreadyNamed = new Set(verdict.majorOnly.map((found) => found.updatePackage));
+    const unsaid = verdict.backwardNamedFixes.filter(
+      (line) => !alreadyNamed.has(line.slice(0, line.indexOf(":"))),
+    );
+    if (unsaid.length > 0) {
+      lines.push(
+        `${checkName}: npm also names no forward fix for ${counted(unsaid.length, "package", "packages")} below the triaged severities — a version behind the lockfile is not an upgrade, so these wait on upstream rather than on a migration here:`,
+      );
+      for (const line of unsaid) lines.push(`  ${line}`);
+    }
+    if (verdict.unstableNamedFixes.length > 0) {
+      lines.push(
+        `${checkName}: ${counted(verdict.unstableNamedFixes.length, "accepted entry", "accepted entries")} exempt from the fix-direction check because npm's own answer varies between runs:`,
+      );
+      for (const line of verdict.unstableNamedFixes) lines.push(`  ${line}`);
+    }
+    if (verdict.namedFixUnread.length > 0) {
+      // The floor's informational half. All of them at once is a failure; one
+      // is a sentence, because npm can name a package the lockfile has no root
+      // entry for and that is not a gate's business.
+      lines.push(
+        `${checkName}: ${counted(verdict.namedFixUnread.length, "namedFix claim", "namedFix claims")} not checked on this run:`,
+      );
+      for (const line of verdict.namedFixUnread) lines.push(`  ${line}`);
+    }
   } else {
     lines.push("", PUBLISHED_ELSEWHERE_NOTE);
   }
@@ -1939,6 +2108,16 @@ export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): Audit
     // Unioned: an entry with no claim has no claim on either read, and the
     // second read cannot make one appear.
     namedFixUnclaimed: [...new Set([...first.namedFixUnclaimed, ...second.namedFixUnclaimed])].sort(),
+    // Read off the accepted list rather than off a report, so the two reads
+    // cannot disagree; the first is as good as the second.
+    unstableNamedFixes: first.unstableNamedFixes,
+    // Both informational, both unioned: each is a thing one of the reads
+    // observed, and a reader wants everything either read saw rather than the
+    // intersection of two accounts of the same tree.
+    namedFixUnread: [...new Set([...first.namedFixUnread, ...second.namedFixUnread])].sort(),
+    backwardNamedFixes: [
+      ...new Set([...first.backwardNamedFixes, ...second.backwardNamedFixes]),
+    ].sort(),
   };
 }
 

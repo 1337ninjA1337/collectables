@@ -14,10 +14,18 @@
  * is reachable under both and npm reports whichever path it resolves first, so
  * a committed version would be red about half the time for nothing.
  *
- * What survived the flip is the DIRECTION — both named versions are behind the
- * lockfile — and that is what `NamedFixClaim.verdict` holds. These cases are
- * about the collapse, the two lists it feeds, and the one case that must NOT
- * fail: a direction nothing could read.
+ * Two runs said both named versions were BEHIND the lockfile, so the first
+ * version of this held the direction. Eleven runs say that is not enough
+ * either: `braces` names `expo@44.0.6` (x5, behind), `react-native@0.87.1`
+ * (x3, AHEAD of the locked 0.81.5) and `gh-pages@6.1.1` (x2, behind). A held
+ * direction would have been red about 40% of the time.
+ *
+ * The other three entries never moved across the same eleven runs, so a
+ * direction IS holdable per entry and is not holdable for `braces` — which is
+ * what `"unstable"` records, with the readings in `observed` and a line on
+ * every green run so the exemption cannot go quiet. These cases are about the
+ * collapse, the four lists it feeds, the floor on a lockfile that answered
+ * nothing, and the two states that must NOT fail.
  */
 
 import assert from "node:assert/strict";
@@ -91,7 +99,7 @@ describe("namedFixVerdict", () => {
 });
 
 describe("the verdict's two named-fix lists", () => {
-  const accepted = (verdict: "forward" | "no-forward" | "unnamed") => [
+  const accepted = (verdict: "forward" | "no-forward" | "unnamed" | "unstable") => [
     {
       package: "expo",
       advisories: [GHSA],
@@ -137,16 +145,105 @@ describe("the verdict's two named-fix lists", () => {
     assert.deepEqual(verdict.namedFixStale, []);
   });
 
-  it("does not fail on a direction nothing could read", () => {
-    // npm names a package the lockfile has no entry for. The claim is simply
-    // not checked on this run, and the gate stays green rather than red for a
-    // reason it is not about.
+  it("reports a direction nothing could read rather than treating it as agreement", () => {
+    // npm names a package the lockfile has no entry for. The claim is not
+    // compared — a disagreement needs two readings — and it does not go
+    // quiet either: it lands in `namedFixUnread`, which prints.
+    //
+    // The floor fires here as well, and that is the point rather than a side
+    // effect: this fixture has ONE claimed package and the lockfile answered
+    // for none of them, which is indistinguishable from a lockfile that
+    // answers nothing at all. The case below is the same reading with a second
+    // package the lockfile does answer for, and there it stays green.
     const verdict = evaluateAudit(
       report("expo", { name: "nowhere", version: "1.0.0", isSemVerMajor: true }, GHSA),
       accepted("forward"),
       LOCK,
     );
+    assert.equal(verdict.namedFixUnread.length, 1);
+    assert.match(verdict.namedFixUnread[0], /no node_modules\/nowhere entry/);
+    assert.equal(verdict.namedFixStale.length, 1, "every claim unread is the floor");
+  });
+
+  it("never compares an unstable claim, whichever way the run points", () => {
+    // The `braces` case. npm answered three ways across eleven runs on one
+    // tree, so there is nothing to compare against; a claim that held one of
+    // the three would be red about 40% of the time.
+    for (const version of ["44.0.6", "57.0.0", "54.0.35"]) {
+      const verdict = evaluateAudit(
+        report("expo", { name: "expo", version, isSemVerMajor: true }, GHSA),
+        accepted("unstable"),
+        LOCK,
+      );
+      assert.deepEqual(verdict.namedFixStale, [], version);
+      assert.deepEqual(verdict.namedFixUnread, [], version);
+    }
+  });
+
+  it("prints every unstable exemption on the green path", () => {
+    const printed = formatAuditVerdict(
+      evaluateAudit(
+        report("expo", { name: "expo", version: "44.0.6", isSemVerMajor: true }, GHSA),
+        accepted("unstable"),
+        LOCK,
+      ),
+      "check",
+      LOCK,
+    );
+    assert.match(printed, /1 accepted entry exempt from the fix-direction check because npm's own answer varies/);
+    assert.match(printed, /expo: read off a fixture \(read 2026-10-05\)/);
+  });
+
+  it("fails when the lockfile answered for none of the claimed packages", () => {
+    // The floor. A `package-lock.json` that parses and carries no versions
+    // makes every direction unread, every claim skipped and both failing lists
+    // empty — for exactly the same reason a healthy tree does.
+    const verdict = evaluateAudit(
+      report("expo", { name: "expo", version: "44.0.6", isSemVerMajor: true }, GHSA),
+      accepted("no-forward"),
+      { packages: {} },
+    );
+    assert.equal(verdict.namedFixStale.length, 1);
+    assert.match(verdict.namedFixStale[0], /the lockfile answered for none of the 1 claimed package/);
+    assert.equal(isClean(verdict), false);
+  });
+
+  it("does not fire the floor when the lockfile answered for some", () => {
+    const verdict = evaluateAudit(
+      {
+        vulnerabilities: {
+          expo: {
+            severity: "high",
+            fixAvailable: { name: "expo", version: "44.0.6", isSemVerMajor: true },
+            effects: [],
+            via: [{ source: 1, url: `https://github.com/advisories/${GHSA}`, severity: "high" }],
+          },
+          other: {
+            severity: "high",
+            fixAvailable: { name: "nowhere", version: "1.0.0", isSemVerMajor: true },
+            effects: [],
+            via: [{ source: 2, url: "https://github.com/advisories/GHSA-dddd-eeee-ffff", severity: "high" }],
+          },
+        },
+        metadata: { vulnerabilities: { high: 2 } },
+      } as unknown as AuditReport,
+      [
+        ...accepted("no-forward"),
+        {
+          package: "other",
+          advisories: ["GHSA-dddd-eeee-ffff"],
+          shipsToClient: false,
+          absentFingerprint: "x",
+          why: "a reason somebody can disagree with",
+          namedFix: { verdict: "forward" as const, read: "2026-10-05", observed: "read off a fixture" },
+        },
+      ],
+      LOCK,
+    );
     assert.deepEqual(verdict.namedFixStale, []);
+    assert.equal(verdict.namedFixUnread.length, 1, "the one unread claim is reported, not failed on");
+    assert.match(verdict.namedFixUnread[0], /other — claims forward/);
+    assert.equal(isClean(verdict), true);
   });
 
   it("reports an accepted package with no claim, which is the completeness half", () => {
@@ -194,6 +291,20 @@ describe("this repository's own baseline", () => {
       assert.ok(
         claim.observed.length > 20,
         `${entry.package}: observed is the reading the verdict came from, not a label`,
+      );
+    }
+  });
+
+  it("makes an unstable claim name more than one version, so it cannot be the easy answer", () => {
+    // `unstable` exempts an entry from the only check this field has, so the
+    // evidence for it is the whole of its cost. One version is one reading,
+    // and one reading cannot establish that an answer varies.
+    for (const entry of ACCEPTED_HIGH_ADVISORIES) {
+      if (entry.namedFix?.verdict !== "unstable") continue;
+      const versions = new Set(entry.namedFix.observed.match(/@\d+\.\d+\.\d+/g) ?? []);
+      assert.ok(
+        versions.size > 1,
+        `${entry.package} claims unstable and its observed reading names ${String(versions.size)} version(s) — that is not a measurement of an answer varying`,
       );
     }
   });

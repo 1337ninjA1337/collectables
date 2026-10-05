@@ -195,11 +195,21 @@ export function describeDirection(reading: NamedFixReading): string {
  * first. A committed version would be red about half the time, on a tree
  * nobody had touched.
  *
- * What was the SAME in both readings is the only thing worth committing: both
- * named versions are behind what the lockfile has, so npm has nowhere forward
- * to send this tree either way. That survives the flip, it is the fact an
- * acceptance actually rests on, and it is what four sentences got wrong by
- * naming a version instead.
+ * Two readings said the two named versions were both BEHIND the lockfile, so
+ * the first version of this held the direction and called it stable. Eleven
+ * runs say otherwise: `braces` names `expo@44.0.6` (behind), `gh-pages@6.1.1`
+ * (behind) and `react-native@0.87.1` (AHEAD of the locked 0.81.5), five, two
+ * and three times respectively. The direction is not stable for a multi-path
+ * advisory either, and a claim holding one would have been red about 40% of
+ * the time.
+ *
+ * What the same eleven runs DO say is that the other three accepted entries
+ * never moved: `postcss` and `node-forge` named `expo@44.0.6` every time and
+ * `image-size` reported a bare `true` every time. So the direction is holdable
+ * where npm has one answer and not holdable where it has three, which is a
+ * fact about each entry rather than about the field — and `NamedFixClaim`
+ * carries `"unstable"` for the second case, with the readings behind it,
+ * rather than holding a number that flips.
  */
 export type NamedFixVerdict =
   /** npm names a version ahead of the lockfile — there is somewhere to go. */
