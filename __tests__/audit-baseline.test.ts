@@ -924,7 +924,7 @@ describe("the OK line — upgrades, never advisories", () => {
     namedFixUnclaimed: [],
     namedFixUnread: [],
     backwardNamedFixes: [],
-    candidateVersions: {},
+    tree: null,
         majorOnly: [
           { key: `mild#${A1}`, severity: "low", updatePackage: "one-root", updateVersion: null, updateGroup: "one-root" },
           { key: `severe#${A2}`, severity: "high", updatePackage: "one-root", updateVersion: null, updateGroup: "one-root" },
@@ -979,7 +979,7 @@ describe("the OK line — upgrades, never advisories", () => {
     namedFixUnclaimed: [],
     namedFixUnread: [],
     backwardNamedFixes: [],
-    candidateVersions: {},
+    tree: null,
         majorOnly: [],
       },
       "check",

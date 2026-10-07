@@ -419,7 +419,6 @@ describe("the verdict's two named-fix lists", () => {
     const stale = formatAuditVerdict(
       evaluateAudit(report("expo", { name: "expo", version: "44.0.6", isSemVerMajor: true }, GHSA), accepted("forward"), LOCK),
       "check",
-      LOCK,
     );
     assert.match(stale, /1 baseline entry with a namedFix direction npm no longer reports/);
     assert.match(stale, /re-read the DIRECTION/);
@@ -430,7 +429,6 @@ describe("the verdict's two named-fix lists", () => {
         LOCK,
       ),
       "check",
-      LOCK,
     );
     assert.match(unclaimed, /1 accepted package with nothing said about npm's fix verdict/);
   });

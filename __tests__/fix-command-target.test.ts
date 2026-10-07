@@ -45,12 +45,12 @@ const LOCK = {
 };
 
 /** Every candidate's own named version, as `selfNamedVersions` reads them. */
-const VERSIONS = new Map([
-  ["@sentry/react-native", "5.15.2"],
-  ["expo", "44.0.6"],
-  ["gh-pages", "6.1.1"],
-  ["react-native", "0.87.1"],
-]);
+const VERSIONS: Readonly<Record<string, string>> = {
+  "@sentry/react-native": "5.15.2",
+  expo: "44.0.6",
+  "gh-pages": "6.1.1",
+  "react-native": "0.87.1",
+};
 
 const BRACES_GROUP = "@sentry/react-native / expo / gh-pages / react-native";
 
@@ -68,7 +68,7 @@ function advisory(picked: string): FixableAdvisory {
     key: "braces#GHSA-aaaa-bbbb-cccc",
     severity: "high",
     updatePackage: picked,
-    updateVersion: VERSIONS.get(picked) ?? null,
+    updateVersion: VERSIONS[picked] ?? null,
     updateGroup: BRACES_GROUP,
   };
 }
@@ -94,7 +94,7 @@ describe("fixCommandTargets", () => {
     // Every candidate behind the lockfile. The pick is positional and the
     // sentence below says so — but it is the SAME position on every run,
     // which npm's pick was not.
-    const behind = new Map(VERSIONS).set("react-native", "0.70.0");
+    const behind = { ...VERSIONS, "react-native": "0.70.0" };
     for (const picked of ["expo", "react-native"]) {
       const target = fixCommandTargets([advisory(picked)], { lock: LOCK, versions: behind })[0];
       assert.equal(target?.package, "@sentry/react-native");
@@ -149,11 +149,7 @@ describe("fixCommandTargets", () => {
         ],
         {
           lock: LOCK,
-          versions: new Map([
-            ["expo", "57.0.19"],
-            ["gh-pages", "6.1.1"],
-            ["react-native", "0.70.0"],
-          ]),
+          versions: { expo: "57.0.19", "gh-pages": "6.1.1", "react-native": "0.70.0" },
         },
       ),
       ["expo"],
@@ -177,7 +173,7 @@ describe("describeFixChoice", () => {
               updateGroup: "undici",
             },
           ],
-          { lock: LOCK, versions: new Map([["undici", "5.28.4"]]) },
+          { lock: LOCK, versions: { undici: "5.28.4" } },
         ),
       ),
       [],
@@ -192,7 +188,7 @@ describe("describeFixChoice", () => {
   });
 
   it("counts the forward routes when there is more than one", () => {
-    const twoForward = new Map(VERSIONS).set("expo", "57.0.19");
+    const twoForward = { ...VERSIONS, expo: "57.0.19" };
     const said = describeFixChoice(fixCommandTargets([advisory("expo")], { lock: LOCK, versions: twoForward }))[0] ?? "";
     assert.match(said, /expo is the lowest-sorted of 2 of 4 packages/);
     assert.match(said, /are ahead of the lockfile/);
@@ -201,7 +197,7 @@ describe("describeFixChoice", () => {
   });
 
   it("asks for a reading when the lockfile places nothing ahead", () => {
-    const behind = new Map(VERSIONS).set("react-native", "0.70.0");
+    const behind = { ...VERSIONS, "react-native": "0.70.0" };
     assert.match(
       describeFixChoice(fixCommandTargets([advisory("expo")], { lock: LOCK, versions: behind }))[0] ?? "",
       /places none of them ahead of what is installed, so @sentry\/react-native is the sorted-first rather than a reading/,
@@ -266,7 +262,6 @@ describe("the printed command, end to end", () => {
       const printed = formatAuditVerdict(
         evaluateAudit(inRangeMultiCandidate(picked), [], LOCK),
         "check",
-        LOCK,
       );
       // The command on its own line, the reading indented below it, the
       // paragraph after — three lines rather than one that wraps.
@@ -303,7 +298,6 @@ describe("the printed command, end to end", () => {
         { packages: { "node_modules/undici": { version: "5.20.0" } } },
       ),
       "check",
-      { packages: { "node_modules/undici": { version: "5.20.0" } } },
     );
     // No choice to explain, so nothing between the command and the paragraph.
     assert.match(
@@ -341,7 +335,6 @@ describe("the redirect beside each finding", () => {
       const printed = formatAuditVerdict(
         evaluateAudit(inRangeMultiCandidate(picked), [], LOCK),
         "check",
-        LOCK,
       );
       assert.match(printed, /FIXABLE {2}moderate {2}vulnerable#\S+ {2}\(fix in react-native\)/, printed);
       assert.doesNotMatch(printed, /\(fix in expo\)/, printed);
@@ -374,7 +367,6 @@ describe("the redirect beside each finding", () => {
         lock,
       ),
       "check",
-      lock,
     );
     assert.doesNotMatch(printed, /\(fix in/, printed);
   });
@@ -434,7 +426,7 @@ describe("the candidate set and the version map are one population", () => {
     ].sort();
 
   const versionKeys = (report: AuditReport): readonly string[] =>
-    Object.keys(evaluateAudit(report, [], LOCK).candidateVersions).sort();
+    Object.keys(evaluateAudit(report, [], LOCK).tree?.versions ?? {}).sort();
 
   it("agrees on every fixture in this file", () => {
     for (const report of [
@@ -482,9 +474,7 @@ describe("the candidate set and the version map are one population", () => {
  */
 describe("every redirect names a package the command names", () => {
   const printedFor = (picked: string): string =>
-    formatAuditVerdict(evaluateAudit(inRangeMultiCandidate(picked), [], LOCK), "check", {
-      ...LOCK,
-    });
+    formatAuditVerdict(evaluateAudit(inRangeMultiCandidate(picked), [], LOCK), "check");
 
   it("holds on both of npm's picks for the multi-candidate group", () => {
     for (const picked of ["expo", "react-native"]) {
@@ -531,7 +521,6 @@ describe("every redirect names a package the command names", () => {
         lock,
       ),
       "check",
-      lock,
     );
     assert.deepEqual([...printed.matchAll(/\(fix in ([^)]+)\)/g)], []);
     assert.match(printed, /Run `npm update undici`/);
@@ -582,7 +571,7 @@ describe("the lockfile reaches every block that places a candidate", () => {
 
   it("reads the direction for the green summary's groups", () => {
     const lock = { packages: { "node_modules/expo": { version: "54.0.35" } } };
-    const printed = formatAuditVerdict(evaluateAudit(majorOnly, [], lock), "check", lock);
+    const printed = formatAuditVerdict(evaluateAudit(majorOnly, [], lock), "check");
     assert.match(printed, /NO FORWARD FIX/, printed);
     assert.match(printed, /expo@44\.0\.6 is behind 54\.0\.35/, printed);
   });
@@ -591,7 +580,6 @@ describe("the lockfile reaches every block that places a candidate", () => {
     const printed = formatAuditVerdict(
       evaluateAudit(inRangeMultiCandidate("expo"), [], LOCK),
       "check",
-      LOCK,
     );
     assert.match(printed, /is ahead of the lockfile/, printed);
   });

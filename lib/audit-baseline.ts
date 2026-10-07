@@ -1208,18 +1208,21 @@ export interface AuditVerdict {
    */
   readonly backwardNamedFixes: readonly string[];
   /**
-   * Every candidate npm names, with the version from its OWN entry.
+   * The tree this verdict was read against, or `null` when none was handed in.
    *
-   * On the verdict rather than re-walked by the formatter, because the walk
-   * needs the report and {@link formatAuditVerdict} is handed a verdict. It is
-   * what lets a group's direction be read over all of its candidates instead
-   * of off npm's single pick — the field that answered `braces` three
-   * different ways across eleven runs.
+   * On the verdict rather than re-walked or re-passed, because the walk needs
+   * the report and {@link formatAuditVerdict} is handed a verdict. It used to
+   * be the version map alone, and the formatter took the LOCKFILE again as its
+   * own parameter — so nine call sites across three suites passed the same
+   * object twice, by convention, and nothing stopped a verdict evaluated
+   * against one tree being printed against another. Two readings of one thing,
+   * computed apart, which is the defect this file spent 2026-10-07 removing
+   * from three other places.
    *
-   * Empty when no lockfile reached {@link evaluateAudit}, with the rest of the
-   * named-fix reading.
+   * `null` is "no lockfile reached {@link evaluateAudit}", which is also what
+   * empties the rest of the named-fix reading.
    */
-  readonly candidateVersions: Readonly<Record<string, string>>;
+  readonly tree: AuditTree | null;
 }
 
 /** `package#id`, the form every list in {@link AuditVerdict} carries. */
@@ -1556,7 +1559,7 @@ export function evaluateAudit(
       : [],
     ...namedFixLists(report, accepted, lock),
     backwardNamedFixes: backwardNamedFixes(report, lock),
-    candidateVersions: lock === undefined ? {} : selfNamedVersions(report),
+    tree: lock === undefined ? null : { lock, versions: selfNamedVersions(report) },
   };
 }
 
@@ -1829,7 +1832,7 @@ function majorOnlySummary(
    * had four spellings and two of them meant nothing, and both of those two
    * came out as the sentence this gate printed falsely for a month.
    */
-  tree?: FixCommandTree,
+  tree?: AuditTree,
 ): string {
   if (majorOnly.length === 0) return "";
   const groups = [...groupByPackage(majorOnly, (found) => found.updateGroup)]
@@ -1912,7 +1915,7 @@ function majorOnlySummary(
  */
 function namedFixReading(
   group: readonly FixableAdvisory[],
-  tree: FixCommandTree | undefined,
+  tree: AuditTree | undefined,
 ): NamedFixReading | null {
   if (tree === undefined) return null;
   const named = group[0]?.updateVersion;
@@ -1932,12 +1935,12 @@ function namedFixReading(
  */
 function groupCandidates(
   group: readonly FixableAdvisory[],
-  tree: FixCommandTree | undefined,
+  tree: AuditTree | undefined,
 ): readonly NamedFixReading[] {
   if (tree === undefined) return [];
   const readings: NamedFixReading[] = [];
   for (const name of (group[0]?.updateGroup ?? "").split(GROUP_SEPARATOR)) {
-    const version = tree.versions.get(name);
+    const version = tree.versions[name];
     if (version === undefined) continue;
     readings.push(readNamedFix(tree.lock, name, version));
   }
@@ -1997,22 +2000,15 @@ function groupByPackage<T>(items: readonly T[], name: (item: T) => string): Map<
 export function formatAuditVerdict(
   verdict: AuditVerdict,
   checkName: string,
-  /**
-   * Parsed `package-lock.json`, so the major-only summary can say which way
-   * npm's named fix points. Omitted means the question is not asked and the
-   * line reads as it always did; see {@link directionClause}.
-   */
-  lock?: unknown,
 ): string {
-  // One reading of the tree for the whole report, built once. Three blocks
-  // below place a candidate against the lockfile — the fix command, the green
-  // summary and the choice clause — and each of them used to take `lock` and
-  // the version map as separate optional arguments, which is four spellings
-  // per block of which two said nothing.
-  const tree: FixCommandTree | undefined =
-    lock === undefined
-      ? undefined
-      : { lock, versions: new Map(Object.entries(verdict.candidateVersions)) };
+  // The tree the VERDICT was read against, not one handed in again here. Three
+  // blocks below place a candidate against the lockfile — the fix command, the
+  // green summary and the choice clause — and each of them used to take `lock`
+  // and the version map as separate optional arguments, which is four
+  // spellings per block of which two said nothing. `undefined` rather than the
+  // `null` the field carries, because that is what the three take for "not
+  // asked" and one `??` here is cheaper than three `=== null` below.
+  const tree = verdict.tree ?? undefined;
   const lines: string[] = [];
   if (verdict.unexpected.length > 0) {
     lines.push(
@@ -2188,14 +2184,25 @@ export function advisoryPackage(key: string): string {
  * for — a sentence about a reading, printed where there had been none. The
  * combinations that cannot mean anything are now unspellable.
  */
-export interface FixCommandTree {
+export interface AuditTree {
   /** Parsed `package-lock.json`. */
   readonly lock: unknown;
   /**
-   * Each candidate's own named version. See
-   * {@link AuditVerdict.candidateVersions}, which is this as a `Record`.
+   * Every candidate npm names, with the version from its OWN entry.
+   *
+   * This is the reading `fixAvailable` looked like it could not give: every
+   * candidate is itself a vulnerability entry whose `fixAvailable` names
+   * itself, so a group's direction is read over all of its candidates instead
+   * of off npm's single pick — the field that answered `braces` three
+   * different ways across eleven runs.
+   *
+   * A `Record` rather than a `Map` because it rides {@link AuditVerdict},
+   * which is a plain data shape fixtures write by hand. The readers index it,
+   * and an absent key is a candidate npm named no version for — the one
+   * legitimate difference between this and {@link fixCandidates}' set, which
+   * `fix-command-target.test.ts` pins.
    */
-  readonly versions: ReadonlyMap<string, string>;
+  readonly versions: Readonly<Record<string, string>>;
 }
 
 /** One package `npm update` should name, and the reading that picked it. */
@@ -2213,7 +2220,7 @@ export interface FixCommandTarget {
    *
    * The two `null`s `namedFixReading` distinguishes, in this shape: a `0` is a
    * lockfile that was read and answered nothing about any candidate, and
-   * `null` is no {@link FixCommandTree} having been handed in at all. They
+   * `null` is no {@link AuditTree} having been handed in at all. They
    * print differently, and printing them the same is what claimed a lockfile
    * had been consulted by a caller that offered none.
    */
@@ -2241,14 +2248,14 @@ export interface FixCommandTarget {
  * unlike it does not change between runs — {@link describeFixChoice} says so
  * in that case rather than printing a bare command for a move nobody read.
  *
- * An omitted {@link FixCommandTree} is "the question was not asked": every
+ * An omitted {@link AuditTree} is "the question was not asked": every
  * group falls to its sorted-first, which is what a caller with no lockfile to
  * walk can offer, and `placed` is `null` rather than `0` so the sentence below
  * does not claim a lockfile answered nothing. The gate always hands one in.
  */
 export function fixCommandTargets(
   fixable: readonly FixableAdvisory[],
-  tree?: FixCommandTree,
+  tree?: AuditTree,
 ): readonly FixCommandTarget[] {
   const targets: FixCommandTarget[] = [];
   const seen = new Set<string>();
@@ -2260,7 +2267,7 @@ export function fixCommandTargets(
       tree === undefined || tree.lock === undefined
         ? null
         : candidates.flatMap((name) => {
-            const version = tree.versions.get(name);
+            const version = tree.versions[name];
             return version === undefined ? [] : [readNamedFix(tree.lock, name, version)];
           });
     const forward = (readings ?? [])
@@ -2307,7 +2314,7 @@ export function fixCommandTargets(
  */
 export function fixCommandPackages(
   fixable: readonly FixableAdvisory[],
-  tree?: FixCommandTree,
+  tree?: AuditTree,
 ): readonly string[] {
   return commandNames(fixCommandTargets(fixable, tree));
 }
@@ -2499,7 +2506,7 @@ export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): Audit
     namedFixUnclaimed: [...new Set([...first.namedFixUnclaimed, ...second.namedFixUnclaimed])].sort(),
     // The first read's, not a merge: both reads walked the same tree and the
     // walk is deterministic, so a merge would be two copies of one answer.
-    candidateVersions: first.candidateVersions,
+    tree: first.tree,
     // Both informational, both unioned: each is a thing one of the reads
     // observed, and a reader wants everything either read saw rather than the
     // intersection of two accounts of the same tree.
@@ -2794,7 +2801,8 @@ export function runAuditGate(options: {
     lock,
   });
   const verdict = answered.verdict;
-  const lines = [...answered.lines, formatAuditVerdict(verdict, checkName, lock)];
+  // No lockfile argument: the verdict carries the tree it was read against.
+  const lines = [...answered.lines, formatAuditVerdict(verdict, checkName)];
   // A withheld staleness check is a half-answered run, and the half it did not
   // answer exits 0. The same argument the skip's annotation makes: without a
   // mark on the run summary, "we could not ask" is only ever visible in a log

@@ -21,7 +21,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { type AuditVerdict, type FixableAdvisory, formatAuditVerdict, fixVersion } from "@/lib/audit-baseline";
+import {
+  type AuditTree,
+  type AuditVerdict,
+  type FixableAdvisory,
+  formatAuditVerdict,
+  fixVersion,
+} from "@/lib/audit-baseline";
 import {
   compareVersions,
   describeReadings,
@@ -133,7 +139,14 @@ describe("fixVersion", () => {
 });
 
 describe("the green line's claim", () => {
-  const clean = (majorOnly: readonly FixableAdvisory[]): AuditVerdict => ({
+  // The tree rides the verdict now, so a case that reads one lockfile and a
+  // case that reads another build two verdicts rather than passing a second
+  // lockfile to the formatter — which is the pair of arguments that could
+  // disagree, and the reason this moved.
+  const clean = (
+    majorOnly: readonly FixableAdvisory[],
+    tree: AuditTree | null = null,
+  ): AuditVerdict => ({
     unexpected: [],
     stillPresent: [],
     stale: [],
@@ -145,14 +158,19 @@ describe("the green line's claim", () => {
     namedFixUnclaimed: [],
     namedFixUnread: [],
     backwardNamedFixes: [],
-    candidateVersions: {},
+    tree,
     majorOnly,
   });
 
-  const backward = clean([
-    { key: "postcss#GHSA-aaaa-aaaa-aaa1", severity: "high", updatePackage: "expo", updateVersion: "44.0.6", updateGroup: "expo" },
-  ]);
+  const POSTCSS: FixableAdvisory = {
+    key: "postcss#GHSA-aaaa-aaaa-aaa1",
+    severity: "high",
+    updatePackage: "expo",
+    updateVersion: "44.0.6",
+    updateGroup: "expo",
+  };
   const lock = { packages: { "node_modules/expo": { version: "54.0.35" } } };
+  const backward = clean([POSTCSS]);
 
   it("says 'cleared by upgrades' only when nothing says otherwise", () => {
     // No lockfile is "nobody asked", and the line reads as it always did —
@@ -161,7 +179,7 @@ describe("the green line's claim", () => {
   });
 
   it("stops saying 'cleared by' once a group points backward", () => {
-    const printed = formatAuditVerdict(backward, "check", lock);
+    const printed = formatAuditVerdict(clean([POSTCSS], { lock, versions: {} }), "check");
     assert.ok(!printed.includes("cleared by"), printed);
     assert.match(printed, /named by 1 update, 1 of which npm cannot point forward/);
     // The marker is the VERDICT over the candidates, not one reading's
@@ -175,11 +193,13 @@ describe("the green line's claim", () => {
     // which is unreadable at three groups and was the first version of this.
     const printed = formatAuditVerdict(
       clean([
-        { key: "postcss#GHSA-aaaa-aaaa-aaa1", severity: "high", updatePackage: "expo", updateVersion: "44.0.6", updateGroup: "expo" },
+        POSTCSS,
         { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13", updateGroup: "expo-router" },
-      ]),
+      ], {
+        lock: { packages: { ...lock.packages, "node_modules/expo-router": { version: "56.2.11" } } },
+        versions: {},
+      }),
       "check",
-      { packages: { ...lock.packages, "node_modules/expo-router": { version: "56.2.11" } } },
     );
     const lines = printed.split("\n");
     assert.match(lines[0], /expo \(1, up to high, NO FORWARD FIX\), expo-router \(1, up to moderate\)/);
@@ -191,18 +211,16 @@ describe("the green line's claim", () => {
     const printed = formatAuditVerdict(
       clean([
         { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13", updateGroup: "expo-router" },
-      ]),
+      ], { lock: { packages: { "node_modules/expo-router": { version: "56.2.11" } } }, versions: {} }),
       "check",
-      { packages: { "node_modules/expo-router": { version: "56.2.11" } } },
     );
     assert.match(printed, /cleared by 1 upgrade: expo-router \(1, up to moderate\)\.$/);
   });
 
   it("makes no claim about a bare `true` fix, which names no version", () => {
     const printed = formatAuditVerdict(
-      clean([{ key: "x#GHSA-aaaa-aaaa-aaa3", severity: "high", updatePackage: "x", updateVersion: null, updateGroup: "x" }]),
+      clean([{ key: "x#GHSA-aaaa-aaaa-aaa3", severity: "high", updatePackage: "x", updateVersion: null, updateGroup: "x" }], { lock, versions: {} }),
       "check",
-      lock,
     );
     assert.match(printed, /cleared by 1 upgrade: x \(1, up to high\)/);
   });
@@ -295,15 +313,17 @@ describe("the green line is the same on every run", () => {
       namedFixUnclaimed: [],
       namedFixUnread: [],
       backwardNamedFixes: [],
-      candidateVersions: { expo: "44.0.6", "react-native": "0.87.1" },
+      tree: {
+        lock: {
+          packages: {
+            "node_modules/expo": { version: "54.0.35" },
+            "node_modules/react-native": { version: "0.81.5" },
+          },
+        },
+        versions: { expo: "44.0.6", "react-native": "0.87.1" },
+      },
       majorOnly,
     });
-    const lock = {
-      packages: {
-        "node_modules/expo": { version: "54.0.35" },
-        "node_modules/react-native": { version: "0.81.5" },
-      },
-    };
     // Two advisories, one candidate set, npm picking differently for each.
     const printed = formatAuditVerdict(
       clean([
@@ -323,7 +343,6 @@ describe("the green line is the same on every run", () => {
         },
       ]),
       "check",
-      lock,
     );
     assert.match(printed, /cleared by 1 upgrade: expo \/ react-native \(2, up to high\)/);
     // And the forward candidate decides it, so no detail line.
