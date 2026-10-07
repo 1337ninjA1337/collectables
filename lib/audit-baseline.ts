@@ -2023,8 +2023,9 @@ export function formatAuditVerdict(
     // reading `updatePackage` while the command had moved to the candidate set.
     const targets = fixCommandTargets(
       verdict.fixableInRange,
-      new Map(Object.entries(verdict.candidateVersions)),
-      lock,
+      lock === undefined
+        ? undefined
+        : { lock, versions: new Map(Object.entries(verdict.candidateVersions)) },
     );
     const chosen = new Map(targets.map((target) => [target.group, target.package]));
     for (const found of verdict.fixableInRange) {
@@ -2171,6 +2172,26 @@ export function advisoryPackage(key: string): string {
   return at < 0 ? key : key.slice(0, at);
 }
 
+/**
+ * The tree to read a candidate against, or nothing when nobody asked.
+ *
+ * One parameter rather than two, because the two halves are useless apart and
+ * were separately optional: a populated map with no lockfile and a lockfile
+ * with no map both came out as "no candidate is ahead", which is the state
+ * {@link describeFixChoice} prints `read the direction before running this`
+ * for — a sentence about a reading, printed where there had been none. The
+ * combinations that cannot mean anything are now unspellable.
+ */
+export interface FixCommandTree {
+  /** Parsed `package-lock.json`. */
+  readonly lock: unknown;
+  /**
+   * Each candidate's own named version. See
+   * {@link AuditVerdict.candidateVersions}, which is this as a `Record`.
+   */
+  readonly versions: ReadonlyMap<string, string>;
+}
+
 /** One package `npm update` should name, and the reading that picked it. */
 export interface FixCommandTarget {
   /** The stable group the pick was made inside. See {@link FixableAdvisory.updateGroup}. */
@@ -2181,8 +2202,16 @@ export interface FixCommandTarget {
   readonly package: string;
   /** Every candidate the lockfile places AHEAD of what is installed, sorted. */
   readonly forward: readonly string[];
-  /** How many candidates the lockfile could place at all. */
-  readonly placed: number;
+  /**
+   * How many candidates the lockfile could place, or `null` for "not asked".
+   *
+   * The two `null`s `namedFixReading` distinguishes, in this shape: a `0` is a
+   * lockfile that was read and answered nothing about any candidate, and
+   * `null` is no {@link FixCommandTree} having been handed in at all. They
+   * print differently, and printing them the same is what claimed a lockfile
+   * had been consulted by a caller that offered none.
+   */
+  readonly placed: number | null;
 }
 
 /**
@@ -2206,14 +2235,14 @@ export interface FixCommandTarget {
  * unlike it does not change between runs — {@link describeFixChoice} says so
  * in that case rather than printing a bare command for a move nobody read.
  *
- * `candidateVersions` empty or `lock` omitted is "the question was not asked":
- * every group falls to its sorted-first, which is what a caller with no
- * lockfile to walk can offer. The gate always hands one in.
+ * An omitted {@link FixCommandTree} is "the question was not asked": every
+ * group falls to its sorted-first, which is what a caller with no lockfile to
+ * walk can offer, and `placed` is `null` rather than `0` so the sentence below
+ * does not claim a lockfile answered nothing. The gate always hands one in.
  */
 export function fixCommandTargets(
   fixable: readonly FixableAdvisory[],
-  candidateVersions: ReadonlyMap<string, string> = new Map(),
-  lock?: unknown,
+  tree?: FixCommandTree,
 ): readonly FixCommandTarget[] {
   const targets: FixCommandTarget[] = [];
   const seen = new Set<string>();
@@ -2222,13 +2251,13 @@ export function fixCommandTargets(
     seen.add(found.updateGroup);
     const candidates = found.updateGroup.split(GROUP_SEPARATOR);
     const readings =
-      lock === undefined
-        ? []
+      tree === undefined || tree.lock === undefined
+        ? null
         : candidates.flatMap((name) => {
-            const version = candidateVersions.get(name);
-            return version === undefined ? [] : [readNamedFix(lock, name, version)];
+            const version = tree.versions.get(name);
+            return version === undefined ? [] : [readNamedFix(tree.lock, name, version)];
           });
-    const forward = readings
+    const forward = (readings ?? [])
       .filter((reading) => reading.direction === "forward")
       .map((reading) => reading.package)
       .sort();
@@ -2241,7 +2270,10 @@ export function fixCommandTargets(
       // cannot know.
       package: forward[0] ?? candidates[0] ?? found.updatePackage,
       forward,
-      placed: readings.filter((reading) => reading.direction !== "unknown").length,
+      placed:
+        readings === null
+          ? null
+          : readings.filter((reading) => reading.direction !== "unknown").length,
     });
   }
   return targets;
@@ -2269,10 +2301,9 @@ export function fixCommandTargets(
  */
 export function fixCommandPackages(
   fixable: readonly FixableAdvisory[],
-  candidateVersions: ReadonlyMap<string, string> = new Map(),
-  lock?: unknown,
+  tree?: FixCommandTree,
 ): readonly string[] {
-  return commandNames(fixCommandTargets(fixable, candidateVersions, lock));
+  return commandNames(fixCommandTargets(fixable, tree));
 }
 
 /** The chosen names, deduplicated — what goes after `npm update`. */
@@ -2313,6 +2344,13 @@ export function describeFixChoice(targets: readonly FixCommandTarget[]): readonl
       // owns — the "only one" / "lowest-sorted of n" choice below IS that
       // comparison and goes through the rule.
       if (target.forward.length === 0) {
+        // Three states, not two. "Nobody asked" must not read as "the lockfile
+        // answered nothing": the first is a caller with no tree to walk, and
+        // asking its reader to go and read a direction names a step that has
+        // not been skipped.
+        if (target.placed === null) {
+          return `npm names ${pool} for it and nothing placed them against a lockfile, so ${target.package} is the sorted-first of them`;
+        }
         const why =
           target.placed > 0
             ? "the lockfile places none of them ahead of what is installed"
