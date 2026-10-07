@@ -27,6 +27,7 @@ import {
   type FixableAdvisory,
   describeFixChoice,
   evaluateAudit,
+  fixCandidates,
   fixCommandPackages,
   fixCommandTargets,
   formatAuditVerdict,
@@ -397,5 +398,64 @@ describe("the backward-fix list, as a flat set of packages", () => {
         "gh-pages: npm names 6.1.1, the lockfile is on 6.3.0",
       ],
     );
+  });
+});
+
+/**
+ * The premise three callers rest on, held rather than stated.
+ *
+ * `backwardNamedFixes` reads `selfNamedVersions`' keys AS the union of every
+ * group's candidates, `groupCandidates` looks each candidate's name up in the
+ * same map, and `fixCommandTargets` takes it as a parameter. The claim is that
+ * the two filters are the same one — a candidate is a direct package whose own
+ * `fixAvailable` names itself, which is exactly what `selfNamedVersions`
+ * collects — and it is true today by reading both bodies and held by nothing.
+ *
+ * That matters because `fixCandidates` is the function with a pending reason to
+ * grow a condition: a 2026-10-05 suggestion asks whether a candidate whose own
+ * fix is itself a downgrade (`@sentry/react-native@5.15.2`) belongs in the set
+ * at all. Adding that filter there and not here would leave the map holding a
+ * name no group contains, and every reader would keep passing.
+ */
+describe("the candidate set and the version map are one population", () => {
+  const union = (report: AuditReport): readonly string[] =>
+    [
+      ...new Set(
+        Object.keys(report.vulnerabilities ?? {}).flatMap((name) => [
+          ...fixCandidates(report, name),
+        ]),
+      ),
+    ].sort();
+
+  const versionKeys = (report: AuditReport): readonly string[] =>
+    Object.keys(evaluateAudit(report, [], LOCK).candidateVersions).sort();
+
+  it("agrees on every fixture in this file", () => {
+    for (const report of [
+      inRangeMultiCandidate("expo"),
+      inRangeMultiCandidate("react-native"),
+    ]) {
+      assert.deepEqual(versionKeys(report), union(report), JSON.stringify(union(report)));
+    }
+  });
+
+  it("names a candidate npm gave no version for, and holds that as the ONE difference", () => {
+    // `{ name }` with no `version` is a shape npm emits, and it is the only
+    // way the two populations can disagree: `fixCandidates` reads the name and
+    // `selfNamedVersions` needs the version. A candidate with no version is in
+    // the set and not in the map, which `groupCandidates` already skips by
+    // name — so the difference is load-bearing rather than a leak, and a case
+    // that asserted bare equality would have to be loosened the day one
+    // appears rather than read.
+    const versionless = inRangeMultiCandidate("expo") as unknown as {
+      vulnerabilities: Record<string, { fixAvailable?: unknown }>;
+    };
+    versionless.vulnerabilities["react-native"] = {
+      ...versionless.vulnerabilities["react-native"],
+      fixAvailable: { name: "react-native", isSemVerMajor: false },
+    };
+    const report = versionless as unknown as AuditReport;
+    assert.deepEqual(union(report), ["expo", "react-native"]);
+    assert.deepEqual(versionKeys(report), ["expo"]);
   });
 });
