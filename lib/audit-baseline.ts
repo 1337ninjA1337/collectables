@@ -1659,16 +1659,35 @@ function selfNamedVersions(report: AuditReport): Record<string, string> {
  * cannot see `@sentry/react-native` (moderate, names 5.15.2 against a locked
  * 7.5.0). Deduplicated by package, because one backward-pointing dependency is
  * one fact however many advisories ride it.
+ *
+ * Read over the candidate SET, not npm's pick. Keyed on `updatePackage` this
+ * asked a different question per run: `braces` contributed `expo@44.0.6`
+ * (backward, so a line) on five runs out of eleven and `react-native@0.87.1`
+ * (forward, so nothing) on three, which made the membership of a list printed
+ * on the GREEN path move on a tree nobody had touched — the one thing
+ * `bySeverityThenKey`'s header says a findings list must never do. Each
+ * candidate's version comes from its own entry, so every route is read on
+ * every run.
  */
 function backwardNamedFixes(report: AuditReport, lock: unknown): readonly string[] {
   if (lock === undefined) return [];
+  const versions = selfNamedVersions(report);
   const byPackage = new Map<string, NamedFixReading>();
+  const asked = new Set<string>();
   for (const detail of observedAdvisoryDetails(report).values()) {
-    if (detail.updateVersion === null) continue;
-    if (byPackage.has(detail.updatePackage)) continue;
-    const reading = readNamedFix(lock, detail.updatePackage, detail.updateVersion);
-    if (reading.direction !== "backward" && reading.direction !== "same") continue;
-    byPackage.set(detail.updatePackage, reading);
+    for (const name of detail.updateGroup.split(GROUP_SEPARATOR)) {
+      if (asked.has(name)) continue;
+      // A group that fell back to npm's pick has no candidate entry to read a
+      // version off — npm named a package its own report does not carry as a
+      // vulnerability. Its `updateVersion` is the only version there is, and
+      // dropping it would lose the reading this list was written for.
+      const version = versions[name] ?? (name === detail.updatePackage ? detail.updateVersion : null);
+      if (version === null) continue;
+      asked.add(name);
+      const reading = readNamedFix(lock, name, version);
+      if (reading.direction !== "backward" && reading.direction !== "same") continue;
+      byPackage.set(name, reading);
+    }
   }
   return [...byPackage.values()]
     .map((reading) => `${reading.package}: npm names ${reading.named}, the lockfile is on ${String(reading.installed)}`)
@@ -2002,8 +2021,15 @@ export function formatAuditVerdict(
           : `  (fix in ${found.updatePackage})`;
       lines.push(`  FIXABLE  ${found.severity.padEnd(8)}  ${found.key}${via}`);
     }
+    // Built once: the names and the sentence explaining them are two readings
+    // of one pick, and computing them apart is how they would come to disagree.
+    const targets = fixCommandTargets(
+      verdict.fixableInRange,
+      new Map(Object.entries(verdict.candidateVersions)),
+      lock,
+    );
     lines.push(
-      `Run \`npm update ${fixCommandPackages(verdict.fixableInRange).join(" ")}\` and commit the lockfile. An advisory a lockfile bump clears is not a triage decision, at any severity — accepting one is how seven of these sat on the baseline being read as read, and how three moderate/low roots went a month without anybody asking.`,
+      `Run \`npm update ${commandNames(targets).join(" ")}\` and commit the lockfile.${describeFixChoice(targets)} An advisory a lockfile bump clears is not a triage decision, at any severity — accepting one is how seven of these sat on the baseline being read as read, and how three moderate/low roots went a month without anybody asking.`,
     );
   }
   if (verdict.stale.length > 0) {
@@ -2084,7 +2110,15 @@ export function formatAuditVerdict(
     // summary reads high and critical; this list reads every severity, so what
     // is left over is a backward-pointing fix for an advisory the baseline
     // does not triage — a real case the day one exists, and empty today.
-    const alreadyNamed = new Set(verdict.majorOnly.map((found) => found.updatePackage));
+    // Every candidate of every major-only group, not npm's one pick out of
+    // each: the summary above groups by `updateGroup` and reads its verdict
+    // over the whole set, so a set built from `updatePackage` suppressed one
+    // name of four and let the other three print again — and WHICH one
+    // depended on the field that answered `braces` three ways in eleven runs,
+    // so this list's membership moved between runs on an unchanged tree.
+    const alreadyNamed = new Set(
+      verdict.majorOnly.flatMap((found) => found.updateGroup.split(GROUP_SEPARATOR)),
+    );
     const unsaid = verdict.backwardNamedFixes.filter(
       (line) => !alreadyNamed.has(line.slice(0, line.indexOf(":"))),
     );
@@ -2121,27 +2155,162 @@ export function advisoryPackage(key: string): string {
   return at < 0 ? key : key.slice(0, at);
 }
 
+/** One package `npm update` should name, and the reading that picked it. */
+export interface FixCommandTarget {
+  /** The stable group the pick was made inside. See {@link FixableAdvisory.updateGroup}. */
+  readonly group: string;
+  /** The group key split back apart: every candidate npm names, sorted. */
+  readonly candidates: readonly string[];
+  /** The one package the command names. */
+  readonly package: string;
+  /** Every candidate the lockfile places AHEAD of what is installed, sorted. */
+  readonly forward: readonly string[];
+  /** How many candidates the lockfile could place at all. */
+  readonly placed: number;
+}
+
+/**
+ * Which package to name, per group, and what reading chose it.
+ *
+ * One target per {@link FixableAdvisory.updateGroup}, in the order the groups
+ * were reported — the stable identity rather than
+ * {@link FixableAdvisory.updatePackage}, which is npm's own pick and MOVES:
+ * eleven `npm audit --json` runs on one unchanged tree named three different
+ * packages for `braces`. Grouping and direction moved off that field on
+ * 2026-10-05 and the command did not, so the one output a contributor
+ * COPIES was the last thing here still reading it — `npm update expo` on one
+ * run and `npm update react-native` on the next, for the same finding.
+ *
+ * ## Forward first, then sorted-first — never npm's pick
+ *
+ * A candidate ahead of the lockfile is a package that can actually move, and
+ * that is the whole question the command answers; the lowest-sorted of them
+ * wins so two forward routes do not make the line flip. With no forward
+ * candidate the sorted-first is named, which is as arbitrary as npm's pick and
+ * unlike it does not change between runs — {@link describeFixChoice} says so
+ * in that case rather than printing a bare command for a move nobody read.
+ *
+ * `candidateVersions` empty or `lock` omitted is "the question was not asked":
+ * every group falls to its sorted-first, which is what a caller with no
+ * lockfile to walk can offer. The gate always hands one in.
+ */
+export function fixCommandTargets(
+  fixable: readonly FixableAdvisory[],
+  candidateVersions: ReadonlyMap<string, string> = new Map(),
+  lock?: unknown,
+): readonly FixCommandTarget[] {
+  const targets: FixCommandTarget[] = [];
+  const seen = new Set<string>();
+  for (const found of fixable) {
+    if (seen.has(found.updateGroup)) continue;
+    seen.add(found.updateGroup);
+    const candidates = found.updateGroup.split(GROUP_SEPARATOR);
+    const readings =
+      lock === undefined
+        ? []
+        : candidates.flatMap((name) => {
+            const version = candidateVersions.get(name);
+            return version === undefined ? [] : [readNamedFix(lock, name, version)];
+          });
+    const forward = readings
+      .filter((reading) => reading.direction === "forward")
+      .map((reading) => reading.package)
+      .sort();
+    targets.push({
+      group: found.updateGroup,
+      candidates,
+      // `updatePackage` is the last resort rather than the first, and it is
+      // reachable only for a group key that cannot be split into anything —
+      // which `String.prototype.split` does not produce and the type system
+      // cannot know.
+      package: forward[0] ?? candidates[0] ?? found.updatePackage,
+      forward,
+      placed: readings.filter((reading) => reading.direction !== "unknown").length,
+    });
+  }
+  return targets;
+}
+
 /**
  * The packages one `npm update` should name, in the order they were reported.
  *
  * Deduplicated, because three advisories on one root are one upgrade: a
  * command reading `npm update brace-expansion brace-expansion brace-expansion`
- * is one a reader stops trusting. The dedupe now collapses ACROSS roots as
- * well — twelve advisories whose fix is `expo@57` are one `npm update expo`,
- * where naming the vulnerable packages produced twelve names for one upgrade.
+ * is one a reader stops trusting. The dedupe collapses ACROSS roots as well —
+ * twelve advisories whose fix is `expo@57` are one `npm update expo`, where
+ * naming the vulnerable packages produced twelve names for one upgrade — and
+ * then once more over the chosen names, because two groups can resolve to one
+ * package.
  *
- * Reads {@link FixableAdvisory.updatePackage}, so npm's own report decides. The
- * first version named the vulnerable package instead and printed
+ * The names come from {@link fixCommandTargets}, so npm's report still decides
+ * WHO is a candidate and the lockfile decides WHICH of them the line names.
+ * The first version named the vulnerable package and printed
  * `npm update esbuild` for a fix that lived in `tsx`; a contributor following
  * the printed instruction literally saw it no-op with no way to tell why. The
  * command is still a starting point rather than a guarantee — the gate re-runs
- * and says so if the advisory survives it — but it now names a package that
- * can actually move.
+ * and says so if the advisory survives it — but it names a package that can
+ * actually move, and it names the same one twice in a row.
  */
 export function fixCommandPackages(
   fixable: readonly FixableAdvisory[],
+  candidateVersions: ReadonlyMap<string, string> = new Map(),
+  lock?: unknown,
 ): readonly string[] {
-  return [...new Set(fixable.map((found) => found.updatePackage))];
+  return commandNames(fixCommandTargets(fixable, candidateVersions, lock));
+}
+
+/** The chosen names, deduplicated — what goes after `npm update`. */
+function commandNames(targets: readonly FixCommandTarget[]): readonly string[] {
+  return [...new Set(targets.map((target) => target.package))];
+}
+
+/**
+ * Why the command names THAT package, for the groups that gave it a choice.
+ *
+ * Silent for a one-candidate group, which is most of them: "expo is the only
+ * package npm names for it" on every line is how the `(fix in undici)`
+ * redirect one function up learned to print only when there is one. A group
+ * with four candidates and one forward route is the case this exists for —
+ * a reader who is about to run the line can see it was a reading rather than
+ * a coin toss, and the three names it did NOT pick are where to look if the
+ * command no-ops.
+ *
+ * The clause with no forward candidate is the one that asks for something.
+ * `npm update <a package behind the lockfile>` is not an upgrade, so the line
+ * says the pick was positional and that nobody has read it, rather than
+ * printing it as though the lockfile had agreed.
+ */
+export function describeFixChoice(targets: readonly FixCommandTarget[]): string {
+  const said = targets
+    .filter((target) => target.candidates.length > 1)
+    .map((target) => {
+      const pool = counted(target.candidates.length, "package", "packages");
+      // The no-forward branch tests against 0 rather than inflecting a word, so
+      // it is an `if` and not the one-versus-many comparison `lib/plural.ts`
+      // owns — the "only one" / "lowest-sorted of n" choice below IS that
+      // comparison and goes through the rule.
+      if (target.forward.length === 0) {
+        const why =
+          target.placed > 0
+            ? "the lockfile places none of them ahead of what is installed"
+            : "the lockfile placed none of them at all";
+        return `npm names ${pool} for it and ${why}, so ${target.package} is the sorted-first rather than a reading — read the direction before running this`;
+      }
+      const rank = plural(
+        target.forward.length,
+        "the only one",
+        `the lowest-sorted of ${String(target.forward.length)}`,
+      );
+      // The candidates the command did NOT name AND could not have: the ones
+      // that are not ahead of the lockfile. Naming every other candidate here
+      // would call a second forward route "not ahead", which is the one thing
+      // this sentence is being printed to settle.
+      const held = target.candidates.filter((name) => !target.forward.includes(name));
+      const beside =
+        held.length === 0 ? "" : ` (${held.join(", ")} ${plural(held.length, "is", "are")} not)`;
+      return `${target.package} is ${rank} of ${pool} npm names for it that ${plural(target.forward.length, "is", "are")} ahead of the lockfile${beside}`;
+    });
+  return said.length === 0 ? "" : ` ${said.join("; ")}.`;
 }
 
 /**
