@@ -1671,23 +1671,29 @@ function selfNamedVersions(report: AuditReport): Record<string, string> {
  */
 function backwardNamedFixes(report: AuditReport, lock: unknown): readonly string[] {
   if (lock === undefined) return [];
-  const versions = selfNamedVersions(report);
   const byPackage = new Map<string, NamedFixReading>();
   const asked = new Set<string>();
+  const read = (name: string, version: string | null): void => {
+    if (version === null || asked.has(name)) return;
+    asked.add(name);
+    const reading = readNamedFix(lock, name, version);
+    if (reading.direction !== "backward" && reading.direction !== "same") return;
+    byPackage.set(name, reading);
+  };
+  // Every self-named package in the report, which IS the union of every
+  // group's candidates: a candidate is by definition a direct package whose
+  // own `fixAvailable` names itself, and that is the same filter
+  // `selfNamedVersions` applies. Read as a flat set rather than per advisory,
+  // so the question "which packages does npm name a backward fix for" does not
+  // depend on how many advisories happen to route through one of them.
+  for (const [name, version] of Object.entries(selfNamedVersions(report))) read(name, version);
+  // Then the groups with no candidate at all, which is npm naming a package
+  // its own report does not carry as a vulnerability entry: its
+  // `updateVersion` is the only version there is, and dropping it would lose
+  // the reading this list was written for. `asked` makes this a top-up rather
+  // than a second pass — every name the walk above reached is already decided.
   for (const detail of observedAdvisoryDetails(report).values()) {
-    for (const name of detail.updateGroup.split(GROUP_SEPARATOR)) {
-      if (asked.has(name)) continue;
-      // A group that fell back to npm's pick has no candidate entry to read a
-      // version off — npm named a package its own report does not carry as a
-      // vulnerability. Its `updateVersion` is the only version there is, and
-      // dropping it would lose the reading this list was written for.
-      const version = versions[name] ?? (name === detail.updatePackage ? detail.updateVersion : null);
-      if (version === null) continue;
-      asked.add(name);
-      const reading = readNamedFix(lock, name, version);
-      if (reading.direction !== "backward" && reading.direction !== "same") continue;
-      byPackage.set(name, reading);
-    }
+    read(detail.updatePackage, detail.updateVersion);
   }
   return [...byPackage.values()]
     .map((reading) => `${reading.package}: npm names ${reading.named}, the lockfile is on ${String(reading.installed)}`)

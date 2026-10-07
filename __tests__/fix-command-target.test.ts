@@ -372,3 +372,30 @@ describe("the redirect beside each finding", () => {
     assert.doesNotMatch(printed, /\(fix in/, printed);
   });
 });
+
+describe("the backward-fix list, as a flat set of packages", () => {
+  it("reads a self-named package no advisory's pick ever points at", () => {
+    // What the flat set buys over the per-advisory walk. `gh-pages` carries no
+    // advisory OBJECT of its own and sits in nobody's `effects`, so no group
+    // contains it and no `updatePackage` is ever it — and npm still reports it
+    // as a root whose own fix is a version behind the lockfile, which is
+    // exactly what this list claims to be every one of.
+    const withPassenger = inRangeMultiCandidate("expo") as unknown as {
+      vulnerabilities: Record<string, unknown>;
+    };
+    withPassenger.vulnerabilities["gh-pages"] = {
+      severity: "low",
+      isDirect: true,
+      fixAvailable: { name: "gh-pages", version: "6.1.1", isSemVerMajor: false },
+      effects: [],
+      via: ["something"],
+    };
+    assert.deepEqual(
+      evaluateAudit(withPassenger as unknown as AuditReport, [], LOCK).backwardNamedFixes,
+      [
+        "expo: npm names 44.0.6, the lockfile is on 54.0.35",
+        "gh-pages: npm names 6.1.1, the lockfile is on 6.3.0",
+      ],
+    );
+  });
+});
