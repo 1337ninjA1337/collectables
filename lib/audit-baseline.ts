@@ -1822,14 +1822,14 @@ function counted(count: number, one: string, many: string): string {
  */
 function majorOnlySummary(
   majorOnly: readonly FixableAdvisory[],
-  lock?: unknown,
   /**
-   * Each candidate's own named version, so a group's verdict is read over all
-   * of them rather than off npm's one pick. Built by {@link formatAuditVerdict}
-   * from the same walk; empty means "read npm's pick", which is what a caller
-   * with no report to walk can offer.
+   * The lockfile and each candidate's own named version, so a group's verdict
+   * is read over all of them rather than off npm's one pick. One parameter for
+   * the same reason {@link fixCommandTargets} takes one: as two optionals this
+   * had four spellings and two of them meant nothing, and both of those two
+   * came out as the sentence this gate printed falsely for a month.
    */
-  candidateVersions: ReadonlyMap<string, string> = new Map(),
+  tree?: FixCommandTree,
 ): string {
   if (majorOnly.length === 0) return "";
   const groups = [...groupByPackage(majorOnly, (found) => found.updateGroup)]
@@ -1855,8 +1855,8 @@ function majorOnlySummary(
       // Every candidate in the group's own key, when their versions are in
       // hand; npm's single pick otherwise. The first is deterministic and the
       // second is the field that moved three times on one tree.
-      const readings = groupCandidates(group.found, candidateVersions, lock);
-      const single = namedFixReading(group.found, lock);
+      const readings = groupCandidates(group.found, tree);
+      const single = namedFixReading(group.found, tree);
       return {
         ...group,
         readings: readings.length > 0 ? readings : single === null ? [] : [single],
@@ -1910,11 +1910,14 @@ function majorOnlySummary(
  * `fixAvailable` object, so the group has one named version or none; a group
  * whose entries disagreed would be a group that was not grouped.
  */
-function namedFixReading(group: readonly FixableAdvisory[], lock: unknown): NamedFixReading | null {
-  if (lock === undefined) return null;
+function namedFixReading(
+  group: readonly FixableAdvisory[],
+  tree: FixCommandTree | undefined,
+): NamedFixReading | null {
+  if (tree === undefined) return null;
   const named = group[0]?.updateVersion;
   if (named === null || named === undefined) return null;
-  return readNamedFix(lock, group[0].updatePackage, named);
+  return readNamedFix(tree.lock, group[0].updatePackage, named);
 }
 
 /**
@@ -1929,15 +1932,14 @@ function namedFixReading(group: readonly FixableAdvisory[], lock: unknown): Name
  */
 function groupCandidates(
   group: readonly FixableAdvisory[],
-  candidateVersions: ReadonlyMap<string, string>,
-  lock: unknown,
+  tree: FixCommandTree | undefined,
 ): readonly NamedFixReading[] {
-  if (lock === undefined) return [];
+  if (tree === undefined) return [];
   const readings: NamedFixReading[] = [];
   for (const name of (group[0]?.updateGroup ?? "").split(GROUP_SEPARATOR)) {
-    const version = candidateVersions.get(name);
+    const version = tree.versions.get(name);
     if (version === undefined) continue;
-    readings.push(readNamedFix(lock, name, version));
+    readings.push(readNamedFix(tree.lock, name, version));
   }
   return readings;
 }
@@ -2002,6 +2004,15 @@ export function formatAuditVerdict(
    */
   lock?: unknown,
 ): string {
+  // One reading of the tree for the whole report, built once. Three blocks
+  // below place a candidate against the lockfile — the fix command, the green
+  // summary and the choice clause — and each of them used to take `lock` and
+  // the version map as separate optional arguments, which is four spellings
+  // per block of which two said nothing.
+  const tree: FixCommandTree | undefined =
+    lock === undefined
+      ? undefined
+      : { lock, versions: new Map(Object.entries(verdict.candidateVersions)) };
   const lines: string[] = [];
   if (verdict.unexpected.length > 0) {
     lines.push(
@@ -2021,12 +2032,7 @@ export function formatAuditVerdict(
     // of one pick, and computing them apart is how they come to name different
     // packages on one run — which is what the redirect did until 2026-10-07,
     // reading `updatePackage` while the command had moved to the candidate set.
-    const targets = fixCommandTargets(
-      verdict.fixableInRange,
-      lock === undefined
-        ? undefined
-        : { lock, versions: new Map(Object.entries(verdict.candidateVersions)) },
-    );
+    const targets = fixCommandTargets(verdict.fixableInRange, tree);
     const chosen = new Map(targets.map((target) => [target.group, target.package]));
     for (const found of verdict.fixableInRange) {
       // The redirect is printed only when there IS one. A finding whose fix
@@ -2121,7 +2127,7 @@ export function formatAuditVerdict(
       // Semicolons between them because two of the three END in a
       // comma-separated list of packages, and a comma joining the clauses put
       // the list's last entry and the next clause in the same punctuation.
-      `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly, lock, new Map(Object.entries(verdict.candidateVersions)))}.`,
+      `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly, tree)}.`,
     );
     // Only the packages the major-only summary did not already name. That
     // summary reads high and critical; this list reads every severity, so what

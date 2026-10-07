@@ -537,3 +537,73 @@ describe("every redirect names a package the command names", () => {
     assert.match(printed, /Run `npm update undici`/);
   });
 });
+
+/**
+ * One tree for the whole report, which three blocks used to ask for separately.
+ *
+ * The fix command, the green summary and the choice clause each took the
+ * lockfile and the version map as two optional arguments, so each had four
+ * spellings and two of them said nothing. They are built from one `tree` now.
+ *
+ * No single run can show both halves reading it, and that is a fact about the
+ * report rather than a gap in the case: `majorOnlySummary` is printed inside
+ * `if (isClean(verdict))` and a `fixableInRange` finding makes the verdict
+ * red, so the two blocks are mutually exclusive by construction. Each is
+ * asserted on a run that reaches it, and the third case is the one spelling
+ * that still means "not asked" — now one absent argument rather than two.
+ */
+describe("the lockfile reaches every block that places a candidate", () => {
+  /** One major-only advisory under one direct dependent: the clean path. */
+  const majorOnly = {
+    vulnerabilities: {
+      expo: {
+        severity: "moderate",
+        isDirect: true,
+        fixAvailable: { name: "expo", version: "44.0.6", isSemVerMajor: true },
+        effects: [],
+        via: ["accepted"],
+      },
+      accepted: {
+        severity: "moderate",
+        isDirect: false,
+        fixAvailable: { name: "expo", version: "44.0.6", isSemVerMajor: true },
+        effects: ["expo"],
+        via: [
+          {
+            source: 1,
+            url: "https://github.com/advisories/GHSA-aaaa-bbbb-ccc1",
+            severity: "moderate",
+          },
+        ],
+      },
+    },
+    metadata: { vulnerabilities: { moderate: 2 } },
+  } as unknown as AuditReport;
+
+  it("reads the direction for the green summary's groups", () => {
+    const lock = { packages: { "node_modules/expo": { version: "54.0.35" } } };
+    const printed = formatAuditVerdict(evaluateAudit(majorOnly, [], lock), "check", lock);
+    assert.match(printed, /NO FORWARD FIX/, printed);
+    assert.match(printed, /expo@44\.0\.6 is behind 54\.0\.35/, printed);
+  });
+
+  it("reads it for the red path's choice clause out of the same field", () => {
+    const printed = formatAuditVerdict(
+      evaluateAudit(inRangeMultiCandidate("expo"), [], LOCK),
+      "check",
+      LOCK,
+    );
+    assert.match(printed, /is ahead of the lockfile/, printed);
+  });
+
+  it("says neither direction when no lockfile is handed in", () => {
+    assert.doesNotMatch(
+      formatAuditVerdict(evaluateAudit(inRangeMultiCandidate("expo"), []), "check"),
+      /ahead of the lockfile/,
+    );
+    assert.doesNotMatch(
+      formatAuditVerdict(evaluateAudit(majorOnly, []), "check"),
+      /NO FORWARD FIX/,
+    );
+  });
+});
