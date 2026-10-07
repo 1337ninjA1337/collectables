@@ -157,7 +157,7 @@ describe("describeFixChoice", () => {
   it("says nothing for a one-candidate group, which is most of them", () => {
     // Same reason the `(fix in undici)` redirect one function up prints only
     // when there is one: a clause on every line is a clause nobody reads.
-    assert.equal(
+    assert.deepEqual(
       describeFixChoice(
         fixCommandTargets(
           [
@@ -173,19 +173,20 @@ describe("describeFixChoice", () => {
           LOCK,
         ),
       ),
-      "",
+      [],
     );
   });
 
-  it("names the three routes it did not take", () => {
+  it("names the three routes it did not take, on one line", () => {
     const said = describeFixChoice(fixCommandTargets([advisory("expo")], VERSIONS, LOCK));
-    assert.match(said, /react-native is the only one of 4 packages/);
-    assert.match(said, /@sentry\/react-native, expo, gh-pages are not/);
+    assert.equal(said.length, 1);
+    assert.match(said[0] ?? "", /react-native is the only one of 4 packages/);
+    assert.match(said[0] ?? "", /@sentry\/react-native, expo, gh-pages are not/);
   });
 
   it("counts the forward routes when there is more than one", () => {
     const twoForward = new Map(VERSIONS).set("expo", "57.0.19");
-    const said = describeFixChoice(fixCommandTargets([advisory("expo")], twoForward, LOCK));
+    const said = describeFixChoice(fixCommandTargets([advisory("expo")], twoForward, LOCK))[0] ?? "";
     assert.match(said, /expo is the lowest-sorted of 2 of 4 packages/);
     assert.match(said, /are ahead of the lockfile/);
     // And only the two that are actually behind are named as behind.
@@ -195,14 +196,14 @@ describe("describeFixChoice", () => {
   it("asks for a reading when the lockfile places nothing ahead", () => {
     const behind = new Map(VERSIONS).set("react-native", "0.70.0");
     assert.match(
-      describeFixChoice(fixCommandTargets([advisory("expo")], behind, LOCK)),
+      describeFixChoice(fixCommandTargets([advisory("expo")], behind, LOCK))[0] ?? "",
       /places none of them ahead of what is installed, so @sentry\/react-native is the sorted-first rather than a reading/,
     );
   });
 
   it("distinguishes a lockfile that placed none of them from one that placed all four", () => {
     assert.match(
-      describeFixChoice(fixCommandTargets([advisory("expo")], VERSIONS, { packages: {} })),
+      describeFixChoice(fixCommandTargets([advisory("expo")], VERSIONS, { packages: {} }))[0] ?? "",
       /placed none of them at all/,
     );
   });
@@ -260,8 +261,13 @@ describe("the printed command, end to end", () => {
         "check",
         LOCK,
       );
-      assert.match(printed, /Run `npm update react-native` and commit the lockfile\./, printed);
-      assert.match(printed, /react-native is the only one of 2 packages/, printed);
+      // The command on its own line, the reading indented below it, the
+      // paragraph after — three lines rather than one that wraps.
+      assert.match(
+        printed,
+        /Run `npm update react-native` and commit the lockfile\.\n {2}react-native is the only one of 2 packages[^\n]*\nAn advisory a lockfile bump clears/,
+        printed,
+      );
     }
   });
 
@@ -292,7 +298,12 @@ describe("the printed command, end to end", () => {
       "check",
       { packages: { "node_modules/undici": { version: "5.20.0" } } },
     );
-    assert.match(printed, /Run `npm update undici` and commit the lockfile\. An advisory/, printed);
+    // No choice to explain, so nothing between the command and the paragraph.
+    assert.match(
+      printed,
+      /Run `npm update undici` and commit the lockfile\.\nAn advisory/,
+      printed,
+    );
   });
 });
 
@@ -310,5 +321,54 @@ describe("the backward-fix list the green path prints", () => {
     assert.deepEqual(lists[0], [
       "expo: npm names 44.0.6, the lockfile is on 54.0.35",
     ]);
+  });
+});
+
+describe("the redirect beside each finding", () => {
+  it("names the package the command names, not the one npm filed it under", () => {
+    // Printed from `updatePackage` while the command read the candidate set,
+    // the two disagreed on any group with more than one candidate — and a
+    // reader resolving that disagreement trusts the one printed next to the
+    // advisory, which is the one that cannot move.
+    for (const picked of ["expo", "react-native"]) {
+      const printed = formatAuditVerdict(
+        evaluateAudit(inRangeMultiCandidate(picked), [], LOCK),
+        "check",
+        LOCK,
+      );
+      assert.match(printed, /FIXABLE {2}moderate {2}vulnerable#\S+ {2}\(fix in react-native\)/, printed);
+      assert.doesNotMatch(printed, /\(fix in expo\)/, printed);
+    }
+  });
+
+  it("still prints nothing when the fix is the vulnerable package itself", () => {
+    const lock = { packages: { "node_modules/undici": { version: "5.20.0" } } };
+    const printed = formatAuditVerdict(
+      evaluateAudit(
+        {
+          vulnerabilities: {
+            undici: {
+              severity: "moderate",
+              isDirect: true,
+              fixAvailable: { name: "undici", version: "5.28.4", isSemVerMajor: false },
+              effects: [],
+              via: [
+                {
+                  source: 1,
+                  url: "https://github.com/advisories/GHSA-aaaa-bbbb-cccc",
+                  severity: "moderate",
+                },
+              ],
+            },
+          },
+          metadata: { vulnerabilities: { moderate: 1 } },
+        } as unknown as AuditReport,
+        [],
+        lock,
+      ),
+      "check",
+      lock,
+    );
+    assert.doesNotMatch(printed, /\(fix in/, printed);
   });
 });

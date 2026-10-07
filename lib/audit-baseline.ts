@@ -2010,26 +2010,36 @@ export function formatAuditVerdict(
     lines.push(
       `${checkName}: npm can fix ${counted(verdict.fixableInRange.length, "advisory", "advisories")} without a major version change:`,
     );
-    for (const found of verdict.fixableInRange) {
-      // The redirect is printed only when there IS one. A finding whose fix
-      // lives in its own package needs no explanation, and "(fix in undici)"
-      // on every line is how the redirect stops being read on the one line
-      // where it is the whole answer.
-      const via =
-        found.updatePackage === advisoryPackage(found.key)
-          ? ""
-          : `  (fix in ${found.updatePackage})`;
-      lines.push(`  FIXABLE  ${found.severity.padEnd(8)}  ${found.key}${via}`);
-    }
-    // Built once: the names and the sentence explaining them are two readings
-    // of one pick, and computing them apart is how they would come to disagree.
+    // Built once, and built BEFORE the lines it explains. The redirect on each
+    // finding, the command below and the sentence after it are three readings
+    // of one pick, and computing them apart is how they come to name different
+    // packages on one run — which is what the redirect did until 2026-10-07,
+    // reading `updatePackage` while the command had moved to the candidate set.
     const targets = fixCommandTargets(
       verdict.fixableInRange,
       new Map(Object.entries(verdict.candidateVersions)),
       lock,
     );
+    const chosen = new Map(targets.map((target) => [target.group, target.package]));
+    for (const found of verdict.fixableInRange) {
+      // The redirect is printed only when there IS one. A finding whose fix
+      // lives in its own package needs no explanation, and "(fix in undici)"
+      // on every line is how the redirect stops being read on the one line
+      // where it is the whole answer.
+      //
+      // "Where the command will send you", not "where npm filed it": the two
+      // were the same field for a month and are not the same answer for a
+      // group with four candidates. A redirect naming a package the command
+      // below does not is worse than no redirect, because a reader resolves
+      // the disagreement by trusting the one printed next to the advisory.
+      const target = chosen.get(found.updateGroup) ?? found.updatePackage;
+      const via = target === advisoryPackage(found.key) ? "" : `  (fix in ${target})`;
+      lines.push(`  FIXABLE  ${found.severity.padEnd(8)}  ${found.key}${via}`);
+    }
+    lines.push(`Run \`npm update ${commandNames(targets).join(" ")}\` and commit the lockfile.`);
+    for (const choice of describeFixChoice(targets)) lines.push(`  ${choice}`);
     lines.push(
-      `Run \`npm update ${commandNames(targets).join(" ")}\` and commit the lockfile.${describeFixChoice(targets)} An advisory a lockfile bump clears is not a triage decision, at any severity — accepting one is how seven of these sat on the baseline being read as read, and how three moderate/low roots went a month without anybody asking.`,
+      "An advisory a lockfile bump clears is not a triage decision, at any severity — accepting one is how seven of these sat on the baseline being read as read, and how three moderate/low roots went a month without anybody asking.",
     );
   }
   if (verdict.stale.length > 0) {
@@ -2267,21 +2277,28 @@ function commandNames(targets: readonly FixCommandTarget[]): readonly string[] {
 /**
  * Why the command names THAT package, for the groups that gave it a choice.
  *
- * Silent for a one-candidate group, which is most of them: "expo is the only
- * package npm names for it" on every line is how the `(fix in undici)`
- * redirect one function up learned to print only when there is one. A group
- * with four candidates and one forward route is the case this exists for —
- * a reader who is about to run the line can see it was a reading rather than
- * a coin toss, and the three names it did NOT pick are where to look if the
- * command no-ops.
+ * One line per group, and NONE for a one-candidate group, which is most of
+ * them: "expo is the only package npm names for it" on every line is how the
+ * `(fix in undici)` redirect one function up learned to print only when there
+ * is one. A group with four candidates and one forward route is the case this
+ * exists for — a reader who is about to run the line can see it was a reading
+ * rather than a coin toss, and the three names it did NOT pick are where to
+ * look if the command no-ops.
  *
  * The clause with no forward candidate is the one that asks for something.
  * `npm update <a package behind the lockfile>` is not an upgrade, so the line
  * says the pick was positional and that nobody has read it, rather than
  * printing it as though the lockfile had agreed.
+ *
+ * A LIST rather than one joined clause, because the caller indents each one
+ * below the command. Joined into the command's own sentence, three
+ * four-candidate groups put three ~140-character readings between `npm update`
+ * and the paragraph explaining why it is not a triage decision — the same
+ * shape `majorOnlySummary` moved its detail onto its own lines for, and on the
+ * RED path, which is the one a contributor reads under time pressure.
  */
-export function describeFixChoice(targets: readonly FixCommandTarget[]): string {
-  const said = targets
+export function describeFixChoice(targets: readonly FixCommandTarget[]): readonly string[] {
+  return targets
     .filter((target) => target.candidates.length > 1)
     .map((target) => {
       const pool = counted(target.candidates.length, "package", "packages");
@@ -2310,7 +2327,6 @@ export function describeFixChoice(targets: readonly FixCommandTarget[]): string 
         held.length === 0 ? "" : ` (${held.join(", ")} ${plural(held.length, "is", "are")} not)`;
       return `${target.package} is ${rank} of ${pool} npm names for it that ${plural(target.forward.length, "is", "are")} ahead of the lockfile${beside}`;
     });
-  return said.length === 0 ? "" : ` ${said.join("; ")}.`;
 }
 
 /**
