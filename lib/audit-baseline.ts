@@ -120,6 +120,7 @@ import {
   type NamedFixReading,
   type NamedFixVerdict,
   verdictAcross,
+  lockedVersions,
   readNamedFix,
 } from "./named-fix-direction";
 import { plural } from "./plural";
@@ -1504,6 +1505,10 @@ export function evaluateAudit(
   /**
    * Parsed `package-lock.json`, for the `namedFix` half of the verdict.
    *
+   * The raw JSON, because that is what the caller has: {@link lockedVersions}
+   * turns it into the `name -> version` record every reader below wants, once,
+   * and the `unknown` goes no further than the first line of this function.
+   *
    * Omitted means the two named-fix lists come back empty and the gate says
    * nothing about them — which is right for a fixture with no tree behind it,
    * and is why every existing caller is unaffected. A direction needs an
@@ -1511,6 +1516,10 @@ export function evaluateAudit(
    */
   lock?: unknown,
 ): AuditVerdict {
+  // The `unknown` stops here. Every reader below takes the record, so the
+  // lockfile's shape is established once per run rather than re-asked at every
+  // per-candidate lookup the four readers beneath this made.
+  const installed = lock === undefined ? undefined : lockedVersions(lock);
   const acceptedKeys = new Set(
     accepted.flatMap((entry) => entry.advisories.map((id) => advisoryKey(entry.package, id))),
   );
@@ -1557,9 +1566,9 @@ export function evaluateAudit(
     pinnedFixUnused: completeness.complete
       ? [...pinnedKeys].filter((key) => !inRange.some((found) => found.key === key)).sort()
       : [],
-    ...namedFixLists(report, accepted, lock),
-    backwardNamedFixes: backwardNamedFixes(report, lock),
-    tree: lock === undefined ? null : { lock, versions: selfNamedVersions(report) },
+    ...namedFixLists(report, accepted, installed),
+    backwardNamedFixes: installed === undefined ? [] : backwardNamedFixes(report, installed),
+    tree: installed === undefined ? null : { installed, versions: selfNamedVersions(report) },
   };
 }
 
@@ -1592,9 +1601,9 @@ export function evaluateAudit(
 function namedFixLists(
   report: AuditReport,
   accepted: readonly AcceptedAdvisory[],
-  lock: unknown,
+  installed: Readonly<Record<string, string>> | undefined,
 ): Pick<AuditVerdict, "namedFixStale" | "namedFixUnclaimed" | "namedFixUnread"> {
-  if (lock === undefined) {
+  if (installed === undefined) {
     return { namedFixStale: [], namedFixUnclaimed: [], namedFixUnread: [] };
   }
   const stale: string[] = [];
@@ -1602,7 +1611,7 @@ function namedFixLists(
   const unread: string[] = [];
   let namedForAClaim = 0;
   for (const entry of accepted) {
-    const readings = readEntryCandidates(report, entry, lock);
+    const readings = readEntryCandidates(report, entry, installed);
     const live = verdictAcross(readings);
     if (entry.namedFix === undefined) {
       unclaimed.push(
@@ -1672,14 +1681,16 @@ function selfNamedVersions(report: AuditReport): Record<string, string> {
  * candidate's version comes from its own entry, so every route is read on
  * every run.
  */
-function backwardNamedFixes(report: AuditReport, lock: unknown): readonly string[] {
-  if (lock === undefined) return [];
+function backwardNamedFixes(
+  report: AuditReport,
+  installed: Readonly<Record<string, string>>,
+): readonly string[] {
   const byPackage = new Map<string, NamedFixReading>();
   const asked = new Set<string>();
   const read = (name: string, version: string | null): void => {
     if (version === null || asked.has(name)) return;
     asked.add(name);
-    const reading = readNamedFix(lock, name, version);
+    const reading = readNamedFix(installed, name, version);
     if (reading.direction !== "backward" && reading.direction !== "same") return;
     byPackage.set(name, reading);
   };
@@ -1715,10 +1726,10 @@ function backwardNamedFixes(report: AuditReport, lock: unknown): readonly string
 function readEntryCandidates(
   report: AuditReport,
   entry: AcceptedAdvisory,
-  lock: unknown,
+  installed: Readonly<Record<string, string>>,
 ): readonly NamedFixReading[] {
   return candidateFixes(report, entry.package).map((candidate) =>
-    readNamedFix(lock, candidate.package, candidate.version),
+    readNamedFix(installed, candidate.package, candidate.version),
   );
 }
 
@@ -1900,8 +1911,8 @@ function majorOnlySummary(
 /**
  * A group's named fix, placed against the lockfile — or `null` when it cannot be.
  *
- * Two different `null`s and neither is a problem. `lock === undefined` is
- * "nobody asked": the caller that hands no lockfile in gets the sentence this
+ * Two different `null`s and neither is a problem. `tree === undefined` is
+ * "nobody asked": the caller that hands no tree in gets the sentence this
  * gate printed for a month, which is right for a fixture with no tree behind
  * it. A `null` `updateVersion` is npm's bare `true` fix, which names no
  * version to compare. The GATE always hands a lockfile in, because on
@@ -1920,7 +1931,7 @@ function namedFixReading(
   if (tree === undefined) return null;
   const named = group[0]?.updateVersion;
   if (named === null || named === undefined) return null;
-  return readNamedFix(tree.lock, group[0].updatePackage, named);
+  return readNamedFix(tree.installed, group[0].updatePackage, named);
 }
 
 /**
@@ -1942,7 +1953,7 @@ function groupCandidates(
   for (const name of (group[0]?.updateGroup ?? "").split(GROUP_SEPARATOR)) {
     const version = tree.versions[name];
     if (version === undefined) continue;
-    readings.push(readNamedFix(tree.lock, name, version));
+    readings.push(readNamedFix(tree.installed, name, version));
   }
   return readings;
 }
@@ -2183,10 +2194,30 @@ export function advisoryPackage(key: string): string {
  * {@link describeFixChoice} prints `read the direction before running this`
  * for — a sentence about a reading, printed where there had been none. The
  * combinations that cannot mean anything are now unspellable.
+ *
+ * Both fields are now records of `name -> version` and neither is optional, so
+ * "nobody asked" is this object being absent and nothing else.
+ * {@link fixCommandTargets} dropped the `|| tree.lock === undefined` it still
+ * carried beside that check, which was the last way left to spell a
+ * half-asked question.
  */
 export interface AuditTree {
-  /** Parsed `package-lock.json`. */
-  readonly lock: unknown;
+  /**
+   * Every root install the lockfile resolved, as `name -> version`.
+   *
+   * The parsed shape rather than the lockfile itself. This was `unknown` and
+   * three functions reached into it through `lockedVersion`, which re-ran four
+   * type guards per candidate, per group — while the one shape anybody needed
+   * out of `package-lock.json` was this record. {@link lockedVersions} does
+   * that walk once, at the boundary where `readLock()`'s `unknown` arrives, so
+   * the two fields here are now two records of the same shape: what is
+   * installed, and what npm names.
+   *
+   * An EMPTY record is a lockfile that parsed and answered nothing — a v1
+   * lockfile, a renamed structure — which is a real state and not the same as
+   * no lockfile at all. The latter is this whole object being absent.
+   */
+  readonly installed: Readonly<Record<string, string>>;
   /**
    * Every candidate npm names, with the version from its OWN entry.
    *
@@ -2264,11 +2295,11 @@ export function fixCommandTargets(
     seen.add(found.updateGroup);
     const candidates = found.updateGroup.split(GROUP_SEPARATOR);
     const readings =
-      tree === undefined || tree.lock === undefined
+      tree === undefined
         ? null
         : candidates.flatMap((name) => {
             const version = tree.versions[name];
-            return version === undefined ? [] : [readNamedFix(tree.lock, name, version)];
+            return version === undefined ? [] : [readNamedFix(tree.installed, name, version)];
           });
     const forward = (readings ?? [])
       .filter((reading) => reading.direction === "forward")

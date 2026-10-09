@@ -33,7 +33,7 @@ import {
   describeReadings,
   groupLabel,
   fixDirection,
-  lockedVersion,
+  lockedVersions,
   readNamedFix,
 } from "@/lib/named-fix-direction";
 
@@ -84,35 +84,49 @@ describe("fixDirection", () => {
   });
 });
 
-describe("lockedVersion", () => {
+describe("lockedVersions", () => {
   const lock = {
     packages: {
       "": { name: "root" },
       "node_modules/expo": { version: "54.0.35" },
+      "node_modules/@sentry/react-native": { version: "7.5.0" },
       "node_modules/react-native": { version: "0.81.5" },
       "node_modules/react-native/node_modules/react-native": { version: "0.86.0" },
       "node_modules/broken": { version: 7 },
+      "node_modules/empty": { version: "" },
+      "node_modules/notanobject": null,
+      "not-node-modules/expo": { version: "1.0.0" },
     },
   };
 
-  it("reads the root install of a package", () => {
-    assert.equal(lockedVersion(lock, "expo"), "54.0.35");
+  it("reads every root install in one walk", () => {
+    assert.deepEqual(lockedVersions(lock), {
+      expo: "54.0.35",
+      "@sentry/react-native": "7.5.0",
+      "react-native": "0.81.5",
+    });
   });
 
-  it("ignores a nested duplicate, which is a second answer to a one-answer question", () => {
+  it("keeps a scoped name's own slash and drops a nested duplicate", () => {
     // This tree really does have react-native twice — 0.81.5 at the root and a
     // nested 0.86.0 that `npm run bundle:native` fails on. Picking one
-    // silently is exactly how that would stop being visible.
-    assert.equal(lockedVersion(lock, "react-native"), "0.81.5");
+    // silently is exactly how that would stop being visible, and the scoped
+    // key beside it is why the test is "no FURTHER /node_modules/ segment"
+    // rather than "no slash".
+    const installed = lockedVersions(lock);
+    assert.equal(installed["react-native"], "0.81.5");
+    assert.equal(installed["@sentry/react-native"], "7.5.0");
+    assert.equal(Object.keys(installed).length, 3);
   });
 
-  it("is undefined for everything it cannot read", () => {
-    assert.equal(lockedVersion(lock, "absent"), undefined);
-    assert.equal(lockedVersion(lock, "broken"), undefined);
-    assert.equal(lockedVersion({}, "expo"), undefined);
-    assert.equal(lockedVersion(null, "expo"), undefined);
-    assert.equal(lockedVersion("{}", "expo"), undefined);
-    assert.equal(lockedVersion({ packages: null }, "expo"), undefined);
+  it("is an empty record for everything it cannot read", () => {
+    // Empty rather than thrown, and the callers that need to tell this from
+    // "no lockfile at all" do it by whether they were handed one.
+    assert.deepEqual(lockedVersions({}), {});
+    assert.deepEqual(lockedVersions(null), {});
+    assert.deepEqual(lockedVersions("{}"), {});
+    assert.deepEqual(lockedVersions({ packages: null }), {});
+    assert.deepEqual(lockedVersions(undefined), {});
   });
 
   it("reads this repository's own lockfile", () => {
@@ -120,7 +134,13 @@ describe("lockedVersion", () => {
     // fixture has not been shown to read the real shape. And `expo` in
     // particular, because it is the package the finding was about.
     const real: unknown = JSON.parse(readRepoFile("package-lock.json"));
-    assert.match(String(lockedVersion(real, "expo")), /^\d+\.\d+\.\d+$/);
+    const installed = lockedVersions(real);
+    assert.match(String(installed["expo"]), /^\d+\.\d+\.\d+$/);
+    // The one walk has to find MANY of them, or a regex over one key would
+    // pass against a record built from a single lucky entry.
+    assert.ok(Object.keys(installed).length > 100);
+    // And no nested path survived it, on the real tree rather than a fixture.
+    for (const name of Object.keys(installed)) assert.ok(!name.includes("/node_modules/"));
   });
 });
 
@@ -169,7 +189,7 @@ describe("the green line's claim", () => {
     updateVersion: "44.0.6",
     updateGroup: "expo",
   };
-  const lock = { packages: { "node_modules/expo": { version: "54.0.35" } } };
+  const installed = { expo: "54.0.35" };
   const backward = clean([POSTCSS]);
 
   it("says 'cleared by upgrades' only when nothing says otherwise", () => {
@@ -179,7 +199,7 @@ describe("the green line's claim", () => {
   });
 
   it("stops saying 'cleared by' once a group points backward", () => {
-    const printed = formatAuditVerdict(clean([POSTCSS], { lock, versions: {} }), "check");
+    const printed = formatAuditVerdict(clean([POSTCSS], { installed, versions: {} }), "check");
     assert.ok(!printed.includes("cleared by"), printed);
     assert.match(printed, /named by 1 update, 1 of which npm cannot point forward/);
     // The marker is the VERDICT over the candidates, not one reading's
@@ -196,7 +216,7 @@ describe("the green line's claim", () => {
         POSTCSS,
         { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13", updateGroup: "expo-router" },
       ], {
-        lock: { packages: { ...lock.packages, "node_modules/expo-router": { version: "56.2.11" } } },
+        installed: { ...installed, "expo-router": "56.2.11" },
         versions: {},
       }),
       "check",
@@ -211,7 +231,7 @@ describe("the green line's claim", () => {
     const printed = formatAuditVerdict(
       clean([
         { key: "q#GHSA-aaaa-aaaa-aaa2", severity: "moderate", updatePackage: "expo-router", updateVersion: "58.0.13", updateGroup: "expo-router" },
-      ], { lock: { packages: { "node_modules/expo-router": { version: "56.2.11" } } }, versions: {} }),
+      ], { installed: { "expo-router": "56.2.11" }, versions: {} }),
       "check",
     );
     assert.match(printed, /cleared by 1 upgrade: expo-router \(1, up to moderate\)\.$/);
@@ -219,7 +239,7 @@ describe("the green line's claim", () => {
 
   it("makes no claim about a bare `true` fix, which names no version", () => {
     const printed = formatAuditVerdict(
-      clean([{ key: "x#GHSA-aaaa-aaaa-aaa3", severity: "high", updatePackage: "x", updateVersion: null, updateGroup: "x" }], { lock, versions: {} }),
+      clean([{ key: "x#GHSA-aaaa-aaaa-aaa3", severity: "high", updatePackage: "x", updateVersion: null, updateGroup: "x" }], { installed, versions: {} }),
       "check",
     );
     assert.match(printed, /cleared by 1 upgrade: x \(1, up to high\)/);
@@ -227,14 +247,12 @@ describe("the green line's claim", () => {
 });
 
 describe("describeReadings", () => {
-  const lock = {
-    packages: {
-      "node_modules/@sentry/react-native": { version: "7.5.0" },
-      "node_modules/expo": { version: "54.0.35" },
-      "node_modules/react-native": { version: "0.81.5" },
-    },
+  const installed = {
+    "@sentry/react-native": "7.5.0",
+    expo: "54.0.35",
+    "react-native": "0.81.5",
   };
-  const read = (pkg: string, version: string) => readNamedFix(lock, pkg, version);
+  const read = (pkg: string, version: string) => readNamedFix(installed, pkg, version);
 
   it("says nothing when one candidate is ahead", () => {
     // The group line already states the normal case, and a four-candidate
@@ -261,11 +279,11 @@ describe("describeReadings", () => {
     // Named per candidate: a lockfile with no entry and a version nothing
     // parsed are different things to go and look at.
     assert.match(
-      describeReadings([readNamedFix({ packages: {} }, "expo", "44.0.6")]),
+      describeReadings([readNamedFix({}, "expo", "44.0.6")]),
       /the lockfile placed no candidate npm names, so which way they point is unread — expo@44\.0\.6 has no node_modules\/expo entry/,
     );
     assert.match(
-      describeReadings([readNamedFix({ packages: { "node_modules/expo": { version: "weird" } } }, "expo", "44.0.6")]),
+      describeReadings([readNamedFix({ expo: "weird" }, "expo", "44.0.6")]),
       /against a locked weird, neither an exact version/,
     );
   });
@@ -314,12 +332,7 @@ describe("the green line is the same on every run", () => {
       namedFixUnread: [],
       backwardNamedFixes: [],
       tree: {
-        lock: {
-          packages: {
-            "node_modules/expo": { version: "54.0.35" },
-            "node_modules/react-native": { version: "0.81.5" },
-          },
-        },
+        installed: { expo: "54.0.35", "react-native": "0.81.5" },
         versions: { expo: "44.0.6", "react-native": "0.87.1" },
       },
       majorOnly,

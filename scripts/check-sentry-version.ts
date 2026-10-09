@@ -16,6 +16,7 @@ import {
   findSentryVersionIssues,
 } from "../lib/check-sentry-version";
 import { GuardRootError } from "../lib/guard-root";
+import { lockedVersions } from "../lib/named-fix-direction";
 import { ScannedFloorError, assertParsedInputs } from "../lib/scanned-floor";
 import { guardScanRoot, readJsonInput } from "./guard-io";
 
@@ -35,12 +36,15 @@ function main(): void {
   const manifest = pkg as {
     dependencies?: Record<string, string | undefined>;
   };
-  const lockfile = lock as {
-    packages?: Record<string, { version?: string } | undefined>;
-  };
   const declaredRange = manifest.dependencies?.["@sentry/react-native"];
-  const lockedVersion =
-    lockfile.packages?.["node_modules/@sentry/react-native"]?.version;
+  // One reader for one shape. This was a fourth hand-rolled walk into
+  // `packages["node_modules/<name>"].version` — an unguarded cast reaching
+  // two levels in, which reads `undefined` on a v1 lockfile and says so, but
+  // is the same question `lib/named-fix-direction.ts` answers for the audit
+  // gate. A nested duplicate is dropped there, which matters here too: this
+  // tree carries react-native twice and the question is what the ROOT install
+  // is on.
+  const lockedVersion = lockedVersions(lock)["@sentry/react-native"];
 
   const issues = findSentryVersionIssues({ declaredRange, lockedVersion });
 

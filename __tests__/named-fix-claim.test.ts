@@ -46,7 +46,7 @@ import {
   formatAuditVerdict,
   isClean,
 } from "@/lib/audit-baseline";
-import { readNamedFix, verdictAcross } from "@/lib/named-fix-direction";
+import { lockedVersions, readNamedFix, verdictAcross } from "@/lib/named-fix-direction";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -150,7 +150,10 @@ function multiCandidate(picked: string, versions: Record<string, string> = {}): 
 }
 
 describe("verdictAcross", () => {
-  const read = (pkg: string, version: string, lock: unknown = LOCK) => readNamedFix(lock, pkg, version);
+  // The lockfile is parsed once here, which is what `evaluateAudit` does at
+  // its own boundary: `readNamedFix` takes the versions, not the lockfile.
+  const read = (pkg: string, version: string, lock: unknown = LOCK) =>
+    readNamedFix(lockedVersions(lock), pkg, version);
 
   it("is forward when ANY candidate is ahead, which is the braces answer", () => {
     // Three dead ends and one route is still a route. Reading this as
@@ -255,18 +258,19 @@ describe("fixCandidates", () => {
   });
 });
 
-describe("the verdict's two named-fix lists", () => {
-  const accepted = (verdict: "forward" | "no-forward" | "unnamed", pkg = "expo") => [
-    {
-      package: pkg,
-      advisories: [GHSA],
-      shipsToClient: false,
-      absentFingerprint: "x",
-      why: "a reason somebody can disagree with",
-      namedFix: { verdict, read: "2026-10-05", observed: "read off a fixture" },
-    },
-  ];
+/** One accepted entry claiming `verdict` about `pkg`, which is the whole input. */
+const accepted = (verdict: "forward" | "no-forward" | "unnamed", pkg = "expo") => [
+  {
+    package: pkg,
+    advisories: [GHSA],
+    shipsToClient: false,
+    absentFingerprint: "x",
+    why: "a reason somebody can disagree with",
+    namedFix: { verdict, read: "2026-10-05", observed: "read off a fixture" },
+  },
+];
 
+describe("the verdict's two named-fix lists", () => {
   it("says nothing at all when no lockfile reaches the evaluator", () => {
     // Every existing caller is in this state, which is why none of them moved.
     const verdict = evaluateAudit(report("expo", { name: "expo", version: "44.0.6", isSemVerMajor: true }, GHSA), accepted("forward"));
@@ -431,6 +435,55 @@ describe("the verdict's two named-fix lists", () => {
       "check",
     );
     assert.match(unclaimed, /1 accepted package with nothing said about npm's fix verdict/);
+  });
+});
+
+/**
+ * The lockfile is read ONCE, at the one place its `unknown` arrives.
+ *
+ * `AuditTree.lock` was an `unknown` carried to the leaves, and three readers
+ * reached into it through `lockedVersion` — four type guards re-run per
+ * candidate, per group, for the one shape anybody wanted out of
+ * `package-lock.json`. The parse moved to `evaluateAudit`'s first line and the
+ * tree now carries the record, so these cases are about the join: what the
+ * verdict hands the formatter is exactly what the walk read, and the walk's
+ * one judgement call — a nested duplicate is not the installed version —
+ * survives all the way to a printed direction.
+ */
+describe("the lockfile reaches the verdict parsed", () => {
+  it("carries exactly what lockedVersions read, not the lockfile", () => {
+    const verdict = evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable"), MULTI_LOCK);
+    assert.deepEqual(verdict.tree?.installed, lockedVersions(MULTI_LOCK));
+    assert.deepEqual(verdict.tree?.installed, { expo: "54.0.35", "react-native": "0.81.5" });
+  });
+
+  it("is null for no lockfile and an empty record for one that answered nothing", () => {
+    // The two states the readers used to spell twice — once as a missing tree
+    // and once as a `lock === undefined` inside it. Only the first exists now.
+    assert.equal(evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable")).tree, null);
+    const answeredNothing = evaluateAudit(
+      multiCandidate("expo"),
+      accepted("forward", "vulnerable"),
+      { packages: {} },
+    );
+    assert.deepEqual(answeredNothing.tree?.installed, {});
+  });
+
+  it("reads the ROOT install through to the printed direction", () => {
+    // This tree really does carry react-native twice: 0.81.5 at the root and a
+    // nested 0.86.0 that `npm run bundle:native` fails on. npm names 0.87.1,
+    // which is ahead of the root and BEHIND the nested copy — so if the walk
+    // had picked the nested one, the verdict would read no-forward and the
+    // claim below would be the one that goes stale.
+    const nested = {
+      packages: {
+        ...MULTI_LOCK.packages,
+        "node_modules/react-native/node_modules/react-native": { version: "0.90.0" },
+      },
+    };
+    const verdict = evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable"), nested);
+    assert.equal(verdict.tree?.installed["react-native"], "0.81.5");
+    assert.deepEqual(verdict.namedFixStale, []);
   });
 });
 
