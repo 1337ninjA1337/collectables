@@ -38,30 +38,54 @@ import * as path from "node:path";
 
 import { auditReader, runAuditGate } from "../lib/audit-baseline";
 import { runningUnderActions } from "../lib/github-annotations";
+import { lockedVersions } from "../lib/named-fix-direction";
 
 const CHECK_NAME = "check-audit-baseline";
 const REPO_ROOT = path.join(__dirname, "..");
 
 /**
- * The lockfile, for the one question the audit report cannot answer about
- * itself: whether the version npm names as a fix is ahead of the one installed.
+ * The installed versions, for the one question the audit report cannot answer
+ * about itself: whether the version npm names as a fix is ahead of what is
+ * installed.
  *
  * Read here rather than in the module, the same split
  * `scripts/check-sentry-version.ts` uses. An unreadable or unparseable
  * lockfile is `undefined` and the green line simply does not make the claim —
  * a gate that died on a missing lockfile would be a gate that fails for a
  * reason it is not about.
+ *
+ * ## The parse belongs here, with the read
+ *
+ * `lockedVersions` runs HERE rather than inside `evaluateAudit`, and the
+ * difference is one walk versus two: `runAuditGate` evaluates the report, then
+ * `answerWithSecondRead` evaluates a second read of it, and a `lock: unknown`
+ * option meant each call re-walked the same 1,265-entry `packages` block for a
+ * tree that cannot have changed between them — nothing runs `npm install` in
+ * between, only `npm audit --json` is re-read. The two reads share one object
+ * now, which also makes "both were placed against the same tree" a fact about
+ * the type rather than about this file passing the same argument twice.
+ *
+ * The `unknown` therefore never leaves this function: it is what
+ * `JSON.parse` returns, and the one shape anybody downstream wants out of it
+ * is the `name -> version` record.
  */
-function readLock(): { readonly lock?: unknown; readonly note?: string } {
+function readInstalled(): {
+  readonly installed?: Readonly<Record<string, string>>;
+  readonly note?: string;
+} {
   try {
-    return { lock: JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8")) };
+    const lock: unknown = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8"),
+    );
+    return { installed: lockedVersions(lock) };
   } catch (error: unknown) {
     // Named, not swallowed. Two of this gate's failing lists need a direction
     // and a direction needs an installed version, so an unread lockfile makes
     // them empty for the same reason a healthy tree does — and a check that
     // could not ask must not read as a pass. The gate's own floor catches a
-    // lockfile that PARSED and answered nothing; this is the half only the
-    // process can see.
+    // lockfile that PARSED and answered nothing — an EMPTY record from here,
+    // which is a different thing from this `undefined`; this is the half only
+    // the process can see.
     return {
       note: `${CHECK_NAME}: package-lock.json could not be read (${error instanceof Error ? error.message : String(error)}), so no fix direction and no namedFix claim was checked on this run.`,
     };
@@ -78,13 +102,13 @@ function readLock(): { readonly lock?: unknown; readonly note?: string } {
  * bounds the read is {@link auditReader}, for the same reason.
  */
 function main(): void {
-  const { lock, note } = readLock();
+  const { installed, note } = readInstalled();
   if (note !== undefined) console.log(note);
   const run = runAuditGate({
     read: auditReader((options) => execFileSync("npm", ["audit", "--json"], options)),
     checkName: CHECK_NAME,
     underActions: runningUnderActions(),
-    lock,
+    installed,
   });
   for (const line of run.lines) console.log(line);
   if (!run.clean) process.exit(1);

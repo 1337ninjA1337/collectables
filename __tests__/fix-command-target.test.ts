@@ -33,29 +33,24 @@ import {
   fixCommandTargets,
   formatAuditVerdict,
 } from "@/lib/audit-baseline";
-import { lockedVersions } from "@/lib/named-fix-direction";
-
-/** The lockfile this tree actually has, for the four `braces` candidates. */
-const LOCK = {
-  packages: {
-    "node_modules/@sentry/react-native": { version: "7.5.0" },
-    "node_modules/expo": { version: "54.0.35" },
-    "node_modules/gh-pages": { version: "6.3.0" },
-    "node_modules/react-native": { version: "0.81.5" },
-  },
-};
 
 /**
- * The same lockfile as `evaluateAudit` parses it, for the `AuditTree` fixtures.
+ * What this tree actually has installed, for the four `braces` candidates.
  *
- * `AuditTree` carries the RECORD now, not the lockfile: the `unknown` stops at
- * `evaluateAudit`'s first line, where `lockedVersions` does the walk once
- * instead of four type guards per candidate per group. Derived from `LOCK`
- * rather than written out beside it, so the two cannot drift into two
- * different ideas of what this tree is on — which is the defect these cases
- * are about one level up.
+ * The parsed record, not a `package-lock.json` literal. Nothing below the gate
+ * wrapper takes a lockfile any more: `lockedVersions` walks it once in
+ * `scripts/check-audit-baseline.ts`, where the file is read, and `AuditTree`,
+ * `evaluateAudit` and `runAuditGate` all take `name -> version`. So a fixture
+ * states the versions it is making a case about instead of rebuilding npm's
+ * nesting around them — the walk itself, nested paths and unreadable shapes
+ * included, is `named-fix-direction.test.ts`.
  */
-const INSTALLED = lockedVersions(LOCK);
+const LOCK: Readonly<Record<string, string>> = {
+  "@sentry/react-native": "7.5.0",
+  expo: "54.0.35",
+  "gh-pages": "6.3.0",
+  "react-native": "0.81.5",
+};
 
 /** Every candidate's own named version, as `selfNamedVersions` reads them. */
 const VERSIONS: Readonly<Record<string, string>> = {
@@ -88,7 +83,7 @@ function advisory(picked: string): FixableAdvisory {
 
 describe("fixCommandTargets", () => {
   it("names the one candidate the lockfile places ahead, not npm's pick", () => {
-    const target = fixCommandTargets([advisory("expo")], { installed: INSTALLED, versions: VERSIONS })[0];
+    const target = fixCommandTargets([advisory("expo")], { installed: LOCK, versions: VERSIONS })[0];
     assert.equal(target?.package, "react-native");
     assert.deepEqual(target?.forward, ["react-native"]);
     assert.equal(target?.placed, 4);
@@ -98,7 +93,7 @@ describe("fixCommandTargets", () => {
     // The defect, as a case: four picks, one answer. `updatePackage` is the
     // only thing that differs between these four advisories.
     const commands = ["@sentry/react-native", "expo", "gh-pages", "react-native"].map((picked) =>
-      fixCommandPackages([advisory(picked)], { installed: INSTALLED, versions: VERSIONS }),
+      fixCommandPackages([advisory(picked)], { installed: LOCK, versions: VERSIONS }),
     );
     for (const command of commands) assert.deepEqual(command, ["react-native"]);
   });
@@ -109,7 +104,7 @@ describe("fixCommandTargets", () => {
     // which npm's pick was not.
     const behind = { ...VERSIONS, "react-native": "0.70.0" };
     for (const picked of ["expo", "react-native"]) {
-      const target = fixCommandTargets([advisory(picked)], { installed: INSTALLED, versions: behind })[0];
+      const target = fixCommandTargets([advisory(picked)], { installed: LOCK, versions: behind })[0];
       assert.equal(target?.package, "@sentry/react-native");
       assert.deepEqual(target?.forward, []);
       assert.equal(target?.placed, 4);
@@ -142,7 +137,7 @@ describe("fixCommandTargets", () => {
           updateGroup: "undici",
         },
       ],
-      { installed: INSTALLED, versions: VERSIONS },
+      { installed: LOCK, versions: VERSIONS },
     );
     assert.deepEqual(
       targets.map((target) => target.group),
@@ -161,7 +156,7 @@ describe("fixCommandTargets", () => {
           { ...advisory("expo"), key: "other#GHSA-x", updateGroup: "expo / gh-pages" },
         ],
         {
-          installed: INSTALLED,
+          installed: LOCK,
           versions: { expo: "57.0.19", "gh-pages": "6.1.1", "react-native": "0.70.0" },
         },
       ),
@@ -186,7 +181,7 @@ describe("describeFixChoice", () => {
               updateGroup: "undici",
             },
           ],
-          { installed: INSTALLED, versions: { undici: "5.28.4" } },
+          { installed: LOCK, versions: { undici: "5.28.4" } },
         ),
       ),
       [],
@@ -194,7 +189,7 @@ describe("describeFixChoice", () => {
   });
 
   it("names the three routes it did not take, on one line", () => {
-    const said = describeFixChoice(fixCommandTargets([advisory("expo")], { installed: INSTALLED, versions: VERSIONS }));
+    const said = describeFixChoice(fixCommandTargets([advisory("expo")], { installed: LOCK, versions: VERSIONS }));
     assert.equal(said.length, 1);
     assert.match(said[0] ?? "", /react-native is the only one of 4 packages/);
     assert.match(said[0] ?? "", /@sentry\/react-native, expo, gh-pages are not/);
@@ -202,7 +197,7 @@ describe("describeFixChoice", () => {
 
   it("counts the forward routes when there is more than one", () => {
     const twoForward = { ...VERSIONS, expo: "57.0.19" };
-    const said = describeFixChoice(fixCommandTargets([advisory("expo")], { installed: INSTALLED, versions: twoForward }))[0] ?? "";
+    const said = describeFixChoice(fixCommandTargets([advisory("expo")], { installed: LOCK, versions: twoForward }))[0] ?? "";
     assert.match(said, /expo is the lowest-sorted of 2 of 4 packages/);
     assert.match(said, /are ahead of the lockfile/);
     // And only the two that are actually behind are named as behind.
@@ -212,7 +207,7 @@ describe("describeFixChoice", () => {
   it("asks for a reading when the lockfile places nothing ahead", () => {
     const behind = { ...VERSIONS, "react-native": "0.70.0" };
     assert.match(
-      describeFixChoice(fixCommandTargets([advisory("expo")], { installed: INSTALLED, versions: behind }))[0] ?? "",
+      describeFixChoice(fixCommandTargets([advisory("expo")], { installed: LOCK, versions: behind }))[0] ?? "",
       /places none of them ahead of what is installed, so @sentry\/react-native is the sorted-first rather than a reading/,
     );
   });
@@ -308,7 +303,7 @@ describe("the printed command, end to end", () => {
           metadata: { vulnerabilities: { moderate: 1 } },
         } as unknown as AuditReport,
         [],
-        { packages: { "node_modules/undici": { version: "5.20.0" } } },
+        { undici: "5.20.0" },
       ),
       "check",
     );
@@ -355,7 +350,7 @@ describe("the redirect beside each finding", () => {
   });
 
   it("still prints nothing when the fix is the vulnerable package itself", () => {
-    const lock = { packages: { "node_modules/undici": { version: "5.20.0" } } };
+    const lock = { undici: "5.20.0" };
     const printed = formatAuditVerdict(
       evaluateAudit(
         {
@@ -509,7 +504,7 @@ describe("every redirect names a package the command names", () => {
     // The vacuous half, named rather than relied on: a run with no redirect
     // passes the loop above for the wrong reason, so the case that has one is
     // the one that counts and this one says which is which.
-    const lock = { packages: { "node_modules/undici": { version: "5.20.0" } } };
+    const lock = { undici: "5.20.0" };
     const printed = formatAuditVerdict(
       evaluateAudit(
         {
@@ -583,7 +578,7 @@ describe("the lockfile reaches every block that places a candidate", () => {
   } as unknown as AuditReport;
 
   it("reads the direction for the green summary's groups", () => {
-    const lock = { packages: { "node_modules/expo": { version: "54.0.35" } } };
+    const lock = { expo: "54.0.35" };
     const printed = formatAuditVerdict(evaluateAudit(majorOnly, [], lock), "check");
     assert.match(printed, /NO FORWARD FIX/, printed);
     assert.match(printed, /expo@44\.0\.6 is behind 54\.0\.35/, printed);

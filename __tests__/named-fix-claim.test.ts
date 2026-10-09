@@ -40,11 +40,13 @@ import { describe, it } from "node:test";
 import {
   ACCEPTED_HIGH_ADVISORIES,
   type AuditReport,
+  answerWithSecondRead,
   candidateFixes,
   evaluateAudit,
   fixCandidates,
   formatAuditVerdict,
   isClean,
+  worthAsking,
 } from "@/lib/audit-baseline";
 import { lockedVersions, readNamedFix, verdictAcross } from "@/lib/named-fix-direction";
 
@@ -103,12 +105,18 @@ function unplaceableCandidate(): AuditReport {
   } as unknown as AuditReport;
 }
 
-const LOCK = { packages: { "node_modules/expo": { version: "54.0.35" } } };
-const MULTI_LOCK = {
-  packages: {
-    "node_modules/expo": { version: "54.0.35" },
-    "node_modules/react-native": { version: "0.81.5" },
-  },
+/**
+ * What is installed, as the gate wrapper's one `lockedVersions` walk reads it.
+ *
+ * `evaluateAudit` takes the record, not a lockfile: the parse is in
+ * `scripts/check-audit-baseline.ts` beside the `readFileSync`, so one walk
+ * serves both of the gate's reads instead of each re-walking 1,265 keys for a
+ * tree that cannot have changed between them.
+ */
+const LOCK: Readonly<Record<string, string>> = { expo: "54.0.35" };
+const MULTI_LOCK: Readonly<Record<string, string>> = {
+  expo: "54.0.35",
+  "react-native": "0.81.5",
 };
 const GHSA = "GHSA-aaaa-bbbb-cccc";
 
@@ -150,21 +158,20 @@ function multiCandidate(picked: string, versions: Record<string, string> = {}): 
 }
 
 describe("verdictAcross", () => {
-  // The lockfile is parsed once here, which is what `evaluateAudit` does at
-  // its own boundary: `readNamedFix` takes the versions, not the lockfile.
-  const read = (pkg: string, version: string, lock: unknown = LOCK) =>
-    readNamedFix(lockedVersions(lock), pkg, version);
+  const read = (
+    pkg: string,
+    version: string,
+    installed: Readonly<Record<string, string>> = LOCK,
+  ) => readNamedFix(installed, pkg, version);
 
   it("is forward when ANY candidate is ahead, which is the braces answer", () => {
     // Three dead ends and one route is still a route. Reading this as
     // no-forward is what the acceptance said for a day.
-    const lock = {
-      packages: {
-        "node_modules/@sentry/react-native": { version: "7.5.0" },
-        "node_modules/expo": { version: "54.0.35" },
-        "node_modules/gh-pages": { version: "6.3.0" },
-        "node_modules/react-native": { version: "0.81.5" },
-      },
+    const lock: Readonly<Record<string, string>> = {
+      "@sentry/react-native": "7.5.0",
+      expo: "54.0.35",
+      "gh-pages": "6.3.0",
+      "react-native": "0.81.5",
     };
     assert.equal(
       verdictAcross([
@@ -353,7 +360,7 @@ describe("the verdict's two named-fix lists", () => {
     const verdict = evaluateAudit(
       report("expo", { name: "expo", version: "44.0.6", isSemVerMajor: true }, GHSA),
       accepted("no-forward"),
-      { packages: {} },
+      {},
     );
     assert.equal(verdict.namedFixStale.length, 1);
     assert.match(verdict.namedFixStale[0], /the lockfile answered for none of the 1 claimed package/);
@@ -439,33 +446,35 @@ describe("the verdict's two named-fix lists", () => {
 });
 
 /**
- * The lockfile is read ONCE, at the one place its `unknown` arrives.
+ * The lockfile is walked ONCE, and what the verdict carries is that walk.
  *
- * `AuditTree.lock` was an `unknown` carried to the leaves, and three readers
+ * `AuditTree.lock` was an `unknown` carried to the leaves, and four readers
  * reached into it through `lockedVersion` — four type guards re-run per
  * candidate, per group, for the one shape anybody wanted out of
- * `package-lock.json`. The parse moved to `evaluateAudit`'s first line and the
- * tree now carries the record, so these cases are about the join: what the
- * verdict hands the formatter is exactly what the walk read, and the walk's
- * one judgement call — a nested duplicate is not the installed version —
- * survives all the way to a printed direction.
+ * `package-lock.json`. The parse is now `lockedVersions`, called in
+ * `scripts/check-audit-baseline.ts` beside the `readFileSync` that produced
+ * the `unknown`, and `evaluateAudit`, `runAuditGate` and `AuditTree` all take
+ * the record. These cases are about the join: the verdict carries the object
+ * it was handed rather than a second derivation of it, the gate's second read
+ * is placed against the same versions as its first, and the walk's one
+ * judgement call — a nested duplicate is not the installed version — survives
+ * all the way to a printed direction.
  */
-describe("the lockfile reaches the verdict parsed", () => {
-  it("carries exactly what lockedVersions read, not the lockfile", () => {
+describe("the installed versions reach the verdict unparsed", () => {
+  it("carries the record it was handed, by reference rather than by copy", () => {
+    // By reference on purpose. A copy would be a second thing to keep in step
+    // with the first, which is the defect this and three other changes on
+    // 2026-10-07 removed from this file.
     const verdict = evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable"), MULTI_LOCK);
-    assert.deepEqual(verdict.tree?.installed, lockedVersions(MULTI_LOCK));
-    assert.deepEqual(verdict.tree?.installed, { expo: "54.0.35", "react-native": "0.81.5" });
+    assert.equal(verdict.tree?.installed, MULTI_LOCK);
   });
 
-  it("is null for no lockfile and an empty record for one that answered nothing", () => {
+  it("is null for no record and an empty record for a lockfile that answered nothing", () => {
     // The two states the readers used to spell twice — once as a missing tree
-    // and once as a `lock === undefined` inside it. Only the first exists now.
+    // and once as a `lock === undefined` inside it. Only the first exists now,
+    // and the second is a lockfile the walk read and found nothing in.
     assert.equal(evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable")).tree, null);
-    const answeredNothing = evaluateAudit(
-      multiCandidate("expo"),
-      accepted("forward", "vulnerable"),
-      { packages: {} },
-    );
+    const answeredNothing = evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable"), {});
     assert.deepEqual(answeredNothing.tree?.installed, {});
   });
 
@@ -475,15 +484,49 @@ describe("the lockfile reaches the verdict parsed", () => {
     // which is ahead of the root and BEHIND the nested copy — so if the walk
     // had picked the nested one, the verdict would read no-forward and the
     // claim below would be the one that goes stale.
-    const nested = {
+    const nested = lockedVersions({
       packages: {
-        ...MULTI_LOCK.packages,
+        "node_modules/expo": { version: "54.0.35" },
+        "node_modules/react-native": { version: "0.81.5" },
         "node_modules/react-native/node_modules/react-native": { version: "0.90.0" },
       },
-    };
+    });
+    assert.equal(nested["react-native"], "0.81.5");
     const verdict = evaluateAudit(multiCandidate("expo"), accepted("forward", "vulnerable"), nested);
     assert.equal(verdict.tree?.installed["react-native"], "0.81.5");
     assert.deepEqual(verdict.namedFixStale, []);
+  });
+
+  it("places the gate's SECOND read against the same versions", () => {
+    // The whole point of moving the parse out: `runAuditGate` evaluates the
+    // report and then `answerWithSecondRead` evaluates a second read of it,
+    // and a `lock: unknown` option meant each call re-walked the same 1,265
+    // keys for a tree nothing had touched in between.
+    //
+    // `reconcile` keeps the FIRST read's `tree` — "both reads walked the same
+    // tree", which is the convention this change turns into a fact about the
+    // type — so asserting on `tree` would not observe the second read at all.
+    // `backwardNamedFixes` is UNIONED across the two, and every line in it is
+    // a version read against `installed`, so a second read handed nothing
+    // contributes nothing and this case goes red.
+    const incomplete: AuditReport = { vulnerabilities: {}, metadata: { vulnerabilities: { high: 1 } } };
+    const first = evaluateAudit(incomplete, accepted("forward"), MULTI_LOCK);
+    assert.equal(worthAsking(first), true, "the fixture does not reach the second read");
+    assert.deepEqual(first.backwardNamedFixes, [], "the first read already answers this");
+    const answered = answerWithSecondRead({
+      first,
+      readAgain: () => ({
+        kind: "answered" as const,
+        report: report("expo", { name: "expo", version: "44.0.6", isSemVerMajor: true }, GHSA),
+      }),
+      checkName: "check",
+      underActions: false,
+      accepted: accepted("forward"),
+      installed: MULTI_LOCK,
+    });
+    assert.deepEqual(answered.verdict.backwardNamedFixes, [
+      "expo: npm names 44.0.6, the lockfile is on 54.0.35",
+    ]);
   });
 });
 

@@ -120,7 +120,6 @@ import {
   type NamedFixReading,
   type NamedFixVerdict,
   verdictAcross,
-  lockedVersions,
   readNamedFix,
 } from "./named-fix-direction";
 import { plural } from "./plural";
@@ -1503,23 +1502,24 @@ export function evaluateAudit(
   report: AuditReport,
   accepted: readonly AcceptedAdvisory[] = ACCEPTED_HIGH_ADVISORIES,
   /**
-   * Parsed `package-lock.json`, for the `namedFix` half of the verdict.
+   * Every root install the lockfile resolved, as {@link lockedVersions} reads it.
    *
-   * The raw JSON, because that is what the caller has: {@link lockedVersions}
-   * turns it into the `name -> version` record every reader below wants, once,
-   * and the `unknown` goes no further than the first line of this function.
+   * The parsed record rather than the lockfile. This was `lock?: unknown` and
+   * the parse was this function's first line, which made the gate walk the
+   * same 1,265-entry `packages` block twice: `runAuditGate` hands its lockfile
+   * here and then to {@link answerWithSecondRead}, which hands the same
+   * `unknown` back here for the second read. One walk, in the wrapper that
+   * read the file, and the two reads now share an object rather than a
+   * convention — the same correction 2026-10-07 made to
+   * {@link formatAuditVerdict} one function over.
    *
    * Omitted means the two named-fix lists come back empty and the gate says
-   * nothing about them — which is right for a fixture with no tree behind it,
-   * and is why every existing caller is unaffected. A direction needs an
-   * installed version, and there is no installed version without this.
+   * nothing about them — which is right for a fixture with no tree behind it.
+   * A direction needs an installed version, and there is no installed version
+   * without this.
    */
-  lock?: unknown,
+  installed?: Readonly<Record<string, string>>,
 ): AuditVerdict {
-  // The `unknown` stops here. Every reader below takes the record, so the
-  // lockfile's shape is established once per run rather than re-asked at every
-  // per-candidate lookup the four readers beneath this made.
-  const installed = lock === undefined ? undefined : lockedVersions(lock);
   const acceptedKeys = new Set(
     accepted.flatMap((entry) => entry.advisories.map((id) => advisoryKey(entry.package, id))),
   );
@@ -2793,15 +2793,19 @@ export function runAuditGate(options: {
   readonly underActions: boolean;
   readonly accepted?: readonly AcceptedAdvisory[];
   /**
-   * Parsed `package-lock.json`, for the direction half of the green line.
+   * The installed versions, for the direction half of the green line.
    *
    * Optional and read-only: the gate's verdict does not depend on it, because
    * a named fix pointing backward is not something a contributor can act on.
    * What it changes is whether the run's own sentence is true.
+   *
+   * The parsed record rather than the lockfile, so the two reads below cannot
+   * be evaluated against two walks of it. The wrapper that read the file does
+   * the parse, which is where the `unknown` it came from belongs.
    */
-  readonly lock?: unknown;
+  readonly installed?: Readonly<Record<string, string>>;
 }): AuditGateRun {
-  const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, lock } = options;
+  const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, installed } = options;
   const read = reader();
   if (isSkippedRead(read)) {
     // The headline is who gave up, which the sentence alone does not carry: a
@@ -2824,12 +2828,12 @@ export function runAuditGate(options: {
     return skippedGate(lines);
   }
   const answered = answerWithSecondRead({
-    first: evaluateAudit(read.report, accepted, lock),
+    first: evaluateAudit(read.report, accepted, installed),
     readAgain: reader,
     checkName,
     underActions,
     accepted,
-    lock,
+    installed,
   });
   const verdict = answered.verdict;
   // No lockfile argument: the verdict carries the tree it was read against.
@@ -2899,10 +2903,15 @@ export function answerWithSecondRead(options: {
   readonly checkName: string;
   readonly underActions: boolean;
   readonly accepted?: readonly AcceptedAdvisory[];
-  /** Parsed `package-lock.json`, so the second read evaluates the same way. */
-  readonly lock?: unknown;
+  /**
+   * The installed versions, so the second read evaluates the same way.
+   *
+   * The SAME record the first read was given, not a second parse of one
+   * lockfile: `runAuditGate` builds it once and hands both reads the object.
+   */
+  readonly installed?: Readonly<Record<string, string>>;
 }): AnsweredAudit {
-  const { first, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, lock } = options;
+  const { first, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, installed } = options;
   if (!worthAsking(first)) return { verdict: first, lines: [] };
   const lines = [
     `${checkName}: this answer rests on what npm did NOT report, so asking once more before acting on it.`,
@@ -2922,7 +2931,7 @@ export function answerWithSecondRead(options: {
     );
     return { verdict: first, lines };
   }
-  const second = evaluateAudit(again.report, accepted, lock);
+  const second = evaluateAudit(again.report, accepted, installed);
   // The line the log was missing: it announced a second call and then printed a
   // verdict, so a reader could not tell whether the second read landed, agreed,
   // or was the one that changed the answer.
