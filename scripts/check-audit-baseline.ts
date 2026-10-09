@@ -38,7 +38,7 @@ import * as path from "node:path";
 
 import { auditReader, runAuditGate } from "../lib/audit-baseline";
 import { runningUnderActions } from "../lib/github-annotations";
-import { lockedVersions } from "../lib/named-fix-direction";
+import { type InstalledVersions, lockedVersions } from "../lib/lockfile";
 
 const CHECK_NAME = "check-audit-baseline";
 const REPO_ROOT = path.join(__dirname, "..");
@@ -70,7 +70,7 @@ const REPO_ROOT = path.join(__dirname, "..");
  * is the `name -> version` record.
  */
 function readInstalled(): {
-  readonly installed?: Readonly<Record<string, string>>;
+  readonly installed?: InstalledVersions;
   readonly note?: string;
 } {
   try {

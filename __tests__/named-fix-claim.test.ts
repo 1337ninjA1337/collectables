@@ -48,7 +48,8 @@ import {
   isClean,
   worthAsking,
 } from "@/lib/audit-baseline";
-import { lockedVersions, readNamedFix, verdictAcross } from "@/lib/named-fix-direction";
+import { lockedVersions } from "@/lib/lockfile";
+import { readNamedFix, verdictAcross } from "@/lib/named-fix-direction";
 
 import { readRepoFile } from "./helpers/repo-file";
 

@@ -114,6 +114,7 @@
  */
 
 import { annotation } from "./github-annotations";
+import type { InstalledVersions } from "./lockfile";
 import {
   describeReadings,
   groupLabel,
@@ -1518,7 +1519,7 @@ export function evaluateAudit(
    * A direction needs an installed version, and there is no installed version
    * without this.
    */
-  installed?: Readonly<Record<string, string>>,
+  installed?: InstalledVersions,
 ): AuditVerdict {
   const acceptedKeys = new Set(
     accepted.flatMap((entry) => entry.advisories.map((id) => advisoryKey(entry.package, id))),
@@ -1601,7 +1602,7 @@ export function evaluateAudit(
 function namedFixLists(
   report: AuditReport,
   accepted: readonly AcceptedAdvisory[],
-  installed: Readonly<Record<string, string>> | undefined,
+  installed: InstalledVersions | undefined,
 ): Pick<AuditVerdict, "namedFixStale" | "namedFixUnclaimed" | "namedFixUnread"> {
   if (installed === undefined) {
     return { namedFixStale: [], namedFixUnclaimed: [], namedFixUnread: [] };
@@ -1683,7 +1684,7 @@ function selfNamedVersions(report: AuditReport): Record<string, string> {
  */
 function backwardNamedFixes(
   report: AuditReport,
-  installed: Readonly<Record<string, string>>,
+  installed: InstalledVersions,
 ): readonly string[] {
   const byPackage = new Map<string, NamedFixReading>();
   const asked = new Set<string>();
@@ -1726,7 +1727,7 @@ function backwardNamedFixes(
 function readEntryCandidates(
   report: AuditReport,
   entry: AcceptedAdvisory,
-  installed: Readonly<Record<string, string>>,
+  installed: InstalledVersions,
 ): readonly NamedFixReading[] {
   return candidateFixes(report, entry.package).map((candidate) =>
     readNamedFix(installed, candidate.package, candidate.version),
@@ -2217,7 +2218,7 @@ export interface AuditTree {
    * lockfile, a renamed structure — which is a real state and not the same as
    * no lockfile at all. The latter is this whole object being absent.
    */
-  readonly installed: Readonly<Record<string, string>>;
+  readonly installed: InstalledVersions;
   /**
    * Every candidate npm names, with the version from its OWN entry.
    *
@@ -2233,7 +2234,7 @@ export interface AuditTree {
    * legitimate difference between this and {@link fixCandidates}' set, which
    * `fix-command-target.test.ts` pins.
    */
-  readonly versions: Readonly<Record<string, string>>;
+  readonly versions: InstalledVersions;
 }
 
 /** One package `npm update` should name, and the reading that picked it. */
@@ -2803,7 +2804,7 @@ export function runAuditGate(options: {
    * be evaluated against two walks of it. The wrapper that read the file does
    * the parse, which is where the `unknown` it came from belongs.
    */
-  readonly installed?: Readonly<Record<string, string>>;
+  readonly installed?: InstalledVersions;
 }): AuditGateRun {
   const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, installed } = options;
   const read = reader();
@@ -2909,7 +2910,7 @@ export function answerWithSecondRead(options: {
    * The SAME record the first read was given, not a second parse of one
    * lockfile: `runAuditGate` builds it once and hands both reads the object.
    */
-  readonly installed?: Readonly<Record<string, string>>;
+  readonly installed?: InstalledVersions;
 }): AnsweredAudit {
   const { first, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES, installed } = options;
   if (!worthAsking(first)) return { verdict: first, lines: [] };

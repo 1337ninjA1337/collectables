@@ -16,7 +16,7 @@ import {
   findSentryVersionIssues,
 } from "../lib/check-sentry-version";
 import { GuardRootError } from "../lib/guard-root";
-import { lockedVersions } from "../lib/named-fix-direction";
+import { lockedVersions } from "../lib/lockfile";
 import { ScannedFloorError, assertParsedInputs } from "../lib/scanned-floor";
 import { guardScanRoot, readJsonInput } from "./guard-io";
 
