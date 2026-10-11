@@ -88,3 +88,28 @@ export function syncDrafts(seeded: ProfileDraftSeed | null, incomingId: string):
 export function nextDraft(draft: string, seeded: string, incoming: string): string {
   return draft === seeded ? incoming : draft;
 }
+
+/**
+ * What to save for a draft the user may have emptied on purpose.
+ *
+ * `app/profile/[id].tsx` saved `bioDraft.trim() || localizedBio`, so somebody
+ * who selected their whole bio, deleted it and pressed save got the stored one
+ * back. The `||` cannot tell "the user cleared this" from "this was never
+ * filled in", and those want opposite answers: the first is an edit to honour,
+ * the second is a draft that has not been seeded yet and must not overwrite a
+ * real bio with an empty string.
+ *
+ * The seed is what distinguishes them, and it is the same ref the sync above
+ * already keeps: a null seed means the effect has not run, which on this
+ * screen means nothing has been shown to the user, so `fallback` is the only
+ * safe answer. Once a seed exists, an empty draft is a decision and is saved
+ * as one.
+ *
+ * Trimmed, because trailing whitespace is not content and a bio of three
+ * spaces is a bio somebody cleared with the keyboard still open.
+ */
+export function draftToSave(draft: string, seeded: ProfileDraftSeed | null, fallback: string): string {
+  const trimmed = draft.trim();
+  if (trimmed !== "") return trimmed;
+  return seeded === null ? fallback : "";
+}

@@ -20,7 +20,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
+import { draftToSave, nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
 
 const ANNA: ProfileDraftSeed = { id: "u-anna", bio: "collects tin robots", username: "anna" };
 
@@ -82,5 +82,29 @@ describe("nextDraft", () => {
     // `useState("")` then a reseed: the untouched test has to hold for "" or
     // the first profile would never reach the field.
     assert.equal(nextDraft("", "", "collects tin robots"), "collects tin robots");
+  });
+});
+
+describe("draftToSave", () => {
+  it("saves what the user wrote, trimmed", () => {
+    assert.equal(draftToSave("  collects tin cars  ", ANNA, "fallback"), "collects tin cars");
+  });
+
+  it("saves an empty bio the user emptied on purpose", () => {
+    // The bug: `bioDraft.trim() || localizedBio` handed back the stored bio,
+    // so clearing a bio and saving it was a no-op that looked like a save.
+    assert.equal(draftToSave("", ANNA, "collects tin robots"), "");
+    // Whitespace is not content — three spaces is a bio cleared with the
+    // keyboard still open.
+    assert.equal(draftToSave("   ", ANNA, "collects tin robots"), "");
+  });
+
+  it("falls back only when no seed exists, which is before anything was shown", () => {
+    // The one case the `||` was right about, kept: a null seed means the sync
+    // effect has not run, so the empty draft is `useState("")` rather than an
+    // answer, and saving it would wipe a real bio.
+    assert.equal(draftToSave("", null, "collects tin robots"), "collects tin robots");
+    // And a typed draft still wins even then, because somebody typed it.
+    assert.equal(draftToSave("typed first", null, "collects tin robots"), "typed first");
   });
 });

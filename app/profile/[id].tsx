@@ -50,7 +50,7 @@ import { DEFAULT_EN_PROFILE_BIO, useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
-import { nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
+import { draftToSave, nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
 
 
@@ -293,13 +293,24 @@ export default function ProfileScreen() {
   }
 
   async function handleSaveBio() {
+    // `draftToSave` rather than `bioDraft.trim() || localizedBio`, which
+    // restored the stored bio for anybody who cleared theirs on purpose: the
+    // `||` could not tell an emptied draft from an unseeded one. The fallback
+    // is still there and still right, for the only case that needs it — no
+    // seed means the sync effect has not run, so nothing has been shown and
+    // an empty draft is not an answer.
     await updateMyProfile({
-      bio: bioDraft.trim() || localizedBio,
+      bio: draftToSave(bioDraft, seededDraftsRef.current, localizedBio),
     });
   }
 
   async function handleSaveProfileId() {
     if (!activeProfile) return;
+    // The handle keeps its `||` and that is a decision, not an oversight: a
+    // profile with no handle is not a state this app has — `publicId` and
+    // every link to it are built from one — so an emptied handle draft is a
+    // mistake to refuse rather than an edit to honour. The bio beside it went
+    // the other way because an empty bio is a bio.
     await updateMyProfile({
       username: profileIdDraft.trim() || activeProfile.username,
     });

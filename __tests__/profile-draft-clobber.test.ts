@@ -40,6 +40,28 @@ describe("app/profile/[id].tsx — the drafts a refresh must not overwrite", () 
     assert.match(src, /seededDraftsRef\.current = \{ id: activeProfile\.id, bio, username \};/);
   });
 
+  it("saves the bio through draftToSave, so clearing one is a save", () => {
+    // `bioDraft.trim() || localizedBio` restored the stored bio for anybody
+    // who cleared theirs — the `||` could not tell an emptied draft from an
+    // unseeded one, and the seed ref can.
+    assert.match(
+      src,
+      /bio: draftToSave\(bioDraft, seededDraftsRef\.current, localizedBio\),/,
+    );
+    assert.ok(
+      !src.includes("bio: bioDraft.trim() || localizedBio"),
+      "the fallback that undid a deliberate clear must not come back",
+    );
+  });
+
+  it("keeps the handle's own fallback, which is a different answer on purpose", () => {
+    // A profile with no handle is not a state this app has — `publicId` and
+    // every link are built from one — so an emptied handle draft is a mistake
+    // to refuse. The two fields next to each other with opposite rules is the
+    // thing a reader will want to have been deliberate.
+    assert.match(src, /username: profileIdDraft\.trim\(\) \|\| activeProfile\.username,/);
+  });
+
   it("keeps the profile id in the effect's dependency list and the drafts out of it", () => {
     // The id joined the deps with this change — the effect reads
     // `activeProfile.id` now and a profile switch has to re-run it. The drafts
