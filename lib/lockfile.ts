@@ -35,7 +35,9 @@
  * criticised for on 2026-10-07 and fixed by making both fields required.
  *
  * {@link InstalledRead} is the two states that exist, and
- * {@link readInstalledVersions} is the only thing that produces them. The
+ * {@link readInstalledVersions} is the only thing that produces them — which
+ * is also the one place with a reason to ask what VERSION of lockfile it was
+ * handed; see {@link unwalkableLockfile}. The
  * process keeps the one part only a process can do — the `readFileSync` — and
  * hands it in as a thunk, which is the split `auditReader` and `runAuditGate`
  * already use for the registry call: the decision and the sentence explaining
@@ -85,6 +87,13 @@ const NESTED_SEGMENT = "/node_modules/";
  * need to tell "no lockfile" from "a lockfile that answered nothing" do it by
  * whether they were handed one at all, which is the distinction
  * `AuditVerdict.tree` and `FixCommandTarget.placed` are built on.
+ *
+ * A v1 lockfile is also an empty record here, and that is the one empty record
+ * that is a LIE rather than an answer — the file named every install, under a
+ * key this walk does not read. This function stays unable to tell the two
+ * apart, deliberately: `scripts/check-sentry-version.ts` wants the record and
+ * nothing else. {@link unwalkableLockfile} is the question asked beside the
+ * walk by the caller that has somewhere to put the answer.
  */
 export function lockedVersions(lock: unknown): InstalledVersions {
   if (typeof lock !== "object" || lock === null) return {};
@@ -100,6 +109,61 @@ export function lockedVersions(lock: unknown): InstalledVersions {
     if (typeof version === "string" && version !== "") installed[name] = version;
   }
   return installed;
+}
+
+/**
+ * The oldest `lockfileVersion` {@link lockedVersions} can walk.
+ *
+ * npm keys every install path under `packages` in v2 and v3. v1 — npm 6 and
+ * older — has a nested `dependencies` tree and no `packages` at all, which is
+ * a different walk entirely and not one anything here needs: this repository's
+ * own file is `"lockfileVersion": 3` three lines from the top, and v2 is the
+ * oldest npm still writes.
+ */
+export const OLDEST_WALKABLE_LOCKFILE_VERSION = 2;
+
+/**
+ * Why this parse is one {@link lockedVersions} cannot answer for, or
+ * `undefined` if it can.
+ *
+ * ## The one empty record that is not an answer
+ *
+ * {@link lockedVersions} returns `{}` for a v1 lockfile, because it reads
+ * `packages` and v1 has none — the same `{}` it returns for a tree with
+ * nothing installed, and for `null`, and for a string. Those are answers: the
+ * audit gate's floor reports them as "the lockfile answered for none of the
+ * claimed packages", which is true and actionable. For a v1 file it is false
+ * and misleading in the worst available direction: the file named every
+ * install, this walk looked in the wrong place, and the sentence blames the
+ * tree.
+ *
+ * So the version is read exactly where there is somewhere to put the answer —
+ * {@link readInstalledVersions}, which has a second state — rather than inside
+ * the walk, whose one-shape contract three callers depend on.
+ *
+ * ## Two tests, because the field is not load-bearing on its own
+ *
+ * A `lockfileVersion` of 1 is the stated case. A parse with a `dependencies`
+ * block and no `packages` is the SAME file with the field missing or
+ * mistyped, and is worth catching for the reason the field is worth reading:
+ * the layout is what the walk actually fails on. A parse with neither block is
+ * NOT reported — `{}` and `{"lockfileVersion":3}` are a lockfile that named
+ * nothing, which is the answer the gate's floor is for, and a reader told
+ * "this looks like v1" about an empty object has been sent the wrong way.
+ */
+export function unwalkableLockfile(lock: unknown): string | undefined {
+  if (typeof lock !== "object" || lock === null) return undefined;
+  const shape = lock as { lockfileVersion?: unknown; packages?: unknown; dependencies?: unknown };
+  const hasPackages = typeof shape.packages === "object" && shape.packages !== null;
+  if (hasPackages) return undefined;
+  const version = shape.lockfileVersion;
+  const stated =
+    typeof version === "number" && version < OLDEST_WALKABLE_LOCKFILE_VERSION
+      ? `lockfileVersion ${String(version)}`
+      : undefined;
+  const nested = typeof shape.dependencies === "object" && shape.dependencies !== null;
+  if (stated === undefined && !nested) return undefined;
+  return `${stated ?? "no \`packages\` block and a nested \`dependencies\` one, which is a lockfileVersion 1 layout"}, and this check reads the \`packages\` block npm writes from version ${String(OLDEST_WALKABLE_LOCKFILE_VERSION)} on — run \`npm install\` with a current npm to rewrite it`;
 }
 
 /**
@@ -174,23 +238,49 @@ export interface InstalledUnreadable {
  * The note is the half only the reader can see; the floor inside the gate is
  * the half it can.
  *
- * Both failures are one `catch` on purpose: `read` throwing (no file, no
- * permission) and `JSON.parse` refusing its output are the same answer to the
- * same question, and the caller prints the same sentence for either. What
- * distinguishes them is already in the message npm or the OS produced, which
- * is why it is quoted rather than summarised.
+ * Two of the three ways to fail share one `catch` on purpose: `read` throwing
+ * (no file, no permission) and `JSON.parse` refusing its output are the same
+ * answer to the same question, and the caller prints the same sentence for
+ * either. What distinguishes them is already in the message npm or the OS
+ * produced, which is why it is quoted rather than summarised.
+ *
+ * The third does not throw and is the reason this function reads
+ * {@link unwalkableLockfile} rather than handing the parse straight to the
+ * walk: a v1 lockfile parses fine and walks to an empty record, which the
+ * caller would report as a tree with nothing installed. It is the unreadable
+ * half with its own cause clause, because it is the one failure a contributor
+ * can act on from the sentence alone.
  *
  * @param checkName The gate's own name, so the note reads as that check's line.
  */
 export function readInstalledVersions(read: () => string, checkName: string): InstalledRead {
+  let lock: unknown;
   try {
-    const lock: unknown = JSON.parse(read());
-    return { kind: "read", installed: lockedVersions(lock) };
+    lock = JSON.parse(read());
   } catch (error: unknown) {
     const cause = error instanceof Error ? error.message : String(error);
-    return {
-      kind: "unreadable",
-      note: `${checkName}: package-lock.json could not be read (${cause}), so no fix direction and no namedFix claim was checked on this run.`,
-    };
+    return { kind: "unreadable", note: unreadableNote(checkName, `package-lock.json could not be read (${cause})`) };
   }
+  const unwalkable = unwalkableLockfile(lock);
+  if (unwalkable !== undefined) {
+    return { kind: "unreadable", note: unreadableNote(checkName, `package-lock.json is ${unwalkable}`) };
+  }
+  return { kind: "read", installed: lockedVersions(lock) };
+}
+
+/**
+ * The one sentence both unreadable halves end with, said once.
+ *
+ * The clause after the comma is the CONSEQUENCE, and it is the same for every
+ * way of failing: two of the audit gate's failing lists need a fix direction,
+ * a direction needs an installed version, and without one they are empty for
+ * the same reason a healthy tree makes them empty. A reader who sees only the
+ * cause does not know the run was weaker than a green one.
+ *
+ * Written once rather than at both returns because that is exactly how the two
+ * drifted apart in the first draft of the v1 branch: the same consequence,
+ * reworded, which reads as two different consequences.
+ */
+function unreadableNote(checkName: string, cause: string): string {
+  return `${checkName}: ${cause}, so no fix direction and no namedFix claim was checked on this run.`;
 }

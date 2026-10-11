@@ -22,12 +22,23 @@
  * nothing", and that distinction is the gate's to draw. It lived in
  * `scripts/check-audit-baseline.ts` as two optional fields and was therefore
  * reachable by no test at all; its own header says what the cases are for.
+ *
+ * The third is `unwalkableLockfile`, which is the one empty record the walk
+ * returns that is a lie rather than an answer: a v1 lockfile named every
+ * install under a key this walk does not read. Most of its cases are about
+ * what it does NOT report, because the failure mode of a version check is
+ * sending a reader after their npm when their tree is simply not installed.
  */
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { lockedVersions, readInstalledVersions } from "@/lib/lockfile";
+import {
+  lockedVersions,
+  OLDEST_WALKABLE_LOCKFILE_VERSION,
+  readInstalledVersions,
+  unwalkableLockfile,
+} from "@/lib/lockfile";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -177,5 +188,83 @@ describe("readInstalledVersions", () => {
     assert.equal(read.kind, "read");
     assert.ok(Object.keys(read.installed ?? {}).length > 100);
     assert.match(String(read.installed?.["expo"]), /^\d+\.\d+\.\d+$/);
+  });
+});
+
+/**
+ * The version question, asked beside the walk rather than inside it.
+ *
+ * `lockedVersions` returns `{}` for a v1 lockfile, for `null`, for a string
+ * and for a tree with nothing installed. Three of those four are answers the
+ * audit gate's floor reports truthfully. The v1 one is not: the file named
+ * every install under `dependencies`, the walk read `packages`, and the
+ * sentence that comes out blames the tree for the reader's npm.
+ *
+ * The cases below are the boundary, and most of them are about what is NOT
+ * reported — an empty object and a bare `lockfileVersion: 3` are a lockfile
+ * that named nothing, and a reader told "this looks like v1" about those has
+ * been sent the wrong way.
+ */
+describe("unwalkableLockfile", () => {
+  it("names a stated v1 and what to do about it", () => {
+    const why = unwalkableLockfile({ lockfileVersion: 1, dependencies: { expo: {} } });
+    assert.match(String(why), /^lockfileVersion 1,/);
+    // The version this check needs, from the constant rather than a literal.
+    assert.match(String(why), new RegExp(`from version ${String(OLDEST_WALKABLE_LOCKFILE_VERSION)} on`));
+    // And the one action that fixes it, because that is the whole point of
+    // separating this from "the lockfile answered for none of them".
+    assert.match(String(why), /run `npm install` with a current npm/);
+  });
+
+  it("names the v1 LAYOUT when the field is missing or mistyped", () => {
+    // The field is not load-bearing on its own: the layout is what the walk
+    // fails on, so a nested `dependencies` with no `packages` is the same
+    // file with the field lost.
+    for (const lock of [
+      { dependencies: { expo: { version: "1.0.0" } } },
+      { lockfileVersion: "1", dependencies: {} },
+    ]) {
+      const why = unwalkableLockfile(lock);
+      assert.match(String(why), /^no `packages` block and a nested `dependencies` one/);
+    }
+  });
+
+  it("is silent for every lockfile the walk can actually read", () => {
+    // v2 and v3 both key installs under `packages`, and a `dependencies`
+    // block BESIDE one is npm's v2 back-compatibility copy, not a v1 file.
+    assert.equal(unwalkableLockfile({ lockfileVersion: 3, packages: {} }), undefined);
+    assert.equal(unwalkableLockfile({ lockfileVersion: 2, packages: {}, dependencies: {} }), undefined);
+    assert.equal(unwalkableLockfile({ packages: { "node_modules/expo": { version: "1.0.0" } } }), undefined);
+  });
+
+  it("is silent for a lockfile that simply named nothing", () => {
+    // The distinction this function exists to draw, from the other side. None
+    // of these claims to be v1, and the gate's floor is the right reporter
+    // for all of them.
+    for (const lock of [{}, { lockfileVersion: 3 }, { packages: null }, null, "{}", undefined, 7]) {
+      assert.equal(unwalkableLockfile(lock), undefined, JSON.stringify(lock) ?? "undefined");
+    }
+  });
+
+  it("is silent on this repository's own lockfile", () => {
+    // The floor: this file is lockfileVersion 3 and the gate must not start
+    // reporting it as unreadable.
+    const real: unknown = JSON.parse(readRepoFile("package-lock.json"));
+    assert.equal(unwalkableLockfile(real), undefined);
+    assert.equal((real as { lockfileVersion?: unknown }).lockfileVersion, 3);
+  });
+
+  it("is the unreadable half of a read, with the shared consequence clause", () => {
+    // The two unreadable causes end in one sentence, written once: a reader
+    // who sees only the cause does not know the run was weaker than a green
+    // one.
+    const read = readInstalledVersions(
+      () => JSON.stringify({ lockfileVersion: 1, dependencies: {} }),
+      "check-audit-baseline",
+    );
+    assert.equal(read.kind, "unreadable");
+    assert.equal(read.installed, undefined);
+    assert.match(String(read.note), /^check-audit-baseline: package-lock\.json is lockfileVersion 1,/);
+    assert.match(String(read.note), /so no fix direction and no namedFix claim was checked on this run\.$/);
   });
 });
