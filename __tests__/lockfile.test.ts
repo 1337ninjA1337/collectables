@@ -16,12 +16,18 @@
  * only a fixture has not been shown to read the real file. It asserts a COUNT
  * as well as a version, because a regex over one key passes against a record
  * built from one lucky entry.
+ *
+ * The second suite is `readInstalledVersions`, the walk's one caller-facing
+ * wrapper: the walk cannot tell "no lockfile" from "a lockfile naming
+ * nothing", and that distinction is the gate's to draw. It lived in
+ * `scripts/check-audit-baseline.ts` as two optional fields and was therefore
+ * reachable by no test at all; its own header says what the cases are for.
  */
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { lockedVersions } from "@/lib/lockfile";
+import { lockedVersions, readInstalledVersions } from "@/lib/lockfile";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -82,5 +88,94 @@ describe("lockedVersions", () => {
     assert.ok(Object.keys(installed).length > 100);
     // And no nested path survived it, on the real tree rather than a fixture.
     for (const name of Object.keys(installed)) assert.ok(!name.includes("/node_modules/"));
+  });
+});
+
+/**
+ * The two states a lockfile read can be in, and the two it used to be able to
+ * spell.
+ *
+ * `scripts/check-audit-baseline.ts` returned `{ installed?, note? }` until
+ * 2026-10-11: four states for the two that happen, with `{ installed, note }`
+ * and `{}` both constructible and neither meaning anything. The union is the
+ * fix; these cases are what hold the two halves apart, and in particular the
+ * one boundary that is a DECISION rather than a shape — a lockfile that parsed
+ * and named nothing is the `"read"` half, because the gate's own floor is what
+ * says so and naming it unreadable would name the wrong cause.
+ *
+ * The reader takes a thunk, so the unreadable half is exercised by a thunk
+ * that throws rather than by planting a broken file on disk. The floor at the
+ * bottom reads the real lockfile through the real `node:fs`, which is the only
+ * part of this a fixture cannot stand in for.
+ */
+describe("readInstalledVersions", () => {
+  const LOCK = JSON.stringify({
+    packages: {
+      "node_modules/expo": { version: "54.0.35" },
+      "node_modules/react-native": { version: "0.81.5" },
+    },
+  });
+
+  it("is the read half, carrying the walk's record", () => {
+    const read = readInstalledVersions(() => LOCK, "check-x");
+    assert.equal(read.kind, "read");
+    assert.deepEqual(read.installed, { expo: "54.0.35", "react-native": "0.81.5" });
+    // The mirror field, which is what lets the one caller pass
+    // `read.installed` onward without narrowing first.
+    assert.equal(read.note, undefined);
+  });
+
+  it("is the read half for a lockfile that parsed and answered nothing", () => {
+    // The one boundary here that is a judgement call. An empty record is an
+    // ANSWER — this tree has nothing installed — and the gate's floor is what
+    // reports it. Calling it unreadable would blame the file for the tree.
+    for (const text of ["{}", '{"packages":null}', '{"lockfileVersion":3}']) {
+      const read = readInstalledVersions(() => text, "check-x");
+      assert.equal(read.kind, "read", text);
+      assert.deepEqual(read.installed, {});
+      assert.equal(read.note, undefined);
+    }
+  });
+
+  it("is the unreadable half when the read throws, and quotes why", () => {
+    const read = readInstalledVersions(() => {
+      throw new Error("ENOENT: no such file or directory");
+    }, "check-audit-baseline");
+    assert.equal(read.kind, "unreadable");
+    assert.equal(read.installed, undefined);
+    // The check's own name on the front, so the line reads as that gate's.
+    assert.match(String(read.note), /^check-audit-baseline: package-lock\.json could not be read/);
+    // The OS's own words, not a summary of them: a missing file and a
+    // permission refusal are different problems with different fixes.
+    assert.match(String(read.note), /ENOENT: no such file or directory/);
+    // And the consequence, because an unread lockfile empties two of the
+    // gate's lists for the same reason a healthy tree does.
+    assert.match(String(read.note), /no fix direction and no namedFix claim was checked/);
+  });
+
+  it("is the unreadable half when the text is not JSON", () => {
+    // One `catch` for both failures on purpose: a file that is not there and
+    // a file that is not JSON are the same answer to the same question.
+    const read = readInstalledVersions(() => "not json at all", "check-x");
+    assert.equal(read.kind, "unreadable");
+    assert.equal(read.installed, undefined);
+    assert.match(String(read.note), /^check-x: package-lock\.json could not be read \(/);
+  });
+
+  it("carries a non-Error throw through as a string", () => {
+    const read = readInstalledVersions(() => {
+      throw "plain string";
+    }, "check-x");
+    assert.equal(read.kind, "unreadable");
+    assert.match(String(read.note), /\(plain string\)/);
+  });
+
+  it("reads this repository's own lockfile through node:fs", () => {
+    // The floor: everything above is a thunk, and a reader shown only thunks
+    // has not been shown to read the file the gate actually reads.
+    const read = readInstalledVersions(() => readRepoFile("package-lock.json"), "check-x");
+    assert.equal(read.kind, "read");
+    assert.ok(Object.keys(read.installed ?? {}).length > 100);
+    assert.match(String(read.installed?.["expo"]), /^\d+\.\d+\.\d+$/);
   });
 });
