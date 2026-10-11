@@ -8,9 +8,10 @@ import {
   majorOfVersion,
 } from "../lib/check-sentry-version";
 import { LINT_GUARDS } from "../lib/lint-guards";
-import { lockedVersions, unwalkableLockfile } from "../lib/lockfile";
+import { unwalkableLockfile } from "../lib/lockfile";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { REPO_INSTALLED, REPO_LOCKFILE } from "./helpers/repo-lockfile";
 
 describe("majorOfRange / majorOfVersion", () => {
   it("parses tilde, caret, and exact ranges", () => {
@@ -90,16 +91,18 @@ describe("repository state", () => {
   const pkg = JSON.parse(
     readRepoFile("package.json"),
   );
-  const lock = JSON.parse(
-    readRepoFile("package-lock.json"),
-  );
 
   it("the real package.json + lockfile pass the guard", () => {
+    // Through the walk, not through `packages["node_modules/@sentry/react-native"]
+    // .version`, which is what this case said until 2026-10-11: an unguarded
+    // two-level index that throws a `TypeError` on a v1 lockfile instead of
+    // reporting anything, in the one suite whose subject is what this guard
+    // does with a lockfile it cannot walk.
     assert.deepEqual(
       findSentryVersionIssues({
         declaredRange: pkg.dependencies["@sentry/react-native"],
-        lockedVersion:
-          lock.packages["node_modules/@sentry/react-native"].version,
+        lockedVersion: REPO_INSTALLED["@sentry/react-native"],
+        unwalkable: unwalkableLockfile(REPO_LOCKFILE),
       }),
       [],
     );
@@ -179,13 +182,12 @@ describe("findSentryVersionIssues with an unwalkable lockfile", () => {
   it("is silent on this repository's own lockfile, which is v3", () => {
     // The floor: the guard must not start reporting the real file as a layout
     // it cannot read.
-    const real: unknown = JSON.parse(readRepoFile("package-lock.json"));
-    assert.equal(unwalkableLockfile(real), undefined);
+    assert.equal(unwalkableLockfile(REPO_LOCKFILE), undefined);
     assert.deepEqual(
       findSentryVersionIssues({
         declaredRange: "~7.5.0",
-        lockedVersion: lockedVersions(real)["@sentry/react-native"],
-        unwalkable: unwalkableLockfile(real),
+        lockedVersion: REPO_INSTALLED["@sentry/react-native"],
+        unwalkable: unwalkableLockfile(REPO_LOCKFILE),
       }),
       [],
     );

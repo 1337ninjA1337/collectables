@@ -40,7 +40,7 @@ import {
   unwalkableLockfile,
 } from "@/lib/lockfile";
 
-import { readRepoFile } from "./helpers/repo-file";
+import { REPO_LOCKFILE, REPO_LOCKFILE_TEXT } from "./helpers/repo-lockfile";
 
 describe("lockedVersions", () => {
   const lock = {
@@ -91,8 +91,7 @@ describe("lockedVersions", () => {
     // The floor every scanner here keeps: a reader that only ever saw a
     // fixture has not been shown to read the real shape. And `expo` in
     // particular, because it is the package the finding was about.
-    const real: unknown = JSON.parse(readRepoFile("package-lock.json"));
-    const installed = lockedVersions(real);
+    const installed = lockedVersions(REPO_LOCKFILE);
     assert.match(String(installed["expo"]), /^\d+\.\d+\.\d+$/);
     // The one walk has to find MANY of them, or a regex over one key would
     // pass against a record built from a single lucky entry.
@@ -184,7 +183,7 @@ describe("readInstalledVersions", () => {
   it("reads this repository's own lockfile through node:fs", () => {
     // The floor: everything above is a thunk, and a reader shown only thunks
     // has not been shown to read the file the gate actually reads.
-    const read = readInstalledVersions(() => readRepoFile("package-lock.json"), "check-x");
+    const read = readInstalledVersions(() => REPO_LOCKFILE_TEXT, "check-x");
     assert.equal(read.kind, "read");
     assert.ok(Object.keys(read.installed ?? {}).length > 100);
     assert.match(String(read.installed?.["expo"]), /^\d+\.\d+\.\d+$/);
@@ -249,9 +248,8 @@ describe("unwalkableLockfile", () => {
   it("is silent on this repository's own lockfile", () => {
     // The floor: this file is lockfileVersion 3 and the gate must not start
     // reporting it as unreadable.
-    const real: unknown = JSON.parse(readRepoFile("package-lock.json"));
-    assert.equal(unwalkableLockfile(real), undefined);
-    assert.equal((real as { lockfileVersion?: unknown }).lockfileVersion, 3);
+    assert.equal(unwalkableLockfile(REPO_LOCKFILE), undefined);
+    assert.equal((REPO_LOCKFILE as { lockfileVersion?: unknown }).lockfileVersion, 3);
   });
 
   it("is the unreadable half of a read, with the shared consequence clause", () => {

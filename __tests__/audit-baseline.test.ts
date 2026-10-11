@@ -61,6 +61,7 @@ import { LINT_ALL_EXEMPT, LINT_GUARDS } from "@/lib/lint-guards";
 import { measuredFloor } from "./helpers/coverage-floor";
 import { moduleDoc, proseNames } from "./helpers/module-doc";
 import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { REPO_LOCKFILE_ENTRIES } from "./helpers/repo-lockfile";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -3273,9 +3274,6 @@ describe("the gate script's header names things that exist", () => {
  * `package-lock.json` and are checked here against it.
  */
 describe("an in-range fix the tree is pinned away from", () => {
-  const lockfile = JSON.parse(readRepoFile("package-lock.json")) as {
-    packages?: Record<string, { dependencies?: Record<string, string> }>;
-  };
 
   const pinned = ACCEPTED_HIGH_ADVISORIES.filter((entry) => entry.inRangeFixPinned);
 
@@ -3288,7 +3286,7 @@ describe("an in-range fix the tree is pinned away from", () => {
     for (const entry of pinned) {
       const pin = entry.inRangeFixPinned;
       assert.ok(pin, "filtered on it");
-      const dependent = lockfile.packages?.[pin.pinnedBy];
+      const dependent = REPO_LOCKFILE_ENTRIES[pin.pinnedBy];
       assert.ok(
         dependent,
         `${entry.package}: inRangeFixPinned names ${pin.pinnedBy} and package-lock.json has no such package — the dependent moved and the measurement did not`,
