@@ -16,7 +16,7 @@ import {
   findSentryVersionIssues,
 } from "../lib/check-sentry-version";
 import { GuardRootError } from "../lib/guard-root";
-import { lockedVersions } from "../lib/lockfile";
+import { lockedVersions, unwalkableLockfile } from "../lib/lockfile";
 import { ScannedFloorError, assertParsedInputs } from "../lib/scanned-floor";
 import { guardScanRoot, readJsonInput } from "./guard-io";
 
@@ -45,8 +45,14 @@ function main(): void {
   // tree carries react-native twice and the question is what the ROOT install
   // is on.
   const lockedVersion = lockedVersions(lock)["@sentry/react-native"];
+  // Asked beside the walk, because the walk cannot tell "no entry" from "an
+  // entry this walk does not know how to find". A v1 lockfile keys every
+  // install under `dependencies`, so `lockedVersions` returns `{}` and the
+  // finding would have read "package-lock.json has no entry for
+  // node_modules/@sentry/react-native" about a file that names it.
+  const unwalkable = unwalkableLockfile(lock);
 
-  const issues = findSentryVersionIssues({ declaredRange, lockedVersion });
+  const issues = findSentryVersionIssues({ declaredRange, lockedVersion, unwalkable });
 
   if (issues.length === 0) {
     console.log(

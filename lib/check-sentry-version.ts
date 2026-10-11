@@ -34,6 +34,19 @@ export interface SentryVersionInput {
   declaredRange: string | undefined;
   /** The exact version resolved in package-lock.json. */
   lockedVersion: string | undefined;
+  /**
+   * Why the lockfile could not be walked, if it could not be —
+   * `unwalkableLockfile` in `lib/lockfile.ts`, which the wrapper asks beside
+   * the walk that produced {@link lockedVersion}.
+   *
+   * Set means {@link lockedVersion} is `undefined` for a reason that is NOT
+   * "there is no entry": a v1 lockfile nests every install under
+   * `dependencies`, the walk reads `packages`, and the answer is an absent
+   * version for a package the file does name. Both states end at `npm
+   * install`, which is why this went unnoticed; they are different sentences,
+   * and one of them is false.
+   */
+  readonly unwalkable?: string;
 }
 
 /** Validate the declared range and locked version. Sorted issue list. */
@@ -57,7 +70,14 @@ export function findSentryVersionIssues(input: SentryVersionInput): string[] {
     }
   }
 
-  if (!input.lockedVersion) {
+  if (input.unwalkable !== undefined) {
+    // Reported INSTEAD of the absent-entry issue below, not beside it. The
+    // absent entry is a consequence of the layout, and a finding list that
+    // states a consequence as a second finding reads as two problems.
+    issues.push(
+      `package-lock.json is ${input.unwalkable}, so this check could not read what @sentry/react-native resolves to`,
+    );
+  } else if (!input.lockedVersion) {
     issues.push(
       "package-lock.json has no entry for node_modules/@sentry/react-native — run npm install",
     );

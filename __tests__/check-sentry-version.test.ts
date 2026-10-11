@@ -8,6 +8,7 @@ import {
   majorOfVersion,
 } from "../lib/check-sentry-version";
 import { LINT_GUARDS } from "../lib/lint-guards";
+import { lockedVersions, unwalkableLockfile } from "../lib/lockfile";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -113,5 +114,80 @@ describe("repository state", () => {
     // step both run the guard via the lint:all aggregator (wiring pinned
     // in lint-guards.test.ts).
     assert.ok(LINT_GUARDS.some((g) => g.npmScript === "lint:sentry-version"));
+  });
+});
+
+/**
+ * The lockfile this guard could not walk, which used to read as a lockfile
+ * that had never heard of Sentry.
+ *
+ * `lockedVersions` reads `packages`, and a v1 lockfile (npm 6 and older)
+ * nests every install under `dependencies`. So the walk returned `{}`, the
+ * locked version was `undefined`, and the finding said "package-lock.json has
+ * no entry for node_modules/@sentry/react-native" about a file that names it.
+ * Both states end at `npm install`, which is why it went unnoticed for as
+ * long as it did — and one of the two sentences is false, which is the whole
+ * cost.
+ *
+ * The wrapper now asks `unwalkableLockfile` beside the walk and passes the
+ * reason through. These cases hold the one judgement in it: the layout is
+ * reported INSTEAD of the absent entry, not beside it.
+ */
+describe("findSentryVersionIssues with an unwalkable lockfile", () => {
+  const V1 = unwalkableLockfile({ lockfileVersion: 1, dependencies: {} });
+
+  it("names the layout instead of claiming there is no entry", () => {
+    const issues = findSentryVersionIssues({
+      declaredRange: "~7.5.0",
+      lockedVersion: undefined,
+      unwalkable: V1,
+    });
+    assert.equal(issues.length, 1);
+    assert.match(issues[0], /^package-lock\.json is lockfileVersion 1,/);
+    assert.match(issues[0], /could not read what @sentry\/react-native resolves to$/);
+    // The false sentence, gone. A finding list that states a consequence as a
+    // second finding reads as two problems.
+    assert.ok(!issues.some((i) => i.includes("has no entry for")));
+  });
+
+  it("still reports a declared-range problem beside it", () => {
+    // The two halves are independent: package.json parsed fine and its range
+    // is still wrong, which is a finding this guard can still make.
+    const issues = findSentryVersionIssues({
+      declaredRange: "~6.0.0",
+      lockedVersion: undefined,
+      unwalkable: V1,
+    });
+    assert.equal(issues.length, 2);
+    assert.ok(issues.some((i) => i.includes("targets major 6")));
+    assert.ok(issues.some((i) => i.includes("lockfileVersion 1")));
+  });
+
+  it("is the absent-entry finding again when the lockfile was walkable", () => {
+    // The other side of the branch, and the state this repository would be in
+    // after `npm uninstall @sentry/react-native`.
+    const issues = findSentryVersionIssues({
+      declaredRange: "~7.5.0",
+      lockedVersion: undefined,
+      unwalkable: unwalkableLockfile({ lockfileVersion: 3, packages: {} }),
+    });
+    assert.deepEqual(issues, [
+      "package-lock.json has no entry for node_modules/@sentry/react-native — run npm install",
+    ]);
+  });
+
+  it("is silent on this repository's own lockfile, which is v3", () => {
+    // The floor: the guard must not start reporting the real file as a layout
+    // it cannot read.
+    const real: unknown = JSON.parse(readRepoFile("package-lock.json"));
+    assert.equal(unwalkableLockfile(real), undefined);
+    assert.deepEqual(
+      findSentryVersionIssues({
+        declaredRange: "~7.5.0",
+        lockedVersion: lockedVersions(real)["@sentry/react-native"],
+        unwalkable: unwalkableLockfile(real),
+      }),
+      [],
+    );
   });
 });
