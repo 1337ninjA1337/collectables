@@ -31,9 +31,9 @@ import * as exhaustiveDeps from "./exhaustive-deps-triage";
 import * as setStateInEffect from "./set-state-in-effect-triage";
 
 /**
- * Neither rule is gated and neither should be: 26 of the 30
+ * Neither rule is gated and neither should be: 27 of the 29 live
  * `set-state-in-effect` findings are correct as written, and gating would
- * mean 26 eslint-disable comments written to make a gate green. What IS gated
+ * mean 27 eslint-disable comments written to make a gate green. What IS gated
  * is that the readings stay COMPLETE — a new finding of either rule fails the
  * leg until somebody writes a verdict for it, which is a much smaller ask
  * than a fix and is the one that keeps a registry from describing the day it

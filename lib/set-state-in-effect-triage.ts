@@ -14,7 +14,11 @@
  *
  * ## What the reading found
  *
- * One bug, and it was a request loop rather than a render loop.
+ * One bug on the triage pass itself, and it was a request loop rather than a
+ * render loop; a second came out of settling an `open` entry two weeks later,
+ * and the two are nothing alike — the first could not be seen without reading
+ * a dependency list, the second could not be seen without asking what the
+ * screen does while somebody is typing in it.
  * `app/listing/[id].tsx` guarded its fetch on `fetchingRemote` and had
  * `fetchingRemote` in the effect's own dependency list: set true, re-run,
  * bail; fetch resolves `null` for a listing that does not exist; set false,
@@ -37,19 +41,29 @@
  * are for; the extra render is the point, and in none of them does the flag
  * feed the dependency list that re-runs the effect.
  *
- * Three are `open`, and they are the interesting ones: state derived from a
+ * Two are `open`, and they are the interesting ones: state derived from a
  * prop, which React's docs say to compute during render or key a remount on
- * instead. Each would be a behaviour change (a draft that stops being
- * clobbered mid-edit is a different screen), so each is a decision, and the
+ * instead. Each would be a behaviour change, so each is a decision, and the
  * decision was not the triage pass's to make.
+ *
+ * There were three, and `app/profile/[id].tsx`'s drafts were the one of them
+ * that was not only a question of style. The sentence left in this header —
+ * "a draft that stops being clobbered mid-edit is a different screen" —
+ * described a bug in the present tense: the sync ran on `ensureProfilesLoaded`
+ * from the focus effect, on a pull-to-refresh and on a language switch, and
+ * each one replaced a bio the user was part-way through writing. It was
+ * settled on 2026-10-11 the way the other two still are not, because it had an
+ * answer that is not a preference: what somebody just typed wins.
  *
  * There were four, and `lib/use-chunked-list.ts` was the one settled first
  * (2026-09-29) because it was the only one of the four that was not a question
  * about what the user should see. The effect is right; what was missing was
  * anything holding callers to the stable reference it depends on, and
- * `lint:chunked-items` is that. The other three are still decisions about
- * behaviour: `app/profile/[id].tsx`'s drafts, `components/item-filters.tsx`'s
- * sheet draft and `app/collection/[id].tsx`'s sort restore.
+ * `lint:chunked-items` is that. The two still open are decisions about
+ * behaviour with no wrong answer: `components/item-filters.tsx`' sheet draft
+ * (which a `key` on the sheet would delete the effect for) and
+ * `app/collection/[id].tsx`'s sort restore (which wants the preference
+ * resolved before the screen mounts, and that is a routing change).
  *
  * ## Why it is a registry and not prose
  *
@@ -205,10 +219,10 @@ export const SET_STATE_IN_EFFECT_SITES: readonly SetStateInEffectSite[] = [
   },
   {
     file: "app/profile/[id].tsx",
-    call: 'setBioDraft(activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio);',
+    call: "setBioDraft(bio);",
     shape: "sync-to-prop",
-    verdict: "open",
-    why: "Two edit drafts kept in step with the loaded profile. It is the textbook case for deriving during render, and it is also the one that changes behaviour visibly: a realtime profile update currently overwrites what the user is typing, and stopping that is a decision about which of the two wins.",
+    verdict: "fixed",
+    why: "Two edit drafts kept in step with the loaded profile, and the sync overwrote what the user was typing: `ensureProfilesLoaded` on focus, a pull-to-refresh and a language switch all move the effect's inputs while the screen is open. The decision the triage left open is made — what somebody just typed wins, because losing a remote bio edit is a refresh away and losing a half-typed one is not recoverable — and a `seededDraftsRef` keyed by profile id is what tells an untouched draft from a written one.",
   },
   {
     file: "components/item-filters.tsx",

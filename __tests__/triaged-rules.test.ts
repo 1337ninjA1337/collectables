@@ -72,14 +72,16 @@ describe("registryTotals", () => {
     }
   });
 
-  it("is the report's two populations at 30 and 11", () => {
+  it("is the report's two populations at 29 and 11", () => {
     // The numbers CLAUDE.md states, reached from the registries rather than
-    // from a terminal. `exhaustive-deps` is 11 entries standing for 13
+    // from a terminal. Both are entries minus the `fixed` ones:
+    // `set-state-in-effect` is 31 entries and 29 live, the second having gone
+    // `fixed` on 2026-10-11; `exhaustive-deps` is 11 entries standing for 13
     // findings and the live sum is 11, because two of the entries are `fixed`
     // — which is exactly the arithmetic the snapshot used to restate.
     assert.deepEqual(
       Object.fromEntries(registryTotals(TRIAGED_RULES)),
-      { "react-hooks/set-state-in-effect": 30, "react-hooks/exhaustive-deps": 11 },
+      { "react-hooks/set-state-in-effect": 29, "react-hooks/exhaustive-deps": 11 },
     );
   });
 

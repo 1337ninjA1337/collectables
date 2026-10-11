@@ -89,19 +89,24 @@ export interface LintReportSnapshot {
 }
 
 /**
- * Re-taken on 2026-10-03, after `no-require-imports` cleared the last
- * population in the report with no reading behind it — which is why `byRule`
- * is empty, and why an entry appearing in it is news rather than noise.
+ * Re-taken on 2026-10-11, when `app/profile/[id].tsx`'s draft sync went from
+ * `open` to `fixed` and stopped reporting. `byRule` stays empty, which is the
+ * healthy state and the reason it was emptied on 2026-10-03 — every
+ * population in the report has a reading behind it — so an entry appearing in
+ * it is news rather than noise.
  *
- * The 41 are `react-hooks/set-state-in-effect` (30) and
+ * The 40 are `react-hooks/set-state-in-effect` (29) and
  * `react-hooks/exhaustive-deps` (11), both summed from their registries at
  * comparison time. These two numbers can only move by a verdict being
- * written or withdrawn, or by a rule nobody has read starting to report.
+ * written or withdrawn, or by a rule nobody has read starting to report —
+ * and this re-take is the first of the first kind: a `fixed` verdict is a
+ * finding that no longer exists, which `findingsByFile` excludes, so the
+ * count fell by one for a code change rather than for a reading.
  */
 export const LINT_REPORT_SNAPSHOT: LintReportSnapshot = {
-  takenOn: "2026-10-03",
-  findings: 41,
-  errors: 30,
+  takenOn: "2026-10-11",
+  findings: 40,
+  errors: 29,
   byRule: {},
 };
 

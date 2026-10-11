@@ -50,6 +50,7 @@ import { DEFAULT_EN_PROFILE_BIO, useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
+import { nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
 
 
@@ -192,12 +193,33 @@ export default function ProfileScreen() {
     ? (activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio)
     : "";
 
+  /**
+   * What the profile last put into each draft, so a remote change can tell an
+   * untouched field from one the user is typing in.
+   *
+   * `lib/profile-draft-sync.ts` is the rule and the argument for it; this ref
+   * is the one piece that has to live on the screen, because "what was seeded"
+   * is a fact about this mount and not about either value.
+   */
+  const seededDraftsRef = useRef<ProfileDraftSeed | null>(null);
+
   useEffect(() => {
-    if (activeProfile) {
-      setBioDraft(activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio);
-      setProfileIdDraft(activeProfile.username);
+    if (!activeProfile) return;
+    const bio = activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio;
+    const username = activeProfile.username;
+    const sync = syncDrafts(seededDraftsRef.current, activeProfile.id);
+    seededDraftsRef.current = { id: activeProfile.id, bio, username };
+    if (sync.kind === "reseed") {
+      setBioDraft(bio);
+      setProfileIdDraft(username);
+      return;
     }
-  }, [activeProfile?.bio, activeProfile?.username, t]);
+    // Updaters, so React bails out when the value has not moved: on the
+    // common path — a refresh that found the same profile — this effect now
+    // renders nothing at all, where before it set two states on every run.
+    setBioDraft((draft) => nextDraft(draft, sync.seeded.bio, bio));
+    setProfileIdDraft((draft) => nextDraft(draft, sync.seeded.username, username));
+  }, [activeProfile?.id, activeProfile?.bio, activeProfile?.username, t]);
 
   if (loadingRemote && !activeProfile) {
     return (

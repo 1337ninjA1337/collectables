@@ -1,0 +1,59 @@
+/**
+ * The profile screen's half of the draft rule, pinned structurally.
+ *
+ * `lib/profile-draft-sync.ts` holds the decision and
+ * `profile-draft-sync.test.ts` runs it. What a pure module cannot say is that
+ * the SCREEN uses it — and the bug was entirely in how the screen wrote the
+ * two drafts, so a rule it stopped calling would put the bug straight back
+ * with every case still green.
+ *
+ * Structural, because mounting this screen means React Native peers and a
+ * router; the repository's other screen-level pins are the same shape and for
+ * the same reason.
+ */
+
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import { readRepoFile } from "./helpers/repo-file";
+
+describe("app/profile/[id].tsx — the drafts a refresh must not overwrite", () => {
+  const src = readRepoFile("app/profile/[id].tsx");
+
+  it("asks syncDrafts before writing either draft", () => {
+    assert.match(src, /const sync = syncDrafts\(seededDraftsRef\.current, activeProfile\.id\);/);
+    assert.match(src, /if \(sync\.kind === "reseed"\) \{/);
+  });
+
+  it("writes both drafts through nextDraft on the follow path", () => {
+    // The unguarded `setBioDraft(...)` / `setProfileIdDraft(...)` pair this
+    // replaced is the bug: it ran on every change to the profile or the
+    // language and took whatever the user had typed with it.
+    assert.match(src, /setBioDraft\(\(draft\) => nextDraft\(draft, sync\.seeded\.bio, bio\)\);/);
+    assert.match(src, /setProfileIdDraft\(\(draft\) => nextDraft\(draft, sync\.seeded\.username, username\)\);/);
+  });
+
+  it("records the seed it just applied, keyed by profile id", () => {
+    // Without the id the untouched test would compare against another
+    // person's bio; without the write, every run would look like the first.
+    assert.match(src, /const seededDraftsRef = useRef<ProfileDraftSeed \| null>\(null\);/);
+    assert.match(src, /seededDraftsRef\.current = \{ id: activeProfile\.id, bio, username \};/);
+  });
+
+  it("keeps the profile id in the effect's dependency list and the drafts out of it", () => {
+    // The id joined the deps with this change — the effect reads
+    // `activeProfile.id` now and a profile switch has to re-run it. The drafts
+    // stay out, which is what the updater form is for: a draft in the deps of
+    // the effect that sets it is the self-feeding shape the triage registry
+    // names as the one real loop it found.
+    assert.match(src, /\}, \[activeProfile\?\.id, activeProfile\?\.bio, activeProfile\?\.username, t\]\);/);
+    assert.ok(
+      !/\}, \[[^\]]*\bbioDraft\b[^\]]*\]\);/.test(src),
+      "bioDraft must not be in the dependency list of the effect that sets it",
+    );
+    assert.ok(
+      !/\}, \[[^\]]*\bprofileIdDraft\b[^\]]*\]\);/.test(src),
+      "profileIdDraft must not be in the dependency list of the effect that sets it",
+    );
+  });
+});

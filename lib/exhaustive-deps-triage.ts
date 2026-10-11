@@ -149,10 +149,10 @@ export const EXHAUSTIVE_DEPS_SITES: readonly ExhaustiveDepsSite[] = [
   {
     file: "app/profile/[id].tsx",
     dependency: "activeProfile",
-    anchor: "setProfileIdDraft(activeProfile.username);",
+    anchor: "const sync = syncDrafts(seededDraftsRef.current, activeProfile.id);",
     shape: "narrowed-object",
     verdict: "keep",
-    why: "Depends on `activeProfile?.bio` and `activeProfile?.username`, which is exactly what the effect reads; the profile object is rebuilt by the social context on every refresh while those two strings are not.",
+    why: "Depends on `activeProfile?.id`, `?.bio` and `?.username`, which is exactly what the effect reads; the profile object is rebuilt by the social context on every refresh while those three strings are not. The id joined the other two on 2026-10-11, when the effect stopped overwriting a draft the user had typed in and started needing to know whether this is still the same person's profile.",
   },
   {
     file: "lib/auth-context.tsx",

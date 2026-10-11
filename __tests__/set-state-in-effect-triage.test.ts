@@ -37,14 +37,15 @@ describe("the set-state-in-effect triage", () => {
     assert.equal(new Set(keys).size, keys.length, "no site may be registered twice");
   });
 
-  it("decided all 31: 27 keep, 3 open, 1 fixed", () => {
+  it("decided all 31: 27 keep, 2 open, 2 fixed", () => {
     // The numbers are in the module header and in `.tasks/.tasks.md`, so they
     // are asserted rather than restated. A verdict that moves without the
-    // sentences moving is the drift this catches — and one has moved:
+    // sentences moving is the drift this catches — and two have moved:
     // use-chunked-list's page reset went from open to keep on 2026-09-29 when
     // `lint:chunked-items` started holding its callers to the contract the
-    // effect depends on.
-    assert.deepEqual(verdictCounts(), { keep: 27, open: 3, fixed: 1 });
+    // effect depends on, and `app/profile/[id].tsx`'s drafts went from open to
+    // fixed on 2026-10-11 when the question they were open on got an answer.
+    assert.deepEqual(verdictCounts(), { keep: 27, open: 2, fixed: 2 });
   });
 
   it("gives every site a reason of its own", () => {
@@ -75,16 +76,36 @@ describe("the set-state-in-effect triage", () => {
     }
   });
 
-  it("names the one that was a bug, and it is the one with the self-feeding dependency", () => {
-    const fixed = SET_STATE_IN_EFFECT_SITES.filter((s) => s.verdict === "fixed");
-    assert.equal(fixed.length, 1);
-    assert.equal(fixed[0].file, "app/listing/[id].tsx");
-    assert.equal(fixed[0].shape, "self-feeding-dep");
+  it("names the bug the triage pass found, and it is the one with the self-feeding dependency", () => {
+    // This case asserted `fixed.length === 1` until 2026-10-11, which read as
+    // "one entry was ever a bug" and was really "the triage pass found one".
+    // The second `fixed` came from settling an `open` entry, which is a
+    // different kind of find and the registry should be able to hold both.
+    const selfFeeding = SET_STATE_IN_EFFECT_SITES.filter((s) => s.shape === "self-feeding-dep");
     assert.equal(
-      SET_STATE_IN_EFFECT_SITES.filter((s) => s.shape === "self-feeding-dep").length,
+      selfFeeding.length,
       1,
       "a second self-feeding dependency is a second bug, not a second entry",
     );
+    assert.equal(selfFeeding[0].file, "app/listing/[id].tsx");
+    assert.equal(selfFeeding[0].verdict, "fixed");
+  });
+
+  it("has no `open` entry left whose own sentence describes a bug", () => {
+    // What `app/profile/[id].tsx` was: an `open` verdict whose `why` said, in
+    // the present tense, that the screen overwrites what the user is typing.
+    // `open` means "a real question nobody has answered", and a sentence
+    // reporting a live defect is not a question — it is a finding parked in a
+    // registry. The two that remain say "it works, and React would do it
+    // another way", which is the shape `open` is for.
+    for (const site of SET_STATE_IN_EFFECT_SITES) {
+      if (site.verdict !== "open") continue;
+      assert.match(
+        site.why,
+        /It works|the argument holds/,
+        `${site.file}: an open verdict has to say the site works today, or it is a finding rather than a question`,
+      );
+    }
   });
 
   it("does not call anything `keep` that feeds its own dependency list", () => {
