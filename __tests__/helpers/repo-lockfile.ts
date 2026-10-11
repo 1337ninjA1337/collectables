@@ -28,7 +28,7 @@
  * this repository's own state need a live one.
  */
 
-import { type InstalledVersions, lockedVersions } from "@/lib/lockfile";
+import { type InstalledVersions, lockedVersions, unwalkableLockfile } from "@/lib/lockfile";
 
 import { readRepoFile } from "./repo-file";
 
@@ -82,7 +82,54 @@ export interface RepoLockfileEntry {
  *
  * Keyed the way the file is — `node_modules/<name>`, `node_modules/a/node_modules/b`
  * — because the measurement's `pinnedBy` is a lockfile KEY and looking it up
- * is the whole assertion.
+ * is the whole assertion. Nested copies are KEPT here and dropped by
+ * {@link REPO_INSTALLED}, and the asymmetry is the two questions: "what is
+ * this tree on" has one answer per package, and "what does the dependent at
+ * this key declare" is asked about the key the measurement wrote down, which
+ * may well be a nested one. A reader after the former wants
+ * {@link REPO_INSTALLED}.
+ *
+ * ## Why this throws rather than falling back to `{}`
+ *
+ * It was `?? {}` for one commit, and that is the defect `unwalkableLockfile`
+ * was written for, one directory up: a lockfile with no `packages` block —
+ * v1, truncated, or not a lockfile — would make every entry absent, and the
+ * one reader reports an absent entry as `inRangeFixPinned names metro and
+ * package-lock.json has no such package — the dependent moved and the
+ * measurement did not`. Five true-sounding findings about a file nobody could
+ * read, which is the shape "a check that could not ask must not read as an
+ * answer" is about.
+ *
+ * Throwing at module scope stops the importing suite instead, which is the
+ * call `readRepoFile`'s header makes about `ENOENT` for the same reason: a
+ * suite asserting things about a file it could not read should stop, not
+ * report every assertion as a finding about the code.
  */
 export const REPO_LOCKFILE_ENTRIES: Readonly<Record<string, RepoLockfileEntry | undefined>> =
-  (REPO_LOCKFILE as { packages?: Readonly<Record<string, RepoLockfileEntry>> }).packages ?? {};
+  lockfileEntries(REPO_LOCKFILE);
+
+/**
+ * The entries block, or the error that stops the suite.
+ *
+ * Exported, and only because the throwing branches are unreachable from
+ * {@link REPO_LOCKFILE_ENTRIES}: that const is module scope over a real v3
+ * file, so a case cannot make it fail without planting a broken lockfile in
+ * the repository. A named function is the only way the two refusals get read
+ * by anything, and they are the whole reason this is not `?? {}`.
+ */
+export function lockfileEntries(lock: unknown): Readonly<Record<string, RepoLockfileEntry>> {
+  const packages = typeof lock === "object" && lock !== null ? (lock as { packages?: unknown }).packages : undefined;
+  if (typeof packages !== "object" || packages === null) {
+    throw new Error(
+      "repo-lockfile: package-lock.json has no `packages` block, so no suite here can read a lockfile entry — " +
+        `${String(unwalkableLockfile(lock) ?? "the file parsed and carries no packages")}`,
+    );
+  }
+  const entries = packages as Readonly<Record<string, RepoLockfileEntry>>;
+  if (Object.keys(entries).length === 0) {
+    throw new Error(
+      "repo-lockfile: package-lock.json's `packages` block is empty — run npm install before running the suites that read it",
+    );
+  }
+  return entries;
+}
