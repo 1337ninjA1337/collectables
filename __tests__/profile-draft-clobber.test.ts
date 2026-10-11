@@ -40,17 +40,32 @@ describe("app/profile/[id].tsx — the drafts a refresh must not overwrite", () 
     assert.match(src, /seededDraftsRef\.current = \{ id: activeProfile\.id, bio, username \};/);
   });
 
-  it("saves the bio through draftToSave, so clearing one is a save", () => {
-    // `bioDraft.trim() || localizedBio` restored the stored bio for anybody
-    // who cleared theirs — the `||` could not tell an emptied draft from an
-    // unseeded one, and the seed ref can.
+  it("saves the bio through draftToSave, against the STORED value", () => {
+    // `bioDraft.trim() || localizedBio` got two things wrong for one reason:
+    // it could not tell an emptied draft from an unseeded one, and it saved
+    // what the screen was showing rather than what is on the row — so an
+    // untouched save replaced the `DEFAULT_EN_PROFILE_BIO` sentinel with its
+    // translation. `activeProfile.bio` is the third argument for that reason
+    // and `localizedBio` must not be.
     assert.match(
       src,
-      /bio: draftToSave\(bioDraft, seededDraftsRef\.current, localizedBio\),/,
+      /bio: draftToSave\(bioDraft, seededDraftsRef\.current\?\.bio \?\? null, activeProfile\.bio\),/,
     );
     assert.ok(
       !src.includes("bio: bioDraft.trim() || localizedBio"),
       "the fallback that undid a deliberate clear must not come back",
+    );
+  });
+
+  it("computes the localized bio once and lets the effect read it", () => {
+    // The same expression was written above the effect and again inside it,
+    // and both of this screen's draft fixes read it. The dependency list is
+    // now exactly what the body reads, which is also why `t` left it.
+    assert.match(src, /const bio = localizedBio;/);
+    assert.equal(
+      src.split("activeProfile.bio === DEFAULT_EN_PROFILE_BIO").length - 1,
+      1,
+      "the sentinel comparison belongs in one place",
     );
   });
 
@@ -68,7 +83,7 @@ describe("app/profile/[id].tsx — the drafts a refresh must not overwrite", () 
     // stay out, which is what the updater form is for: a draft in the deps of
     // the effect that sets it is the self-feeding shape the triage registry
     // names as the one real loop it found.
-    assert.match(src, /\}, \[activeProfile\?\.id, activeProfile\?\.bio, activeProfile\?\.username, t\]\);/);
+    assert.match(src, /\}, \[activeProfile\?\.id, activeProfile\?\.username, localizedBio\]\);/);
     assert.ok(
       !/\}, \[[^\]]*\bbioDraft\b[^\]]*\]\);/.test(src),
       "bioDraft must not be in the dependency list of the effect that sets it",

@@ -194,11 +194,6 @@ export const SANCTIONED_EFFECT_DEPS: readonly SanctionedEffectDep[] = [
     why: "rides with saveSharedCollection in the same guarded effect, and in one other that sets a translated screen title",
   },
   {
-    file: "app/profile/[id].tsx",
-    field: "t",
-    why: "sets a translated screen title, which a language change should re-set",
-  },
-  {
     file: "components/bottom-nav.tsx",
     field: "t",
     why: "the premium intent it consumes is announced with a translated toast",

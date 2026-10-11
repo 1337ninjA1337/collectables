@@ -205,7 +205,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!activeProfile) return;
-    const bio = activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio;
+    const bio = localizedBio;
     const username = activeProfile.username;
     const sync = syncDrafts(seededDraftsRef.current, activeProfile.id);
     seededDraftsRef.current = { id: activeProfile.id, bio, username };
@@ -219,7 +219,11 @@ export default function ProfileScreen() {
     // renders nothing at all, where before it set two states on every run.
     setBioDraft((draft) => nextDraft(draft, sync.seeded.bio, bio));
     setProfileIdDraft((draft) => nextDraft(draft, sync.seeded.username, username));
-  }, [activeProfile?.id, activeProfile?.bio, activeProfile?.username, t]);
+    // `localizedBio` rather than `activeProfile?.bio` and `t`: the same
+    // expression was written above this effect and again inside it, and both
+    // of this screen's draft fixes read it. One value, and the list is now
+    // exactly what the body reads.
+  }, [activeProfile?.id, activeProfile?.username, localizedBio]);
 
   if (loadingRemote && !activeProfile) {
     return (
@@ -293,14 +297,16 @@ export default function ProfileScreen() {
   }
 
   async function handleSaveBio() {
-    // `draftToSave` rather than `bioDraft.trim() || localizedBio`, which
-    // restored the stored bio for anybody who cleared theirs on purpose: the
-    // `||` could not tell an emptied draft from an unseeded one. The fallback
-    // is still there and still right, for the only case that needs it — no
-    // seed means the sync effect has not run, so nothing has been shown and
-    // an empty draft is not an answer.
+    if (!activeProfile) return;
+    // `draftToSave` rather than `bioDraft.trim() || localizedBio`, which got
+    // two things wrong for one reason: it could not tell an emptied draft from
+    // an unseeded one, and it saved what the screen was SHOWING rather than
+    // what is on the row — so an untouched save replaced the
+    // `DEFAULT_EN_PROFILE_BIO` sentinel with its translation and no later
+    // language switch could undo it. `activeProfile.bio` is the stored value,
+    // which is what an untouched or unseeded draft has to write back.
     await updateMyProfile({
-      bio: draftToSave(bioDraft, seededDraftsRef.current, localizedBio),
+      bio: draftToSave(bioDraft, seededDraftsRef.current?.bio ?? null, activeProfile.bio),
     });
   }
 

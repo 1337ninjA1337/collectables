@@ -212,14 +212,26 @@ describe("the default bio is one sentinel, translated on render", () => {
     );
   });
 
-  it("is still translated on render, in both places the screen reads it", () => {
+  it("is still translated on render, once, for both places the screen reads it", () => {
+    // This asserted TWO copies of the comparison until 2026-10-11, and holding
+    // two copies in step is the thing it was holding: the screen renders the
+    // bio and seeds the edit draft from it, and they have to agree or the two
+    // disagree the moment somebody opens the editor. One `localizedBio` is the
+    // stronger version of the same claim — they cannot disagree — so the case
+    // now pins the single comparison and both of its readers.
     const matches = PROFILE_SCREEN.match(
       /activeProfile\.bio === DEFAULT_EN_PROFILE_BIO \? t\("defaultProfileBio"\) : activeProfile\.bio/g,
     );
-    assert.equal(
-      matches?.length,
-      2,
-      "the screen renders the bio and seeds the edit draft from it; both have to translate the sentinel or the two disagree the moment somebody opens the editor",
-    );
+    assert.equal(matches?.length, 1, "the sentinel comparison belongs in one place");
+    // The rendered bio.
+    assert.match(PROFILE_SCREEN, /<Text style=\{styles\.bio\}>\{localizedBio\}<\/Text>/);
+    // And the draft seed, which is the one that used to carry its own copy.
+    assert.match(PROFILE_SCREEN, /const bio = localizedBio;/);
+    // What a save writes is deliberately NOT this value — an untouched draft
+    // saves `activeProfile.bio`, the stored sentinel, because writing the
+    // translation would freeze the bio in the author's language and no later
+    // language switch could undo it. That is the same argument as
+    // "NOT localised at write time" above, one layer up.
+    assert.doesNotMatch(PROFILE_SCREEN, /bio: draftToSave\(bioDraft, [^)]*localizedBio\)/);
   });
 });

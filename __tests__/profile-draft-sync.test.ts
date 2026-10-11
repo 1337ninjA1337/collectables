@@ -86,20 +86,39 @@ describe("nextDraft", () => {
 });
 
 describe("draftToSave", () => {
+  const SEEDED = ANNA.bio;
+
   it("saves what the user wrote, trimmed", () => {
-    assert.equal(draftToSave("  collects tin cars  ", ANNA, "fallback"), "collects tin cars");
+    assert.equal(draftToSave("  collects tin cars  ", SEEDED, "collects tin robots"), "collects tin cars");
   });
 
   it("saves an empty bio the user emptied on purpose", () => {
-    // The bug: `bioDraft.trim() || localizedBio` handed back the stored bio,
-    // so clearing a bio and saving it was a no-op that looked like a save.
-    assert.equal(draftToSave("", ANNA, "collects tin robots"), "");
+    // The first of the two bugs: `bioDraft.trim() || localizedBio` handed back
+    // the stored bio, so clearing one and saving it was a no-op that looked
+    // like a save.
+    assert.equal(draftToSave("", SEEDED, "collects tin robots"), "");
     // Whitespace is not content — three spaces is a bio cleared with the
     // keyboard still open.
-    assert.equal(draftToSave("   ", ANNA, "collects tin robots"), "");
+    assert.equal(draftToSave("   ", SEEDED, "collects tin robots"), "");
   });
 
-  it("falls back only when no seed exists, which is before anything was shown", () => {
+  it("writes the STORED value back for an untouched draft, not the one on screen", () => {
+    // The second bug, and the reason the third parameter is `stored` rather
+    // than a fallback. The draft is seeded with `t("defaultProfileBio")` while
+    // the row holds the `DEFAULT_EN_PROFILE_BIO` sentinel, so an untouched
+    // save used to replace the sentinel with its translation — and no later
+    // language switch could undo that, because the switch keys on the
+    // sentinel.
+    assert.equal(
+      draftToSave("собирает жестяных роботов", "собирает жестяных роботов", "Just started collecting"),
+      "Just started collecting",
+    );
+    // And the ordinary case of the same rule: an untouched draft is not an
+    // edit, whatever is in it.
+    assert.equal(draftToSave(SEEDED, SEEDED, "collects tin robots"), "collects tin robots");
+  });
+
+  it("writes the stored value when no seed exists, which is before anything was shown", () => {
     // The one case the `||` was right about, kept: a null seed means the sync
     // effect has not run, so the empty draft is `useState("")` rather than an
     // answer, and saving it would wipe a real bio.

@@ -90,26 +90,40 @@ export function nextDraft(draft: string, seeded: string, incoming: string): stri
 }
 
 /**
- * What to save for a draft the user may have emptied on purpose.
+ * What to save for a draft, given what the profile put there and what is stored.
  *
- * `app/profile/[id].tsx` saved `bioDraft.trim() || localizedBio`, so somebody
- * who selected their whole bio, deleted it and pressed save got the stored one
- * back. The `||` cannot tell "the user cleared this" from "this was never
- * filled in", and those want opposite answers: the first is an edit to honour,
- * the second is a draft that has not been seeded yet and must not overwrite a
- * real bio with an empty string.
+ * Two bugs, both from one expression. `app/profile/[id].tsx` saved
+ * `bioDraft.trim() || localizedBio`:
  *
- * The seed is what distinguishes them, and it is the same ref the sync above
- * already keeps: a null seed means the effect has not run, which on this
- * screen means nothing has been shown to the user, so `fallback` is the only
- * safe answer. Once a seed exists, an empty draft is a decision and is saved
- * as one.
+ * - somebody who selected their whole bio, deleted it and pressed Save got the
+ *   stored one back — a save that looked like a save and was a no-op, because
+ *   `||` cannot tell "the user cleared this" from "this was never filled in";
+ * - somebody who pressed Save without typing anything wrote the LOCALIZED
+ *   default into the row, because the draft is seeded with
+ *   `t("defaultProfileBio")` while the stored sentinel is
+ *   `DEFAULT_EN_PROFILE_BIO`. A profile opened in Russian and saved untouched
+ *   kept Russian prose as its bio forever, and every later language switch
+ *   showed it, because the sentinel the switch keys on was gone.
  *
- * Trimmed, because trailing whitespace is not content and a bio of three
- * spaces is a bio somebody cleared with the keyboard still open.
+ * The seed answers both, and it is the ref {@link syncDrafts} already keeps:
+ *
+ * - **untouched** (`draft === seeded`): save `stored`, unchanged. Not what the
+ *   screen was SHOWING, which is the localized default — what is on the row.
+ *   An untouched draft is not an edit and must not become one.
+ * - **emptied** (seeded, and the draft trims to nothing): save the empty
+ *   string. Somebody did that on purpose.
+ * - **typed**: save it trimmed, because trailing whitespace is not content.
+ * - **no seed at all**: save `stored`. The sync effect has not run, so the
+ *   empty draft is `useState("")` rather than an answer, and this is the one
+ *   case the old `||` was right about.
+ *
+ * `stored` rather than a `fallback`, and the rename is the fix: what to write
+ * when nobody edited anything is "whatever is already there", and spelling it
+ * as a fallback is what let a localized string be passed for it.
  */
-export function draftToSave(draft: string, seeded: ProfileDraftSeed | null, fallback: string): string {
+export function draftToSave(draft: string, seeded: string | null, stored: string): string {
+  if (seeded !== null && draft === seeded) return stored;
   const trimmed = draft.trim();
   if (trimmed !== "") return trimmed;
-  return seeded === null ? fallback : "";
+  return seeded === null ? stored : "";
 }

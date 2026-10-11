@@ -198,7 +198,13 @@ describe("the tree it guards", () => {
     assert.equal(fields.filter((f) => f.supply === "factory-built").length, 58);
   });
 
-  it("finds every effect that depends on one, and all seven are argued", () => {
+  it("finds every effect that depends on one, and all six are argued", () => {
+    // Seven until 2026-10-11, when `app/profile/[id].tsx`'s draft sync stopped
+    // naming `t`: it read `localizedBio`, which was already computed three
+    // lines above it, so the language left the dependency list along with the
+    // second copy of the expression. The sanction went with it — the registry
+    // reports an entry covering nothing as loudly as it reports an unsanctioned
+    // pairing, which is how this count stays honest in both directions.
     const volatileNames = new Set(
       fields.filter((f) => f.supply === "factory-built").map((f) => f.field),
     );
@@ -206,7 +212,7 @@ describe("the tree it guards", () => {
       effectDepsNaming(file, readRepoFile(file), volatileNames),
     );
     assert.deepEqual(effectDepProblems(findings), []);
-    assert.equal(findings.length, 7);
+    assert.equal(findings.length, 6);
   });
 
   it("holds the guard the one dangerous sanction rests on", () => {
