@@ -15,6 +15,12 @@
  * defect `formatAuditVerdict(verdict, name, lock)` was fixed for on
  * 2026-10-07. The first case ties the chain together.
  *
+ * The second is the premise under every live claim about this repository: the
+ * record the suites read the tree from has to be the record the audit gate
+ * builds for itself, and the two reach it by different paths —
+ * `readInstalledVersions` parses the text, the helper calls `lockedVersions`
+ * over its own parse.
+ *
  * The rest are `lockfileEntries`' two refusals, which exist because the
  * fallback they replaced (`?? {}`) would have made a lockfile nobody could
  * read report five findings about dependents that had moved.
@@ -23,7 +29,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { lockedVersions } from "@/lib/lockfile";
+import { lockedVersions, readInstalledVersions } from "@/lib/lockfile";
 
 import {
   lockfileEntries,
@@ -42,6 +48,17 @@ describe("repo-lockfile helper", () => {
     assert.deepEqual(reparsed, REPO_LOCKFILE);
     assert.deepEqual(lockedVersions(reparsed), REPO_INSTALLED);
     assert.deepEqual(lockfileEntries(reparsed), REPO_LOCKFILE_ENTRIES);
+  });
+
+  it("agrees with the record the audit gate builds for itself", () => {
+    // The premise every live claim about this repository rests on: the view
+    // the suites take of the tree is the view the gate takes. Two paths to one
+    // record — the gate parses the text inside `readInstalledVersions`, the
+    // helper calls `lockedVersions` over its own parse — and until this case
+    // nothing said they met.
+    const gate = readInstalledVersions(() => REPO_LOCKFILE_TEXT, "repo-lockfile-helper");
+    assert.equal(gate.kind, "read");
+    assert.deepEqual(gate.installed, REPO_INSTALLED);
   });
 
   it("keeps nested copies in the entries and drops them from the record", () => {

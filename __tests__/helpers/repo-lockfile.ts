@@ -8,9 +8,16 @@
  * `lockfile.test.ts` (the walk's floor, and the version check's floor),
  * `check-sentry-version.test.ts` (the guard's green state, and the same floor)
  * and `audit-baseline.test.ts` (the pinned-fix measurement, which wants the
- * raw `packages` entries rather than the walk's record). 1.9 MB of JSON, and
- * the two in-file duplicates were parsing it twice for two cases in adjacent
- * describes that could not see each other's local.
+ * raw `packages` entries rather than the walk's record). The two in-file
+ * duplicates were parsing it twice for two cases in adjacent describes that
+ * could not see each other's local.
+ *
+ * Not for speed, and the number is here so nobody argues it is: the file is
+ * 640 KiB over 1,265 keyed installs, and reading plus parsing it is 6 ms
+ * (1.5 ms read, 4.6 ms parse, three consecutive runs within 0.4 ms of each
+ * other). Three suites × one parse each is 18 ms of a 168-second run. What
+ * this removes is four spellings of what "the real lockfile" means, and one
+ * of them was a hand-rolled two-level index that throws on a v1 file.
  *
  * ## One parse per PROCESS, which is the only kind that can hit
  *
@@ -117,7 +124,9 @@ export const REPO_LOCKFILE_ENTRIES: Readonly<Record<string, RepoLockfileEntry | 
  * the repository. A named function is the only way the two refusals get read
  * by anything, and they are the whole reason this is not `?? {}`.
  */
-export function lockfileEntries(lock: unknown): Readonly<Record<string, RepoLockfileEntry>> {
+export function lockfileEntries(
+  lock: unknown,
+): Readonly<Record<string, RepoLockfileEntry | undefined>> {
   const packages = typeof lock === "object" && lock !== null ? (lock as { packages?: unknown }).packages : undefined;
   if (typeof packages !== "object" || packages === null) {
     throw new Error(
@@ -125,7 +134,12 @@ export function lockfileEntries(lock: unknown): Readonly<Record<string, RepoLock
         `${String(unwalkableLockfile(lock) ?? "the file parsed and carries no packages")}`,
     );
   }
-  const entries = packages as Readonly<Record<string, RepoLockfileEntry>>;
+  // `| undefined` per key, which is the contract the one reader needs: it
+  // looks up an `inRangeFixPinned.pinnedBy` and the finding it makes is about
+  // the key being absent. A record claiming every key is present would make
+  // that lookup `RepoLockfileEntry` and the `assert.ok(dependent)` above it
+  // dead code.
+  const entries = packages as Readonly<Record<string, RepoLockfileEntry | undefined>>;
   if (Object.keys(entries).length === 0) {
     throw new Error(
       "repo-lockfile: package-lock.json's `packages` block is empty — run npm install before running the suites that read it",
