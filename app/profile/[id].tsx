@@ -50,7 +50,7 @@ import { DEFAULT_EN_PROFILE_BIO, useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
-import { draftToSave, nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
+import { commitDraft, draftToSave, nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
 
 
@@ -308,6 +308,11 @@ export default function ProfileScreen() {
     await updateMyProfile({
       bio: draftToSave(bioDraft, seededDraftsRef.current?.bio ?? null, activeProfile.bio),
     });
+    // A save makes the draft clean again, so the sync effect may deliver what
+    // the row ENDED UP with: `draftToSave` trims, and without this the draft
+    // kept the whitespace the save threw away and was read as dirty forever
+    // after. The handle beside it is where the same line matters visibly.
+    seededDraftsRef.current = commitDraft(seededDraftsRef.current, "bio", bioDraft);
   }
 
   async function handleSaveProfileId() {
@@ -320,6 +325,14 @@ export default function ProfileScreen() {
     await updateMyProfile({
       username: profileIdDraft.trim() || activeProfile.username,
     });
+    // `updateMyProfile` runs `ensureUniqueUsername`, so what lands on the row
+    // is frequently not what was typed: "Ada Lovelace" is stored as
+    // `ada_lovelace`, and an all-Cyrillic handle slugifies to nothing and
+    // becomes the anonymous `user_…` seed. Committing the draft lets the sync
+    // effect replace it with the handle actually in force — before this, the
+    // header read `@user_1234` while the editor behind it still held the
+    // rejected text, and pressing OK again re-slugified that.
+    seededDraftsRef.current = commitDraft(seededDraftsRef.current, "username", profileIdDraft);
     setEditingHandle(false);
   }
 

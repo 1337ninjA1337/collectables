@@ -77,6 +77,33 @@ describe("app/profile/[id].tsx — the drafts a refresh must not overwrite", () 
     assert.match(src, /username: profileIdDraft\.trim\(\) \|\| activeProfile\.username,/);
   });
 
+  it("commits each draft after its own save, with the draft as it stands", () => {
+    // The save half of the dirty-draft rule. `updateMyProfile` normalises
+    // before it writes — `ensureUniqueUsername` turns "Ada Lovelace" into
+    // `ada_lovelace` and an all-Cyrillic handle into the anonymous `user_…`
+    // seed — so without this the header showed the stored handle while the
+    // editor behind it still held the rejected text, and pressing OK again
+    // re-slugified that. The third argument is the DRAFT and not what was
+    // sent, because the untouched test is `draft === seeded`.
+    assert.match(
+      src,
+      /seededDraftsRef\.current = commitDraft\(seededDraftsRef\.current, "bio", bioDraft\);/,
+    );
+    assert.match(
+      src,
+      /seededDraftsRef\.current = commitDraft\(seededDraftsRef\.current, "username", profileIdDraft\);/,
+    );
+  });
+
+  it("commits the handle draft before it closes the editor", () => {
+    // Order matters only in that both must happen; the editor closing on a
+    // stale draft is what the reopened field used to show.
+    const commit = src.indexOf('commitDraft(seededDraftsRef.current, "username"');
+    const close = src.indexOf("setEditingHandle(false);");
+    assert.ok(commit !== -1 && close !== -1);
+    assert.ok(commit < close, "the handle draft is committed by the save that closed the editor");
+  });
+
   it("keeps the profile id in the effect's dependency list and the drafts out of it", () => {
     // The id joined the deps with this change — the effect reads
     // `activeProfile.id` now and a profile switch has to re-run it. The drafts

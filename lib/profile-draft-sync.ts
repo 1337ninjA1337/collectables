@@ -127,3 +127,44 @@ export function draftToSave(draft: string, seeded: string | null, stored: string
   if (trimmed !== "") return trimmed;
   return seeded === null ? stored : "";
 }
+
+/** Which of the screen's two drafts a Save button commits. */
+export type ProfileDraftField = "bio" | "username";
+
+/**
+ * The seed after a save, which is what makes the draft clean again.
+ *
+ * The dirty-draft rule above protects what somebody is typing from a refresh
+ * that arrives mid-sentence, and it has one blind spot: a save is not a
+ * refresh. Once the user has pressed Save the draft is no longer unsaved work
+ * — it has been committed — and what the row ended up holding can differ from
+ * what was typed, because the context normalises before it writes.
+ *
+ * The handle is where that is visible. `updateMyProfile` runs
+ * `ensureUniqueUsername`, so "Ada Lovelace" is stored as `ada_lovelace` and an
+ * all-Cyrillic handle slugifies to nothing and is stored as the anonymous
+ * `user_…` seed. Without this, {@link nextDraft} read the draft as dirty
+ * forever after: the header showed `@user_1234` while the editor behind it
+ * still held "Антон", reopening the editor showed the rejected text rather
+ * than the handle in force, and pressing OK again re-slugified it. The bio has
+ * the same shape one step smaller — the draft keeps the whitespace the save
+ * trimmed off.
+ *
+ * `draft` is the draft AS IT STANDS and deliberately not the value that was
+ * written: the untouched test is `draft === seeded`, so the seed has to be set
+ * to what the draft holds for the next profile change to win. The window
+ * between pressing Save and getting here is one microtask — `updateMyProfile`
+ * awaits no I/O — so there is nothing a keystroke can slip into.
+ *
+ * A null seed stays null. Nothing has been shown to anybody, so there is no
+ * draft to call clean, and inventing a seed here would hand
+ * {@link draftToSave} the "somebody emptied this" reading of a `useState("")`.
+ */
+export function commitDraft(
+  seeded: ProfileDraftSeed | null,
+  field: ProfileDraftField,
+  draft: string,
+): ProfileDraftSeed | null {
+  if (seeded === null) return null;
+  return field === "bio" ? { ...seeded, bio: draft } : { ...seeded, username: draft };
+}

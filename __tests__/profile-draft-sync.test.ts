@@ -20,7 +20,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { draftToSave, nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
+import {
+  commitDraft,
+  draftToSave,
+  nextDraft,
+  type ProfileDraftSeed,
+  syncDrafts,
+} from "@/lib/profile-draft-sync";
 
 const ANNA: ProfileDraftSeed = { id: "u-anna", bio: "collects tin robots", username: "anna" };
 
@@ -125,5 +131,57 @@ describe("draftToSave", () => {
     assert.equal(draftToSave("", null, "collects tin robots"), "collects tin robots");
     // And a typed draft still wins even then, because somebody typed it.
     assert.equal(draftToSave("typed first", null, "collects tin robots"), "typed first");
+  });
+});
+
+describe("commitDraft", () => {
+  it("marks the saved draft clean, so the next profile change wins it", () => {
+    // The blind spot in the dirty-draft rule: a save is not a refresh. Once
+    // somebody has pressed Save the draft is committed work, and `nextDraft`
+    // read it as unsaved typing forever after.
+    const committed = commitDraft(ANNA, "username", "Ada Lovelace");
+    assert.deepEqual(committed, { id: ANNA.id, bio: ANNA.bio, username: "Ada Lovelace" });
+    // Which is the point: the typed text is now the seed, so the handle the
+    // context actually stored replaces it on the next run.
+    assert.equal(nextDraft("Ada Lovelace", committed!.username, "ada_lovelace"), "ada_lovelace");
+  });
+
+  it("leaves the other draft alone", () => {
+    // Two Save buttons, one seed. Committing the handle must not tell the bio
+    // that a bio somebody is still typing has been saved.
+    const committed = commitDraft({ ...ANNA, bio: "half-typed" }, "username", "anna_2");
+    assert.equal(committed?.bio, "half-typed");
+    const bioCommitted = commitDraft({ ...ANNA, username: "half-typed" }, "bio", "collects tin cars");
+    assert.equal(bioCommitted?.username, "half-typed");
+    assert.equal(bioCommitted?.bio, "collects tin cars");
+  });
+
+  it("keeps the profile id, because the untouched test is keyed on it", () => {
+    assert.equal(commitDraft(ANNA, "bio", "anything")?.id, ANNA.id);
+  });
+
+  it("is a no-op for an untouched draft, which was already clean", () => {
+    // Pressing Save without typing writes `stored` back and changes nothing
+    // here: the draft already equals the seed.
+    assert.deepEqual(commitDraft(ANNA, "bio", ANNA.bio), ANNA);
+  });
+
+  it("leaves a null seed null", () => {
+    // Nothing has been shown to anybody, so there is no draft to call clean —
+    // and a seed invented here would hand `draftToSave` the "somebody emptied
+    // this" reading of a `useState("")`.
+    assert.equal(commitDraft(null, "bio", "typed first"), null);
+    assert.equal(commitDraft(null, "username", "typed first"), null);
+  });
+
+  it("commits the draft as it stands, not the value that was written", () => {
+    // The parameter that is easy to get backwards. The untouched test is
+    // `draft === seeded`, so seeding the TRIMMED value the save sent would
+    // leave the draft dirty and the stale text on screen.
+    const draft = "  collects tin cars  ";
+    const committed = commitDraft(ANNA, "bio", draft);
+    assert.equal(nextDraft(draft, committed!.bio, "collects tin cars"), "collects tin cars");
+    const wrong = commitDraft(ANNA, "bio", draft.trim());
+    assert.equal(nextDraft(draft, wrong!.bio, "collects tin cars"), draft);
   });
 });
