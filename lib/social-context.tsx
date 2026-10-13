@@ -56,6 +56,7 @@ import {
   slugifyProfileId,
   stableSuffix,
 } from "@/lib/social-helpers";
+import { DEFAULT_EN_PROFILE_BIO } from "@/lib/profile-draft-sync";
 import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
 
@@ -126,28 +127,6 @@ type SocialContextValue = {
 };
 
 const SocialContext = createContext<SocialContextValue | null>(null);
-
-/**
- * The English bio a brand-new profile is created with, and the SENTINEL that
- * `app/profile/[id].tsx` translates on render.
- *
- * Deliberately not translated at write time, which is the counter-intuitive
- * half. The bio is persisted — to AsyncStorage, and to the cloud row other
- * people read — so a value written in the author's language at sign-up would
- * be frozen in it: switching the app to English afterwards would still show
- * Russian, and a Polish viewer looking at the profile would see Russian too.
- * Storing one known sentence and translating it at RENDER keeps the default
- * bio in whatever language the person reading it has chosen, which is what the
- * profile screen has always done.
- *
- * Exported because it was previously written out twice — a literal here and a
- * private `const` in the profile screen — with nothing tying the copies
- * together. Either one being reworded would have left the screen comparing
- * against a sentence nothing writes any more, and the symptom would be a bio
- * that quietly stopped translating rather than an error.
- */
-export const DEFAULT_EN_PROFILE_BIO =
-  "I collect things worth saving beautifully and sharing with friends.";
 
 /**
  * The profile shown before a cloud row exists — after sign-up, or offline.

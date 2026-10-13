@@ -30,6 +30,18 @@
  * {@link nextDraft} inside a `setState` updater, which is what keeps the
  * current draft out of the effect's dependency list and therefore out of a
  * loop.
+ *
+ * ## The sentinel moved in, and that widened the subject on purpose
+ *
+ * {@link DEFAULT_EN_PROFILE_BIO} and {@link localizedProfileBio} arrived from
+ * `lib/social-context.tsx` on 2026-10-13. The module is now "what the profile
+ * screen's bio and handle hold", which is one subject rather than two: three
+ * of the four functions here already take the stored bio or the shown one as
+ * an argument, and the difference between those two IS the sentinel. Being
+ * React-free is what made it possible — the comparison could not join them
+ * while it had to import a context — and is what the suites gained: the
+ * sentinel's value is imported now instead of being regexed out of a file
+ * `tsx --test` cannot load.
  */
 
 /** The three values a profile puts into the screen's drafts. */
@@ -167,4 +179,48 @@ export function commitDraft(
 ): ProfileDraftSeed | null {
   if (seeded === null) return null;
   return field === "bio" ? { ...seeded, bio: draft } : { ...seeded, username: draft };
+}
+
+/**
+ * The English bio a brand-new profile is created with, and the SENTINEL the
+ * profile screen translates on render.
+ *
+ * Deliberately not translated at write time, which is the counter-intuitive
+ * half. The bio is persisted — to AsyncStorage, and to the cloud row other
+ * people read — so a value written in the author's language at sign-up would
+ * be frozen in it: switching the app to English afterwards would still show
+ * Russian, and a Polish viewer looking at the profile would see Russian too.
+ * Storing one known sentence and translating it at RENDER keeps the default
+ * bio in whatever language the person reading it has chosen.
+ *
+ * It lived in `lib/social-context.tsx` until 2026-10-13, next to the
+ * `buildFallbackProfile` that writes it, and that is why the comparison below
+ * could not live with the two functions that decide what the drafts hold: a
+ * React module cannot be imported here. Here, both halves of one rule are in
+ * one place, and `fallback-profile-locale.test.ts` can IMPORT the sentinel
+ * instead of parsing a literal out of a file it cannot load.
+ */
+export const DEFAULT_EN_PROFILE_BIO =
+  "I collect things worth saving beautifully and sharing with friends.";
+
+/**
+ * The bio as a reader should see it: the sentinel translated, anything else
+ * verbatim.
+ *
+ * The pair this closes was spelled out in two places and read by three — the
+ * sentinel in one module, its six translations in the i18n catalogue, and the
+ * `===` joining them written inline on the screen. A renamed translation key
+ * or an edited sentinel would have left both halves reading plausibly and the
+ * screen showing the English sentinel as somebody's bio.
+ *
+ * `t` is typed as the one key it needs rather than as the whole catalogue,
+ * which keeps this module free of the i18n types for the same reason it is
+ * free of React: the rule is the half worth testing in isolation. A full
+ * `t` is assignable to it.
+ */
+export function localizedProfileBio(
+  bio: string,
+  t: (key: "defaultProfileBio") => string,
+): string {
+  return bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : bio;
 }

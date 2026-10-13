@@ -63,7 +63,7 @@ describe("app/profile/[id].tsx — the drafts a refresh must not overwrite", () 
     // now exactly what the body reads, which is also why `t` left it.
     assert.match(src, /const bio = localizedBio;/);
     assert.equal(
-      src.split("activeProfile.bio === DEFAULT_EN_PROFILE_BIO").length - 1,
+      src.split("localizedProfileBio(activeProfile.bio, t)").length - 1,
       1,
       "the sentinel comparison belongs in one place",
     );

@@ -46,11 +46,18 @@ import {
 import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
-import { DEFAULT_EN_PROFILE_BIO, useSocial } from "@/lib/social-context";
+import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
-import { commitDraft, draftToSave, nextDraft, type ProfileDraftSeed, syncDrafts } from "@/lib/profile-draft-sync";
+import {
+  commitDraft,
+  draftToSave,
+  localizedProfileBio,
+  nextDraft,
+  type ProfileDraftSeed,
+  syncDrafts,
+} from "@/lib/profile-draft-sync";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
 
 
@@ -189,9 +196,7 @@ export default function ProfileScreen() {
     () => (isSelf && activeProfile ? salesForUser(listings, activeProfile.id) : []),
     [isSelf, activeProfile, listings],
   );
-  const localizedBio = activeProfile
-    ? (activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio)
-    : "";
+  const localizedBio = activeProfile ? localizedProfileBio(activeProfile.bio, t) : "";
 
   /**
    * What the profile last put into each draft, so a remote change can tell an

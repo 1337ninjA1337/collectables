@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { DEFAULT_EN_PROFILE_BIO, localizedProfileBio } from "@/lib/profile-draft-sync";
 import {
   FALLBACK_PROFILE_EMAIL,
   FALLBACK_SLUG_SEED,
@@ -39,21 +40,16 @@ const SOCIAL_CONTEXT = readRepoFile("lib/social-context.tsx");
 const PROFILE_SCREEN = readRepoFile("app/profile/[id].tsx");
 
 /**
- * The sentinel's value, read out of the source rather than imported.
+ * The sentinel, imported.
  *
- * `lib/social-context.tsx` pulls React Native peers, which the `tsx --test`
- * harness cannot transform — the same reason `i18n-translation-coverage`
- * parses the translations file instead of importing it. Reading the literal
- * back means this suite is checking the committed text, which is what the
- * profile screen compares against at runtime anyway.
+ * It was parsed out of `lib/social-context.tsx` with a regex until
+ * 2026-10-13, because that module pulls React Native peers the `tsx --test`
+ * harness cannot transform. Moving the constant to the pure
+ * `lib/profile-draft-sync.ts` — where the comparison that reads it now lives
+ * too — turned "the committed text looks like a string literal" into the
+ * value itself.
  */
-const sentinelValue = (): string => {
-  const match = /export const DEFAULT_EN_PROFILE_BIO =\s*\n?\s*"([^"]+)";/.exec(
-    SOCIAL_CONTEXT,
-  );
-  assert.ok(match, "DEFAULT_EN_PROFILE_BIO is not a plain exported string literal");
-  return match![1];
-};
+const sentinelValue = (): string => DEFAULT_EN_PROFILE_BIO;
 
 describe("the fallback identity chain, called rather than read", () => {
   const DEFAULT_NAME = "Коллекционер";
@@ -169,21 +165,41 @@ describe("the slug fields stay ASCII, which is why they are not translated", () 
 });
 
 describe("the default bio is one sentinel, translated on render", () => {
-  it("is exported once and imported by the screen that translates it", () => {
+  it("is declared once, in the pure module that also holds the comparison", () => {
     // The bug: two copies of one sentence, in two files, with nothing tying
     // them together. Rewording either would have left the screen comparing
     // against a sentence nothing writes any more, and the symptom would be a
     // bio that quietly stopped translating rather than an error.
-    assert.match(SOCIAL_CONTEXT, /export const DEFAULT_EN_PROFILE_BIO =/);
+    //
+    // Both halves of the rule are in `lib/profile-draft-sync.ts` now — the
+    // sentinel and the `===` that reads it — which is what let this suite
+    // import the value instead of regexing a file it cannot load.
     assert.match(
-      PROFILE_SCREEN,
-      /import \{ DEFAULT_EN_PROFILE_BIO, useSocial \} from "@\/lib\/social-context";/,
+      readRepoFile("lib/profile-draft-sync.ts"),
+      /export const DEFAULT_EN_PROFILE_BIO =/,
     );
-    assert.doesNotMatch(
-      PROFILE_SCREEN,
-      /const DEFAULT_EN_PROFILE_BIO =/,
-      "the screen declares its own copy of the sentinel again",
+    assert.match(
+      SOCIAL_CONTEXT,
+      /import \{ DEFAULT_EN_PROFILE_BIO \} from "@\/lib\/profile-draft-sync";/,
     );
+    for (const file of [SOCIAL_CONTEXT, PROFILE_SCREEN]) {
+      assert.doesNotMatch(
+        file,
+        /const DEFAULT_EN_PROFILE_BIO =\s*\n?\s*"/,
+        "a second copy of the sentinel is back",
+      );
+    }
+  });
+
+  it("is translated by a function, not by an expression on the screen", () => {
+    // The pair nothing used to read as a pair: the sentinel in one module,
+    // its six translations in the catalogue, and the `===` joining them
+    // written inline on a 790-line screen.
+    assert.equal(localizedProfileBio(DEFAULT_EN_PROFILE_BIO, () => "перевод"), "перевод");
+    assert.equal(localizedProfileBio("собирает роботов", () => "перевод"), "собирает роботов");
+    // The empty bio is a bio — somebody cleared it on purpose — and must not
+    // be read as "no bio set" and replaced with the default.
+    assert.equal(localizedProfileBio("", () => "перевод"), "");
   });
 
   it("is what the fallback profile actually writes", () => {
@@ -219,10 +235,13 @@ describe("the default bio is one sentinel, translated on render", () => {
     // disagree the moment somebody opens the editor. One `localizedBio` is the
     // stronger version of the same claim — they cannot disagree — so the case
     // now pins the single comparison and both of its readers.
-    const matches = PROFILE_SCREEN.match(
-      /activeProfile\.bio === DEFAULT_EN_PROFILE_BIO \? t\("defaultProfileBio"\) : activeProfile\.bio/g,
-    );
+    const matches = PROFILE_SCREEN.match(/localizedProfileBio\(activeProfile\.bio, t\)/g);
     assert.equal(matches?.length, 1, "the sentinel comparison belongs in one place");
+    assert.doesNotMatch(
+      PROFILE_SCREEN,
+      /=== DEFAULT_EN_PROFILE_BIO/,
+      "the comparison is back on the screen, where it cannot be unit-tested",
+    );
     // The rendered bio.
     assert.match(PROFILE_SCREEN, /<Text style=\{styles\.bio\}>\{localizedBio\}<\/Text>/);
     // And the draft seed, which is the one that used to carry its own copy.
