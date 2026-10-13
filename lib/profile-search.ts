@@ -35,16 +35,42 @@ export interface SearchableProfile {
 export const PROFILE_SEARCH_COLUMNS = ["username", "display_name", "public_id"] as const;
 
 /**
- * The text to compare against, from what somebody typed.
+ * What somebody typed, reduced to the characters that can be matched.
  *
- * `@` is stripped because the app prints every handle with one, so a user who
- * copies `@anna` out of a profile header is typing a handle and not a
- * character class. Lower-cased because the client comparison is
- * `includes` — the server's half is `ilike`, which is case-insensitive by
- * definition.
+ * Strips every character that carries meaning inside a PostgREST `or=(...)`
+ * filter or an `ilike` pattern (commas and parens break the boolean tree; `%`,
+ * `*` and `\\` are wildcards; quotes end a quoted literal), then a leading `@`
+ * so users can paste an `@handle` verbatim. What is left is matched as a plain
+ * substring.
+ *
+ * It lives here rather than in `supabase-profiles-shapes.ts` because it is a
+ * fact about the QUERY and not about the URL, and because the client half has
+ * to run it too: {@link profileSearchNeedle} composes it. Before 2026-10-13
+ * only the server half sanitised, so `anna*` searched `*anna*` on the server
+ * and matched nothing at all on the loaded page — and with Supabase
+ * unconfigured, where the server half returns nothing by design, it matched
+ * nobody anywhere.
+ *
+ * The `@` strip moved AFTER the metacharacter strip in the same change, so
+ * `%@anna` reduces to `anna` rather than to `@anna`. Both halves agreed on
+ * `@anna` before, so this is the smaller of the two fixes, but it is the same
+ * one: a leading `@` is what the app prints in front of every handle.
+ */
+export function sanitizeProfileSearchQuery(query: string): string {
+  return query.replace(/[%*,()\\"']/g, "").trim().replace(/^@/, "").trim();
+}
+
+/**
+ * The text the client compares against, from what somebody typed.
+ *
+ * {@link sanitizeProfileSearchQuery} lower-cased, and the composition is the
+ * point: the client comparison is `includes` while the server's is `ilike`, so
+ * case is the ONE thing the two halves may legitimately handle differently —
+ * `ilike` is case-insensitive by definition. Everything else they must agree
+ * on, or a match appears and disappears as the page scrolls.
  */
 export function profileSearchNeedle(query: string): string {
-  return query.trim().toLowerCase().replace(/^@/, "");
+  return sanitizeProfileSearchQuery(query).toLowerCase();
 }
 
 /**

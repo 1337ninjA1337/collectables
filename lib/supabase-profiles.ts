@@ -25,7 +25,6 @@ import {
   profilesPageUrl,
   profilesSearchUrl,
   profilesUrl,
-  sanitizeProfileSearchQuery,
   publicCollectionsByUserUrl,
   removeFriendRequestUrl,
   sendFriendRequestBody,
@@ -35,6 +34,7 @@ import {
   ownCollectionsSinceUrl,
   ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
+import { sanitizeProfileSearchQuery } from "@/lib/profile-search";
 import { collectKeysetPages, withKeysetBefore, withPageLimit } from "@/lib/supabase-pagination";
 import { maxUpdatedAt } from "@/lib/sync-cursors";
 import { partitionByTombstone } from "@/lib/tombstones";

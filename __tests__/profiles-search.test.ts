@@ -5,11 +5,9 @@ import {
   PROFILE_SEARCH_COLUMNS,
   profileMatchesSearch,
   profileSearchNeedle,
-} from "@/lib/profile-search";
-import {
-  profilesSearchUrl,
   sanitizeProfileSearchQuery,
-} from "@/lib/supabase-profiles-shapes";
+} from "@/lib/profile-search";
+import { profilesSearchUrl } from "@/lib/supabase-profiles-shapes";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -29,6 +27,16 @@ describe("sanitizeProfileSearchQuery", () => {
 
   it("returns empty string for a query of only metacharacters", () => {
     assert.equal(sanitizeProfileSearchQuery("%()*,"), "");
+  });
+
+  it("strips the @ AFTER the metacharacters, so %@anna is a handle", () => {
+    // The order used to be the other way round and `%@anna` came out as
+    // `@anna` — which matched nothing on either half, consistently.
+    assert.equal(sanitizeProfileSearchQuery("%@anna"), "anna");
+  });
+
+  it("leaves case alone, because the server's half is ilike", () => {
+    assert.equal(sanitizeProfileSearchQuery("@Anna"), "Anna");
   });
 });
 
@@ -116,6 +124,28 @@ describe("the client half of the same question", () => {
     it("gives the empty string for a blank query, which is the callers' cue to skip", () => {
       assert.equal(profileSearchNeedle("   "), "");
       assert.equal(profileSearchNeedle("@"), "");
+    });
+
+    it("is the server's sanitiser lower-cased, and nothing else", () => {
+      // Case is the one thing the two halves may handle differently, because
+      // `ilike` is case-insensitive by definition. Everything else they have
+      // to agree on, or a match appears and disappears as the page scrolls.
+      for (const typed of ["anna*", "50%", "a,b(c)", "  @Anna_2  ", "%@anna", "", "@"]) {
+        assert.equal(
+          profileSearchNeedle(typed),
+          sanitizeProfileSearchQuery(typed).toLowerCase(),
+          `the two halves disagree about ${JSON.stringify(typed)}`,
+        );
+      }
+    });
+
+    it("drops the wildcards the server drops, so a typed * is not a dead search", () => {
+      // The bug: the client kept `%` and `*` and compared them with
+      // `includes`, so `anna*` searched `*anna*` on the server and matched
+      // nothing on the loaded page — and with Supabase unconfigured, where
+      // the server half returns nothing by design, it matched nobody at all.
+      assert.equal(profileSearchNeedle("anna*"), "anna");
+      assert.equal(profileSearchNeedle("50%"), "50");
     });
   });
 

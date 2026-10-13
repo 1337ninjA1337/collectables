@@ -1,5 +1,5 @@
 import { Collection, CollectableItem, UserProfile } from "@/lib/types";
-import { PROFILE_SEARCH_COLUMNS } from "@/lib/profile-search";
+import { PROFILE_SEARCH_COLUMNS, sanitizeProfileSearchQuery } from "@/lib/profile-search";
 import { withPageLimit } from "@/lib/supabase-pagination";
 
 /**
@@ -91,17 +91,6 @@ export function profilesPageRangeHeader(page: number, pageSize: number): string 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   return `${from}-${to}`;
-}
-
-/**
- * Strips every character that carries meaning inside a PostgREST `or=(...)`
- * filter or an `ilike` pattern (commas/parens break the boolean tree; `%`,
- * `*` and `\` are wildcards; quotes end a quoted literal), plus a leading `@`
- * so users can paste an `@handle` verbatim. What's left is matched as a plain
- * substring.
- */
-export function sanitizeProfileSearchQuery(query: string): string {
-  return query.trim().replace(/^@/, "").replace(/[%*,()\\"']/g, "").trim();
 }
 
 /**
