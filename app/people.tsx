@@ -31,6 +31,7 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
+import { profileMatchesSearch, profileSearchNeedle } from "@/lib/profile-search";
 import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
@@ -124,16 +125,15 @@ export default function PeopleScreen() {
   );
  //
   const filteredPeople = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return others;
-    const needle = normalized.replace(/^@/, "");
+    const needle = profileSearchNeedle(query);
+    if (!needle) return others;
     // Instant pass over the already-loaded page, unioned with the (debounced)
-    // server-wide results so matches beyond the current page appear too.
-    const local = others.filter(
-      (p) =>
-        p.username.toLowerCase().includes(needle) ||
-        p.displayName.toLowerCase().includes(needle),
-    );
+    // server-wide results so matches beyond the current page appear too. The
+    // predicate is shared with the overlay and with the server's `or=` list,
+    // because the page the client holds and the rest of the table have to
+    // answer one question — and all three used to leave `publicId` out, under
+    // a field this screen labels "search by profile ID".
+    const local = others.filter((p) => profileMatchesSearch(p, needle));
     const seen = new Set(local.map((p) => p.id));
     const remote = searchResults.filter(
       (p) => p.id !== myProfile?.id && !seen.has(p.id),

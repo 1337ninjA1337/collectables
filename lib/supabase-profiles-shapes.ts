@@ -1,4 +1,5 @@
 import { Collection, CollectableItem, UserProfile } from "@/lib/types";
+import { PROFILE_SEARCH_COLUMNS } from "@/lib/profile-search";
 import { withPageLimit } from "@/lib/supabase-pagination";
 
 /**
@@ -104,10 +105,18 @@ export function sanitizeProfileSearchQuery(query: string): string {
 }
 
 /**
- * Server-side profile search: username OR display name contains the query
- * (case-insensitive). Search must hit the SERVER — the people browser only
- * holds one page client-side, so filtering that page silently missed every
- * profile beyond it (the "search finds nobody" bug).
+ * Server-side profile search: any of {@link PROFILE_SEARCH_COLUMNS} contains
+ * the query (case-insensitive). Search must hit the SERVER — the people
+ * browser only holds one page client-side, so filtering that page silently
+ * missed every profile beyond it (the "search finds nobody" bug).
+ *
+ * The column list is imported rather than written out here, and that is the
+ * fix as much as `public_id` joining it was: this `or=` and the two client
+ * filters in `app/people.tsx` and `components/search-overlay.tsx` are halves
+ * of one question, and the page the client holds answering it differently from
+ * the rest of the table is a match that appears and disappears as the page
+ * scrolls. `public_id` was missing from all three until 2026-10-13, under a
+ * field the UI calls "search by profile ID".
  */
 export function profilesSearchUrl(
   baseUrl: string,
@@ -115,9 +124,10 @@ export function profilesSearchUrl(
   limit: number,
 ): string {
   const q = encodeURIComponent(`*${sanitizeProfileSearchQuery(query)}*`);
+  const or = PROFILE_SEARCH_COLUMNS.map((column) => `${column}.ilike.${q}`).join(",");
   return (
     `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}` +
-    `&or=(username.ilike.${q},display_name.ilike.${q})` +
+    `&or=(${or})` +
     `&order=created_at.desc&limit=${limit}`
   );
 }

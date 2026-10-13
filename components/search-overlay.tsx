@@ -45,6 +45,7 @@ import {
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
+import { profileMatchesSearch, profileSearchNeedle } from "@/lib/profile-search";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useI18n } from "@/lib/i18n-context";
 import { announceMessage } from "@/lib/announce";
@@ -148,12 +149,10 @@ export function SearchOverlay({ visible, onClose }: Props) {
 
   const matchedProfiles = useMemo(() => {
     if (!q || filter === "collections" || filter === "items") return [];
-    const needle = q.replace(/^@/, "");
-    const local = profiles.filter(
-      (p) =>
-        p.username.toLowerCase().includes(needle) ||
-        p.displayName.toLowerCase().includes(needle),
-    );
+    // Shared with `app/people.tsx` and with the server's `or=` list: the page
+    // the client holds and the rest of the table have to answer one question.
+    const needle = profileSearchNeedle(q);
+    const local = profiles.filter((p) => profileMatchesSearch(p, needle));
     const seen = new Set(local.map((p) => p.id));
     const merged = [...local, ...remoteMatches.filter((p) => !seen.has(p.id))];
     return merged.slice(0, 20);
