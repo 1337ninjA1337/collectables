@@ -44,7 +44,7 @@ describe("profilesSearchUrl", () => {
   const BASE = "https://proj.supabase.co";
 
   it("builds an or=() over every searchable column", () => {
-    const url = profilesSearchUrl(BASE, "juno", 20);
+    const url = profilesSearchUrl(BASE, sanitizeProfileSearchQuery("juno"), 20);
     assert.match(url, /\/rest\/v1\/profiles\?select=/);
     assert.match(
       url,
@@ -57,7 +57,7 @@ describe("profilesSearchUrl", () => {
     // The point of the shared list. This `or=` and the two client filters are
     // halves of one question, and until 2026-10-13 all three left `public_id`
     // out — under a field the UI labels "search by profile ID".
-    const url = profilesSearchUrl(BASE, "juno", 5);
+    const url = profilesSearchUrl(BASE, sanitizeProfileSearchQuery("juno"), 5);
     for (const column of PROFILE_SEARCH_COLUMNS) {
       assert.ok(url.includes(`${column}.ilike.*juno*`), `${column} is not searched`);
     }
@@ -71,11 +71,11 @@ describe("profilesSearchUrl", () => {
   it("searches the public_id a user is invited to share", () => {
     // `profileIdPlaceholder` is `my-collectables-id`, which is a `publicId`.
     // Somebody who passed theirs to a friend was unfindable by it.
-    assert.ok(profilesSearchUrl(BASE, "my-collectables-id", 20).includes("public_id.ilike."));
+    assert.ok(profilesSearchUrl(BASE, sanitizeProfileSearchQuery("my-collectables-id"), 20).includes("public_id.ilike."));
   });
 
-  it("sanitizes the query before embedding it", () => {
-    const url = profilesSearchUrl(BASE, "@ju,no(1)", 10);
+  it("takes a needle already sanitised, so nothing strips the query twice", () => {
+    const url = profilesSearchUrl(BASE, sanitizeProfileSearchQuery("@ju,no(1)"), 10);
     // The user's parens/commas must not survive into the boolean tree — only
     // the or=()'s own two parens and one comma remain.
     assert.match(url, /ilike\.\*juno1\*/);
@@ -190,4 +190,75 @@ describe("the client half of the same question", () => {
       );
     }
   });
+});
+
+describe("the seam the last three defects were on", () => {
+  // Three in a row: the fields the two halves searched (`public_id` in
+  // neither), the text they searched for (the client sanitised nothing), and
+  // the query being stripped twice off one raw string. All three were a
+  // client filter and a server `or=` answering one question differently, and
+  // none of them could be stated by a case about either half alone.
+  //
+  // This is the closest a suite with no database can get: the row the client
+  // predicate sees, run against a pattern derived from the URL the server
+  // would be sent.
+  const ROW = {
+    username: "anna_2",
+    displayName: "Anna Petrova",
+    publicId: "my-collectables-id",
+  };
+  const COLUMN_OF: Readonly<Record<string, keyof typeof ROW>> = {
+    username: "username",
+    display_name: "displayName",
+    public_id: "publicId",
+  };
+
+  /** Whether the `or=` this URL carries would match the row, column by column. */
+  function serverWouldMatch(url: string): boolean {
+    const or = /&or=\(([^)]*)\)/.exec(url);
+    assert.ok(or, "no or= filter in the search URL");
+    return or[1].split(",").some((clause) => {
+      const [column, , pattern] = clause.split(".");
+      const field = COLUMN_OF[column];
+      assert.ok(field, `the or= names a column this case does not know: ${column}`);
+      // `ilike` with `*` wildcards either side is a case-insensitive
+      // substring match, which is what the client's `includes` is.
+      // Lower-cased on BOTH sides, because `ilike` is case-insensitive — which
+      // is the one difference the client's `includes` is allowed to have, and
+      // the reason `profileSearchNeedle` is the sanitiser plus a lower-case.
+      const substring = decodeURIComponent(pattern).replace(/^\*|\*$/g, "").toLowerCase();
+      return ROW[field].toLowerCase().includes(substring);
+    });
+  }
+
+  for (const typed of [
+    "anna",
+    "@anna_2",
+    "ANNA",
+    "Petrova",
+    "my-collectables-id",
+    "MY-COLLECTABLES-ID",
+    "collectables",
+    "anna*",
+    "50%",
+    "a,b(c)",
+    "boris",
+    "nobody-here",
+  ]) {
+    it(`answers ${JSON.stringify(typed)} the same on the page and on the server`, () => {
+      const needle = sanitizeProfileSearchQuery(typed);
+      const client = profileMatchesSearch(ROW, profileSearchNeedle(typed));
+      if (needle.length === 0) {
+        // `searchProfiles` returns [] without asking the server, and both
+        // client readers skip the filter. There is nothing to compare.
+        assert.ok(client, "an empty needle matches everything by construction");
+        return;
+      }
+      assert.equal(
+        client,
+        serverWouldMatch(profilesSearchUrl("https://proj.supabase.co", needle, 20)),
+        "the loaded page and the rest of the table disagree about this query",
+      );
+    });
+  }
 });

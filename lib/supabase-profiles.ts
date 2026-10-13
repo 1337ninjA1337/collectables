@@ -182,9 +182,13 @@ export async function searchProfiles(
   limit: number = 20,
 ): Promise<UserProfile[]> {
   if (!isSupabaseConfigured) return [];
-  if (sanitizeProfileSearchQuery(query).length === 0) return [];
+  // Sanitised ONCE, here, and passed on as a `SanitizedProfileQuery`: the
+  // emptiness check and the URL used to strip the characters separately, off
+  // the same raw query.
+  const needle = sanitizeProfileSearchQuery(query);
+  if (needle.length === 0) return [];
 
-  const res = await supabaseRest(profilesSearchUrl(supabaseUrl!, query, limit));
+  const res = await supabaseRest(profilesSearchUrl(supabaseUrl!, needle, limit));
   const rows: unknown = await res.json();
   if (!res.ok || !Array.isArray(rows)) {
     devLog.debug("[searchProfiles] non-OK response", res.status);

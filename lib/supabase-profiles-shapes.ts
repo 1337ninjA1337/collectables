@@ -1,5 +1,5 @@
 import { Collection, CollectableItem, UserProfile } from "@/lib/types";
-import { PROFILE_SEARCH_COLUMNS, sanitizeProfileSearchQuery } from "@/lib/profile-search";
+import { PROFILE_SEARCH_COLUMNS, type SanitizedProfileQuery } from "@/lib/profile-search";
 import { withPageLimit } from "@/lib/supabase-pagination";
 
 /**
@@ -99,6 +99,9 @@ export function profilesPageRangeHeader(page: number, pageSize: number): string 
  * browser only holds one page client-side, so filtering that page silently
  * missed every profile beyond it (the "search finds nobody" bug).
  *
+ * The needle arrives already sanitised — {@link SanitizedProfileQuery} says
+ * why that is a type and not a convention — so this function strips nothing.
+ *
  * The column list is imported rather than written out here, and that is the
  * fix as much as `public_id` joining it was: this `or=` and the two client
  * filters in `app/people.tsx` and `components/search-overlay.tsx` are halves
@@ -109,10 +112,10 @@ export function profilesPageRangeHeader(page: number, pageSize: number): string 
  */
 export function profilesSearchUrl(
   baseUrl: string,
-  query: string,
+  needle: SanitizedProfileQuery,
   limit: number,
 ): string {
-  const q = encodeURIComponent(`*${sanitizeProfileSearchQuery(query)}*`);
+  const q = encodeURIComponent(`*${needle}*`);
   const or = PROFILE_SEARCH_COLUMNS.map((column) => `${column}.ilike.${q}`).join(",");
   return (
     `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}` +

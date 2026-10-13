@@ -35,6 +35,25 @@ export interface SearchableProfile {
 export const PROFILE_SEARCH_COLUMNS = ["username", "display_name", "public_id"] as const;
 
 /**
+ * A query that has been through {@link sanitizeProfileSearchQuery}.
+ *
+ * A brand rather than a plain `string`, because the alternative was read
+ * twice: `searchProfiles` sanitised the query for its own emptiness check and
+ * then handed the RAW query to `profilesSearchUrl`, which sanitised it a
+ * second time. Both were right and the pair is the two-readings-of-one-thing
+ * shape most of this repository's history is about removing — a caller that
+ * stopped sanitising still worked, and one that sanitised differently would
+ * have won silently. The URL builder takes this type now, so there is exactly
+ * one place the characters can be stripped and the compiler says so.
+ *
+ * The brand is a phantom property and never exists at runtime; the one `as`
+ * is in the function that earns it.
+ */
+export type SanitizedProfileQuery = string & {
+  readonly __brand: "sanitized-profile-query";
+};
+
+/**
  * What somebody typed, reduced to the characters that can be matched.
  *
  * Strips every character that carries meaning inside a PostgREST `or=(...)`
@@ -56,8 +75,12 @@ export const PROFILE_SEARCH_COLUMNS = ["username", "display_name", "public_id"] 
  * `@anna` before, so this is the smaller of the two fixes, but it is the same
  * one: a leading `@` is what the app prints in front of every handle.
  */
-export function sanitizeProfileSearchQuery(query: string): string {
-  return query.replace(/[%*,()\\"']/g, "").trim().replace(/^@/, "").trim();
+export function sanitizeProfileSearchQuery(query: string): SanitizedProfileQuery {
+  return query
+    .replace(/[%*,()\\"']/g, "")
+    .trim()
+    .replace(/^@/, "")
+    .trim() as SanitizedProfileQuery;
 }
 
 /**
