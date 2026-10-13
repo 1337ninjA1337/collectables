@@ -644,7 +644,16 @@ describe("translation floors", () => {
     // to change tab — so a commit had no spoken feedback at all. The sentence
     // names the tab AND its place in the row, so the label and both numbers
     // have to be in all six.
-    assert.match(report, /en: 552\/552 keys \(100\.0%\)/);
+    // 554 on 2026-10-13: `profileDescriptionSaved` and `profileIdSaved`. The
+    // profile screen's two Save buttons landed their writes and moved nothing
+    // a user could see — the bio button does not move, and an untouched or a
+    // cleared save leaves the text on screen identical, so pressing Save read
+    // as "nothing happened". Two sentences rather than one shared "Saved",
+    // because the handle's confirmation is doing a second job: the save
+    // normalises what was typed, so the header may show a handle the user did
+    // not choose, and a confirmation naming the field is what frames that as
+    // the save working.
+    assert.match(report, /en: 554\/554 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

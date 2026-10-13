@@ -180,6 +180,8 @@ export const de: TranslationMap = {
   descriptionPlaceholder: "Was dieser Gegenstand ist, in welchem Zustand er sich befindet und warum er wichtig ist",
   defaultProfileBio: "Ich sammle Dinge, die es wert sind, schön bewahrt und mit Freunden geteilt zu werden.",
   saveProfileDescription: "Profilbeschreibung speichern",
+  profileDescriptionSaved: "Profilbeschreibung gespeichert",
+  profileIdSaved: "Profil-ID gespeichert",
   profileCollections: "Sammlungen des Nutzers",
   settings: "Einstellungen",
   settingsTitle: "App-Einstellungen",

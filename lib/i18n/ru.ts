@@ -194,6 +194,8 @@ export const ru: TranslationMap = {
   editCover: "Изменить обложку",
   saveItem: "Сохранить предмет",
   saveProfileDescription: "Сохранить описание профиля",
+  profileDescriptionSaved: "Описание профиля сохранено",
+  profileIdSaved: "ID профиля сохранён",
   profileIdPlaceholder: "my-collectables-id",
   searchByProfileId: "Поиск по ID профиля",
   searchByProfileIdPlaceholder: "Введите ID профиля",

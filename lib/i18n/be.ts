@@ -181,6 +181,8 @@ export const be: TranslationMap = {
   descriptionPlaceholder: "Што гэта за прадмет, у якім ён стане і чаму ён важны",
   defaultProfileBio: "Я збіраю рэчы, якія варта прыгожа захоўваць і дзяліцца імі з сябрамі.",
   saveProfileDescription: "Захаваць апісанне профілю",
+  profileDescriptionSaved: "Апісанне профілю захавана",
+  profileIdSaved: "ID профілю захаваны",
   profileCollections: "Калекцыі карыстальніка",
   myCollections: "Мае калекцыі",
   newCollectionInline: "+ Новая калекцыя",

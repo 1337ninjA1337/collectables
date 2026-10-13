@@ -140,6 +140,8 @@ export const en = {
   editCover: "Change cover",
   saveItem: "Save item",
   saveProfileDescription: "Save profile description",
+  profileDescriptionSaved: "Profile description saved",
+  profileIdSaved: "Profile ID saved",
   profileIdPlaceholder: "my-collectables-id",
   searchByProfileId: "Search by profile ID",
   searchByProfileIdPlaceholder: "Type profile ID",

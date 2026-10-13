@@ -104,6 +104,28 @@ describe("app/profile/[id].tsx — the drafts a refresh must not overwrite", () 
     assert.ok(commit < close, "the handle draft is committed by the save that closed the editor");
   });
 
+  it("confirms each save, because neither one changes anything visible", () => {
+    // The bio save moved nothing on screen at all: the button does not move,
+    // and an untouched or a cleared save leaves the text identical. The
+    // handle save closes the editor, which is visible but says the wrong
+    // thing — `ensureUniqueUsername` normalises, so what the header shows
+    // next may be a handle the user did not choose, and with no
+    // confirmation that reads as the field having been ignored.
+    assert.match(src, /toast\.success\(t\("profileDescriptionSaved"\)\);/);
+    assert.match(src, /toast\.success\(t\("profileIdSaved"\)\);/);
+  });
+
+  it("confirms the save AFTER it has landed and the draft is committed", () => {
+    // A toast fired before the await would be a promise, not a result.
+    const bioCommit = src.indexOf('commitDraft(seededDraftsRef.current, "bio"');
+    const bioToast = src.indexOf('t("profileDescriptionSaved")');
+    const idCommit = src.indexOf('commitDraft(seededDraftsRef.current, "username"');
+    const idToast = src.indexOf('t("profileIdSaved")');
+    assert.ok(bioCommit !== -1 && bioToast !== -1 && idCommit !== -1 && idToast !== -1);
+    assert.ok(bioCommit < bioToast, "the bio is confirmed after its draft is committed");
+    assert.ok(idCommit < idToast, "the handle is confirmed after its draft is committed");
+  });
+
   it("keeps the profile id in the effect's dependency list and the drafts out of it", () => {
     // The id joined the deps with this change — the effect reads
     // `activeProfile.id` now and a profile switch has to re-run it. The drafts

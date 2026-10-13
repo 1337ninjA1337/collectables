@@ -313,6 +313,12 @@ export default function ProfileScreen() {
     // kept the whitespace the save threw away and was read as dirty forever
     // after. The handle beside it is where the same line matters visibly.
     seededDraftsRef.current = commitDraft(seededDraftsRef.current, "bio", bioDraft);
+    // The button is the only thing that moves when this lands, and it does not
+    // move. Nothing about the screen changes on an untouched or a cleared save
+    // either, so without this the honest reading of pressing Save is "nothing
+    // happened" — and the next thing somebody does with a save that looks
+    // ignored is press it again.
+    toast.success(t("profileDescriptionSaved"));
   }
 
   async function handleSaveProfileId() {
@@ -334,6 +340,12 @@ export default function ProfileScreen() {
     // rejected text, and pressing OK again re-slugified that.
     seededDraftsRef.current = commitDraft(seededDraftsRef.current, "username", profileIdDraft);
     setEditingHandle(false);
+    // Said even though the editor closing is already visible, because what
+    // closed on is frequently not what was typed: `ensureUniqueUsername`
+    // normalises, so the header the user looks at next may hold a handle they
+    // did not choose, and a confirmation is what frames that as the save
+    // working rather than as the field having been ignored.
+    toast.success(t("profileIdSaved"));
   }
 
   async function performAdminDelete() {
