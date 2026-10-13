@@ -50,14 +50,7 @@ import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
-import {
-  commitDraft,
-  draftToSave,
-  localizedProfileBio,
-  nextDraft,
-  type ProfileDraftSeed,
-  syncDrafts,
-} from "@/lib/profile-draft-sync";
+import { useProfileDrafts } from "@/lib/use-profile-drafts";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
 
 
@@ -85,9 +78,6 @@ export default function ProfileScreen() {
   const cachedProfile = getProfileById(params.id);
   const myProfile = getMyProfile();
   const [loadingRemote, setLoadingRemote] = useState(false);
-  const [bioDraft, setBioDraft] = useState("");
-  const [profileIdDraft, setProfileIdDraft] = useState("");
-  const [editingHandle, setEditingHandle] = useState(false);
   const [remoteCollections, setRemoteCollections] = useState<Collection[]>([]);
   const [remoteItemCounts, setRemoteItemCounts] = useState<Record<string, number>>({});
   const [remoteWishlist, setRemoteWishlist] = useState<CollectableItem[]>([]);
@@ -196,39 +186,23 @@ export default function ProfileScreen() {
     () => (isSelf && activeProfile ? salesForUser(listings, activeProfile.id) : []),
     [isSelf, activeProfile, listings],
   );
-  const localizedBio = activeProfile ? localizedProfileBio(activeProfile.bio, t) : "";
-
   /**
-   * What the profile last put into each draft, so a remote change can tell an
-   * untouched field from one the user is typing in.
-   *
-   * `lib/profile-draft-sync.ts` is the rule and the argument for it; this ref
-   * is the one piece that has to live on the screen, because "what was seeded"
-   * is a fact about this mount and not about either value.
+   * The whole edit session — both drafts, the handle editor's open state, and
+   * what each Save writes — behind one call. `lib/use-profile-drafts.ts` holds
+   * the wiring and `lib/profile-draft-sync.ts` the rule; what is left here is
+   * the writing, which is this screen's because `updateMyProfile` is.
    */
-  const seededDraftsRef = useRef<ProfileDraftSeed | null>(null);
-
-  useEffect(() => {
-    if (!activeProfile) return;
-    const bio = localizedBio;
-    const username = activeProfile.username;
-    const sync = syncDrafts(seededDraftsRef.current, activeProfile.id);
-    seededDraftsRef.current = { id: activeProfile.id, bio, username };
-    if (sync.kind === "reseed") {
-      setBioDraft(bio);
-      setProfileIdDraft(username);
-      return;
-    }
-    // Updaters, so React bails out when the value has not moved: on the
-    // common path — a refresh that found the same profile — this effect now
-    // renders nothing at all, where before it set two states on every run.
-    setBioDraft((draft) => nextDraft(draft, sync.seeded.bio, bio));
-    setProfileIdDraft((draft) => nextDraft(draft, sync.seeded.username, username));
-    // `localizedBio` rather than `activeProfile?.bio` and `t`: the same
-    // expression was written above this effect and again inside it, and both
-    // of this screen's draft fixes read it. One value, and the list is now
-    // exactly what the body reads.
-  }, [activeProfile?.id, activeProfile?.username, localizedBio]);
+  const {
+    localizedBio,
+    bioDraft,
+    setBioDraft,
+    profileIdDraft,
+    setProfileIdDraft,
+    editingHandle,
+    setEditingHandle,
+    saveBio,
+    saveHandle,
+  } = useProfileDrafts(activeProfile ?? null, t);
 
   if (loadingRemote && !activeProfile) {
     return (
@@ -302,22 +276,7 @@ export default function ProfileScreen() {
   }
 
   async function handleSaveBio() {
-    if (!activeProfile) return;
-    // `draftToSave` rather than `bioDraft.trim() || localizedBio`, which got
-    // two things wrong for one reason: it could not tell an emptied draft from
-    // an unseeded one, and it saved what the screen was SHOWING rather than
-    // what is on the row — so an untouched save replaced the
-    // `DEFAULT_EN_PROFILE_BIO` sentinel with its translation and no later
-    // language switch could undo it. `activeProfile.bio` is the stored value,
-    // which is what an untouched or unseeded draft has to write back.
-    await updateMyProfile({
-      bio: draftToSave(bioDraft, seededDraftsRef.current?.bio ?? null, activeProfile.bio),
-    });
-    // A save makes the draft clean again, so the sync effect may deliver what
-    // the row ENDED UP with: `draftToSave` trims, and without this the draft
-    // kept the whitespace the save threw away and was read as dirty forever
-    // after. The handle beside it is where the same line matters visibly.
-    seededDraftsRef.current = commitDraft(seededDraftsRef.current, "bio", bioDraft);
+    if (!(await saveBio((bio) => updateMyProfile({ bio })))) return;
     // The button is the only thing that moves when this lands, and it does not
     // move. Nothing about the screen changes on an untouched or a cleared save
     // either, so without this the honest reading of pressing Save is "nothing
@@ -327,23 +286,7 @@ export default function ProfileScreen() {
   }
 
   async function handleSaveProfileId() {
-    if (!activeProfile) return;
-    // The handle keeps its `||` and that is a decision, not an oversight: a
-    // profile with no handle is not a state this app has — `publicId` and
-    // every link to it are built from one — so an emptied handle draft is a
-    // mistake to refuse rather than an edit to honour. The bio beside it went
-    // the other way because an empty bio is a bio.
-    await updateMyProfile({
-      username: profileIdDraft.trim() || activeProfile.username,
-    });
-    // `updateMyProfile` runs `ensureUniqueUsername`, so what lands on the row
-    // is frequently not what was typed: "Ada Lovelace" is stored as
-    // `ada_lovelace`, and an all-Cyrillic handle slugifies to nothing and
-    // becomes the anonymous `user_…` seed. Committing the draft lets the sync
-    // effect replace it with the handle actually in force — before this, the
-    // header read `@user_1234` while the editor behind it still held the
-    // rejected text, and pressing OK again re-slugified that.
-    seededDraftsRef.current = commitDraft(seededDraftsRef.current, "username", profileIdDraft);
+    if (!(await saveHandle((username) => updateMyProfile({ username })))) return;
     setEditingHandle(false);
     // Said even though the editor closing is already visible, because what
     // closed on is frequently not what was typed: `ensureUniqueUsername`

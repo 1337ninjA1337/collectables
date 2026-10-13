@@ -38,7 +38,7 @@ import { stripComments } from "./strip-comments";
  *
  * A NARROWED OBJECT DEPENDENCY, twice. `lib/auth-context.tsx` depends on
  * `session?.user?.id` and `session?.user?.email` rather than `session.user`,
- * and `app/profile/[id].tsx` on `activeProfile?.bio` and
+ * and `lib/use-profile-drafts.ts` on the profile bio and
  * `activeProfile?.username` rather than `activeProfile`. Both read exactly
  * the fields they list. The object is rebuilt by its source on every refresh
  * while the fields are not, so listing the object is how the effect fires on
@@ -147,12 +147,12 @@ export const EXHAUSTIVE_DEPS_SITES: readonly ExhaustiveDepsSite[] = [
     why: "The header's sixteen dependencies held two of the callback's five, and not `itemFilters.sort` — so pressing Reorder after changing the sort ran the early return against the sort the header was built with, never clearing it and never offering the undo.",
   },
   {
-    file: "app/profile/[id].tsx",
-    dependency: "activeProfile",
-    anchor: "const sync = syncDrafts(seededDraftsRef.current, activeProfile.id);",
+    file: "lib/use-profile-drafts.ts",
+    dependency: "profile",
+    anchor: "const sync = syncDrafts(seededDraftsRef.current, profile.id);",
     shape: "narrowed-object",
     verdict: "keep",
-    why: "Depends on `activeProfile?.id`, `?.username` and `localizedBio`, which is exactly what the effect reads; the profile object is rebuilt by the social context on every refresh while those strings are not. Both halves of the list moved on 2026-10-11: the id joined it when the effect stopped overwriting a draft the user had typed in and started needing to know whether this is still the same person's profile, and `activeProfile?.bio` plus `t` left it for the `localizedBio` that was already computed three lines above and was being computed a second time inside the effect.",
+    why: "Depends on `profile?.id`, `?.username` and `localizedBio`, which is exactly what the effect reads; the profile object is rebuilt by the social context on every refresh while those strings are not. Both halves of the list moved on 2026-10-11: the id joined it when the effect stopped overwriting a draft the user had typed in and started needing to know whether this is still the same person's profile, and the bio plus `t` left it for the `localizedBio` that was already computed above and was being computed a second time inside the effect. The effect left `app/profile/[id].tsx` for this hook on 2026-10-13, with the screen's `activeProfile` arriving as the `profile` argument; the list is the same three strings.",
   },
   {
     file: "lib/auth-context.tsx",

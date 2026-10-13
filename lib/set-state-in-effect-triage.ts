@@ -46,7 +46,8 @@
  * instead. Each would be a behaviour change, so each is a decision, and the
  * decision was not the triage pass's to make.
  *
- * There were three, and `app/profile/[id].tsx`'s drafts were the one of them
+ * There were three, and the profile drafts (now `lib/use-profile-drafts.ts`)
+ * were the one of them
  * that was not only a question of style. The sentence left in this header —
  * "a draft that stops being clobbered mid-edit is a different screen" —
  * described a bug in the present tense: the sync ran on `ensureProfilesLoaded`
@@ -218,11 +219,11 @@ export const SET_STATE_IN_EFFECT_SITES: readonly SetStateInEffectSite[] = [
     why: "Not a `setState` — the rule followed `loadPage` into the context. Paging on a page change is what the effect is for.",
   },
   {
-    file: "app/profile/[id].tsx",
+    file: "lib/use-profile-drafts.ts",
     call: "setBioDraft(bio);",
     shape: "sync-to-prop",
     verdict: "fixed",
-    why: "Two edit drafts kept in step with the loaded profile, and the sync overwrote what the user was typing: `ensureProfilesLoaded` on focus, a pull-to-refresh and a language switch all move the effect's inputs while the screen is open. The decision the triage left open is made — what somebody just typed wins, because losing a remote bio edit is a refresh away and losing a half-typed one is not recoverable — and a `seededDraftsRef` keyed by profile id is what tells an untouched draft from a written one.",
+    why: "Two edit drafts kept in step with the loaded profile, and the sync overwrote what the user was typing: `ensureProfilesLoaded` on focus, a pull-to-refresh and a language switch all move the effect's inputs while the screen is open. The decision the triage left open is made — what somebody just typed wins, because losing a remote bio edit is a refresh away and losing a half-typed one is not recoverable — and a `seededDraftsRef` keyed by profile id is what tells an untouched draft from a written one. The effect moved out of `app/profile/[id].tsx` into the `useProfileDrafts` hook on 2026-10-13; the verdict is the same line of code one file over.",
   },
   {
     file: "components/item-filters.tsx",

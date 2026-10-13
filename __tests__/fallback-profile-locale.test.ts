@@ -38,6 +38,7 @@ import { readRepoFile } from "./helpers/repo-file";
 
 const SOCIAL_CONTEXT = readRepoFile("lib/social-context.tsx");
 const PROFILE_SCREEN = readRepoFile("app/profile/[id].tsx");
+const DRAFTS_HOOK = readRepoFile("lib/use-profile-drafts.ts");
 
 /**
  * The sentinel, imported.
@@ -228,29 +229,33 @@ describe("the default bio is one sentinel, translated on render", () => {
     );
   });
 
-  it("is still translated on render, once, for both places the screen reads it", () => {
+  it("is still translated on render, once, for both places the session reads it", () => {
     // This asserted TWO copies of the comparison until 2026-10-11, and holding
     // two copies in step is the thing it was holding: the screen renders the
     // bio and seeds the edit draft from it, and they have to agree or the two
     // disagree the moment somebody opens the editor. One `localizedBio` is the
     // stronger version of the same claim — they cannot disagree — so the case
-    // now pins the single comparison and both of its readers.
-    const matches = PROFILE_SCREEN.match(/localizedProfileBio\(activeProfile\.bio, t\)/g);
+    // pins the single comparison and both of its readers. It moved into
+    // `lib/use-profile-drafts.ts` on 2026-10-13 with the rest of the session,
+    // and the screen reads the value off the hook.
+    const matches = DRAFTS_HOOK.match(/localizedProfileBio\(profile\.bio, t\)/g);
     assert.equal(matches?.length, 1, "the sentinel comparison belongs in one place");
-    assert.doesNotMatch(
-      PROFILE_SCREEN,
-      /=== DEFAULT_EN_PROFILE_BIO/,
-      "the comparison is back on the screen, where it cannot be unit-tested",
-    );
+    for (const file of [PROFILE_SCREEN, DRAFTS_HOOK]) {
+      assert.doesNotMatch(
+        file,
+        /=== DEFAULT_EN_PROFILE_BIO/,
+        "the comparison is written out again instead of being called",
+      );
+    }
     // The rendered bio.
     assert.match(PROFILE_SCREEN, /<Text style=\{styles\.bio\}>\{localizedBio\}<\/Text>/);
     // And the draft seed, which is the one that used to carry its own copy.
-    assert.match(PROFILE_SCREEN, /const bio = localizedBio;/);
+    assert.match(DRAFTS_HOOK, /const bio = localizedBio;/);
     // What a save writes is deliberately NOT this value — an untouched draft
     // saves `activeProfile.bio`, the stored sentinel, because writing the
     // translation would freeze the bio in the author's language and no later
     // language switch could undo it. That is the same argument as
     // "NOT localised at write time" above, one layer up.
-    assert.doesNotMatch(PROFILE_SCREEN, /bio: draftToSave\(bioDraft, [^)]*localizedBio\)/);
+    assert.doesNotMatch(DRAFTS_HOOK, /draftToSave\(bioDraft, [^)]*localizedBio\)/);
   });
 });
