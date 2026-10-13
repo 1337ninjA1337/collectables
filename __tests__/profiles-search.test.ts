@@ -218,9 +218,14 @@ describe("the seam the last three defects were on", () => {
     const or = /&or=\(([^)]*)\)/.exec(url);
     assert.ok(or, "no or= filter in the search URL");
     return or[1].split(",").some((clause) => {
-      const [column, , pattern] = clause.split(".");
+      const [column, operator, pattern] = clause.split(".");
       const field = COLUMN_OF[column];
       assert.ok(field, `the or= names a column this case does not know: ${column}`);
+      // The model's own premise, checked rather than assumed: everything
+      // below is what `ilike` with `*` either side means. A clause using any
+      // other operator would be simulated wrongly and silently.
+      assert.equal(operator, "ilike", `this case cannot simulate ${operator}`);
+      assert.match(pattern, /^\*.*\*$/, "the pattern is not an unanchored substring");
       // `ilike` with `*` wildcards either side is a case-insensitive
       // substring match, which is what the client's `includes` is.
       // Lower-cased on BOTH sides, because `ilike` is case-insensitive — which
@@ -261,4 +266,47 @@ describe("the seam the last three defects were on", () => {
       );
     });
   }
+});
+
+describe("the brand, which is a compile error nothing here can assert", () => {
+  // `SanitizedProfileQuery`'s whole value is that `profilesSearchUrl` cannot
+  // be handed a raw string — and a case that tried would not fail, it would
+  // fail to BUILD, because `tsc --noEmit` runs over this file. So the claim
+  // is made the way the repository's `lint:*` guards make theirs: by reading
+  // the source.
+  const SOURCES = [
+    "lib/supabase-profiles.ts",
+    "app/people.tsx",
+    "components/search-overlay.tsx",
+  ];
+
+  it("has exactly one producer, and it is the sanitiser", () => {
+    const module = readRepoFile("lib/profile-search.ts");
+    assert.equal(
+      module.split("as SanitizedProfileQuery").length - 1,
+      1,
+      "a second cast into the brand is a second place the characters can be stripped",
+    );
+    assert.match(module, /\.trim\(\) as SanitizedProfileQuery;/);
+  });
+
+  it("is never cast into outside the module that defines it", () => {
+    for (const file of SOURCES) {
+      assert.doesNotMatch(
+        readRepoFile(file),
+        /as SanitizedProfileQuery/,
+        `${file} casts into the brand instead of sanitising`,
+      );
+    }
+  });
+
+  it("is what the URL builder takes, so nothing sanitises twice", () => {
+    const shapes = readRepoFile("lib/supabase-profiles-shapes.ts");
+    assert.match(shapes, /needle: SanitizedProfileQuery,/);
+    assert.doesNotMatch(
+      shapes,
+      /sanitizeProfileSearchQuery\(/,
+      "the URL builder strips the query again, off a needle that is already stripped",
+    );
+  });
 });
