@@ -12,6 +12,7 @@ import { Screen } from "@/components/screen";
 import { analyzeItemPhoto, isAiVisionConfigured } from "@/lib/ai-vision";
 import { trackEvent } from "@/lib/analytics";
 import { summarisePayload } from "@/lib/analytics-helpers";
+import { catalogueSearchNeedle, collectionMatchesSearch } from "@/lib/catalogue-search";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import {
@@ -513,11 +514,16 @@ function CollectionSheet({
 }) {
   const { t } = useI18n();
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    // `collectionMatchesSearch` rather than the two inline `includes` this
+    // used to carry: `components/search-overlay.tsx` asks the same question
+    // about the same rows, and the two copies had no way to stay in step.
+    //
+    // The empty-needle branch stays here and stays OPPOSITE to the overlay's,
+    // which returns nothing: this is a picker with a search box, so an empty
+    // field means "every collection", not "no collection".
+    const q = catalogueSearchNeedle(query);
     if (!q) return collections;
-    return collections.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q),
-    );
+    return collections.filter((c) => collectionMatchesSearch(c, q));
   }, [collections, query]);
 
   return (
@@ -535,10 +541,18 @@ function CollectionSheet({
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle} accessibilityRole="header">{t("collectionFieldLabel")}</Text>
 
+          {/* `searchCollectionsPlaceholder`, not `searchPlaceholder`: this
+              sheet lists the user's collections and searches their name and
+              description, and `searchPlaceholder` is the GLOBAL box's copy —
+              "Search items, collections, people..." in all six locales. So
+              the one field carried two labels that disagreed, and the visible
+              one promised two kinds of result this sheet cannot return. The
+              a11y label said "by name" while the filter also read the
+              description; it names both now. */}
           <SheetSearchRow
             value={query}
             onChange={onQueryChange}
-            placeholder={t("searchPlaceholder")}
+            placeholder={t("searchCollectionsPlaceholder")}
             accessibilityLabel={t("collectionPickerSearchA11y")}
           />
 

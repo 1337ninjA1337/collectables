@@ -653,7 +653,13 @@ describe("translation floors", () => {
     // normalises what was typed, so the header may show a handle the user did
     // not choose, and a confirmation naming the field is what frames that as
     // the save working.
-    assert.match(report, /en: 554\/554 keys \(100\.0%\)/);
+    // 555 on 2026-10-15: `searchCollectionsPlaceholder`. `app/create.tsx`'s
+    // collection picker showed `searchPlaceholder` — the GLOBAL box's "Search
+    // items, collections, people..." — over a sheet that lists the user's
+    // collections and nothing else, while its a11y label said "Search your
+    // collections by name". One field with two labels that disagreed, and the
+    // visible one promised two sections the sheet cannot return.
+    assert.match(report, /en: 555\/555 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

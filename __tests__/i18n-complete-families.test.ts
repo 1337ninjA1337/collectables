@@ -125,9 +125,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "search",
     pattern: /^search[A-Z]/,
-    size: 19,
+    size: 20,
     because:
-      "the search overlay was already half-translated — four keys in every locale and fourteen in none, so the same overlay showed a translated placeholder above English result headings",
+      "the search overlay was already half-translated — four keys in every locale and fourteen in none, so the same overlay showed a translated placeholder above English result headings. 20 since 2026-10-15: `searchCollectionsPlaceholder`, because `app/create.tsx`'s collection picker was showing `searchPlaceholder` — the GLOBAL box's \"Search items, collections, people...\" — over a sheet that lists collections and nothing else. A field with two labels that disagreed, and the visible one promised two sections the sheet cannot return",
   },
   {
     name: "marketplace",

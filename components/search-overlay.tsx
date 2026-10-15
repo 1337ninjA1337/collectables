@@ -44,6 +44,7 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
+import { catalogueSearchNeedle, collectionMatchesSearch, itemMatchesSearch } from "@/lib/catalogue-search";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import { profileMatchesSearch, profileSearchNeedle } from "@/lib/profile-search";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
@@ -78,7 +79,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
       .catch(() => {});
   }, [visible]);
 
-  const q = query.trim().toLowerCase();
+  const q = catalogueSearchNeedle(query);
 
   // Unique owners for the owner filter dropdown
   const owners = useMemo(() => {
@@ -95,9 +96,10 @@ export function SearchOverlay({ visible, onClose }: Props) {
     if (!q || filter === "items" || filter === "people") return [];
     return collections
       .filter((c) => {
-        const matchesQuery =
-          c.name.toLowerCase().includes(q) ||
-          c.description.toLowerCase().includes(q);
+        // Shared with `app/create.tsx`'s collection picker: the two used to
+        // be the same two lines written twice, so a third searchable field
+        // would have reached one of them.
+        const matchesQuery = collectionMatchesSearch(c, q);
         const matchesOwner = !ownerFilter || c.ownerUserId === ownerFilter;
         return matchesQuery && matchesOwner;
       })
@@ -113,10 +115,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
         // The rule is `isLiveItem` rather than two early returns because it is
         // the same rule the card counts and the collection totals use.
         if (!isLiveItem(item)) return false;
-        const matchesQuery =
-          item.title.toLowerCase().includes(q) ||
-          item.description.toLowerCase().includes(q) ||
-          item.acquiredFrom.toLowerCase().includes(q);
+        const matchesQuery = itemMatchesSearch(item, q);
         const matchesOwner = !ownerFilter || item.createdByUserId === ownerFilter;
         return matchesQuery && matchesOwner;
       })
