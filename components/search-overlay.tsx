@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -14,19 +13,20 @@ import { MaskedTextInput } from "@/components/masked-text-input";
 //
 import { CostBadge } from "@/components/cost-badge";
 import { EmptyState } from "@/components/empty-state";
+import {
+  SEARCH_RESULT_META_STYLE,
+  SearchResultRow,
+} from "@/components/search-result-row";
 import { isLiveItem } from "@/lib/collections-helpers";
 import { hasFiniteCost } from "@/lib/item-cost";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
-  AMBER_MUTED,
   AMBER_SOFT,
   BORDER,
-  BORDER_3,
   CARD_BG,
   CARD_BG_3,
   HERO_DARK,
-  MUTED,
   MUTED_2,
   MUTED_3,
   MUTED_10,
@@ -34,10 +34,8 @@ import {
   MUTED_15,
   PAGE_BG_2,
   PLACEHOLDER,
-  RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
-  SPACING_CARD,
   SPACING_INLINE,
   SPACING_LIST,
   TEXT_DARK,
@@ -389,51 +387,36 @@ export function SearchOverlay({ visible, onClose }: Props) {
                     {t("searchResultsItems")} ({matchedItems.length})
                   </Text>
                   {matchedItems.map((item) => (
-                    <Pressable
+                    <SearchResultRow
                       key={item.id}
-                      style={styles.row}
+                      photo={item.photos[0]}
+                      fallbackEmoji="📷"
+                      title={item.title}
+                      meta={
+                        <>
+                          {getCollectionName(item.collectionId)}
+                          {/*
+                            `<CostBadge>` rather than `${item.cost}`, and
+                            `hasFiniteCost` rather than a truthiness check.
+                            The raw render printed a bare number with no
+                            currency beside it — the same defect the export
+                            round fixed in the PDF — hid a cost of zero,
+                            which the shared gate holds is a price, and
+                            printed `Infinity` for a non-finite one. The
+                            badge converts, marks a conversion with `≈` and
+                            renders nothing when there is no cost, so the
+                            separator is the only thing left to decide here.
+                          */}
+                          {hasFiniteCost(item) ? (
+                            <>
+                              {" · "}
+                              <CostBadge item={item} style={SEARCH_RESULT_META_STYLE} />
+                            </>
+                          ) : null}
+                        </>
+                      }
                       onPress={() => goToItem(item.id)}
-                      accessibilityRole="button"
-                    >
-                      <View style={styles.rowContent}>
-                        {item.photos.length > 0 ? (
-                          <Image
-                            source={{ uri: item.photos[0] }}
-                            style={styles.rowThumb}
-                          />
-                        ) : (
-                          <View style={[styles.rowThumb, styles.rowThumbEmpty]}>
-                            <Text style={styles.rowThumbEmoji}>📷</Text>
-                          </View>
-                        )}
-                        <View style={styles.rowText}>
-                          <Text style={styles.rowTitle} numberOfLines={1}>
-                            {item.title}
-                          </Text>
-                          <Text style={styles.rowMeta} numberOfLines={1}>
-                            {getCollectionName(item.collectionId)}
-                            {/*
-                              `<CostBadge>` rather than `${item.cost}`, and
-                              `hasFiniteCost` rather than a truthiness check.
-                              The raw render printed a bare number with no
-                              currency beside it — the same defect the export
-                              round fixed in the PDF — hid a cost of zero,
-                              which the shared gate holds is a price, and
-                              printed `Infinity` for a non-finite one. The
-                              badge converts, marks a conversion with `≈` and
-                              renders nothing when there is no cost, so the
-                              separator is the only thing left to decide here.
-                            */}
-                            {hasFiniteCost(item) ? (
-                              <>
-                                {" · "}
-                                <CostBadge item={item} style={styles.rowMeta} />
-                              </>
-                            ) : null}
-                          </Text>
-                        </View>
-                      </View>
-                    </Pressable>
+                    />
                   ))}
                 </>
               )}
@@ -447,33 +430,14 @@ export function SearchOverlay({ visible, onClose }: Props) {
                     {t("searchResultsCollections")} ({matchedCollections.length})
                   </Text>
                   {matchedCollections.map((c) => (
-                    <Pressable
+                    <SearchResultRow
                       key={c.id}
-                      style={styles.row}
+                      photo={c.coverPhoto}
+                      fallbackEmoji="📚"
+                      title={c.name}
+                      meta={c.ownerName}
                       onPress={() => goToCollection(c.id)}
-                      accessibilityRole="button"
-                    >
-                      <View style={styles.rowContent}>
-                        {c.coverPhoto ? (
-                          <Image
-                            source={{ uri: c.coverPhoto }}
-                            style={styles.rowThumb}
-                          />
-                        ) : (
-                          <View style={[styles.rowThumb, styles.rowThumbEmpty]}>
-                            <Text style={styles.rowThumbEmoji}>📚</Text>
-                          </View>
-                        )}
-                        <View style={styles.rowText}>
-                          <Text style={styles.rowTitle} numberOfLines={1}>
-                            {c.name}
-                          </Text>
-                          <Text style={styles.rowMeta} numberOfLines={1}>
-                            {c.ownerName}
-                          </Text>
-                        </View>
-                      </View>
-                    </Pressable>
+                    />
                   ))}
                 </>
               )}
@@ -487,33 +451,15 @@ export function SearchOverlay({ visible, onClose }: Props) {
                     {t("searchResultsPeople")} ({matchedProfiles.length})
                   </Text>
                   {matchedProfiles.map((p) => (
-                    <Pressable
+                    <SearchResultRow
                       key={p.id}
-                      style={styles.row}
+                      photo={p.avatar}
+                      fallbackEmoji="👤"
+                      avatar
+                      title={p.displayName}
+                      meta={`@${p.username}`}
                       onPress={() => goToProfile(p.id)}
-                      accessibilityRole="button"
-                    >
-                      <View style={styles.rowContent}>
-                        {p.avatar ? (
-                          <Image
-                            source={{ uri: p.avatar }}
-                            style={styles.rowAvatar}
-                          />
-                        ) : (
-                          <View style={[styles.rowAvatar, styles.rowAvatarEmpty]}>
-                            <Text style={styles.rowThumbEmoji}>👤</Text>
-                          </View>
-                        )}
-                        <View style={styles.rowText}>
-                          <Text style={styles.rowTitle} numberOfLines={1}>
-                            {p.displayName}
-                          </Text>
-                          <Text style={styles.rowMeta} numberOfLines={1}>
-                            @{p.username}
-                          </Text>
-                        </View>
-                      </View>
-                    </Pressable>
+                    />
                   ))}
                 </>
               )}
@@ -633,59 +579,5 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginTop: 10,
     marginBottom: 6,
-  },
-  row: {
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_3,
-  },
-  rowContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING_CARD,
-  },
-  rowThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: BORDER,
-  },
-  rowThumbEmpty: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: CARD_BG_3,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  rowThumbEmoji: {
-    fontSize: 18,
-  },
-  rowAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS_CARD,
-    backgroundColor: AMBER_MUTED,
-  },
-  rowAvatarEmpty: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: CARD_BG_3,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  rowText: {
-    flex: 1,
-    gap: 2,
-  },
-  rowTitle: {
-    color: TEXT_DARK,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  rowMeta: {
-    color: MUTED,
-    fontSize: 13,
   },
 });

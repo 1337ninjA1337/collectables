@@ -756,18 +756,19 @@ describe("design-tokens adoption", () => {
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
 
+  // AMBER_MUTED / BORDER_3 / MUTED / RADIUS_CARD / SPACING_CARD left with the
+  // result rows when they moved into <SearchResultRow>
+  // (components/search-result-row.tsx) — claimed just below, on all three
+  // sections' behalf, and pinned by search-result-row.test.ts.
   it("components/search-overlay.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/search-overlay.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /AMBER_ACCENT/);
-    assert.match(src, /AMBER_MUTED/);
     assert.match(src, /AMBER_SOFT\b/);
     assert.match(src, /BORDER\b/);
-    assert.match(src, /BORDER_3/);
     assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_3/);
     assert.match(src, /HERO_DARK\b/);
-    assert.match(src, /MUTED\b/);
     assert.match(src, /MUTED_2/);
     assert.match(src, /MUTED_3/);
     assert.match(src, /MUTED_10/);
@@ -778,6 +779,22 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /TEXT_ON_DARK_5/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/search-result-row.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/search-result-row.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_MUTED/);
+    assert.match(src, /AMBER_SOFT\b/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /BORDER_3/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /MUTED\b/);
+    assert.match(src, /RADIUS_CARD\b/);
+    assert.match(src, /SPACING_CARD/);
+    assert.match(src, /TEXT_DARK\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

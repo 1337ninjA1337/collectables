@@ -36,7 +36,10 @@ const MIGRATED_FILES: readonly {
   // batch D/4 — the whole tree now greps clean for borderRadius: 22 / 24
   { rel: "components/login-screen.tsx", usesLg: false },
   { rel: "components/bottom-nav.tsx", usesLg: false },
-  { rel: "components/search-overlay.tsx", usesLg: true },
+  // cardless since 2026-10-15 — the avatar frame's RADIUS_CARD left with
+  // <SearchResultRow>; the sheet keeps RADIUS_CARD_LG and RADIUS_PILL
+  { rel: "components/search-overlay.tsx", usesLg: true, cardless: true },
+  { rel: "components/search-result-row.tsx", usesLg: false },
   { rel: "components/currency-sheet.tsx", usesLg: false },
   { rel: "components/currency-input.tsx", usesLg: false },
   { rel: "components/sold-listing-prompt.tsx", usesLg: true, cardless: true },

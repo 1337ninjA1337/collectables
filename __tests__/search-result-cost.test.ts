@@ -68,7 +68,11 @@ describe("the search result row", () => {
   const BODY = stripComments(SRC);
 
   it("renders the cost through <CostBadge> rather than interpolating the field", () => {
-    assert.match(BODY, /<CostBadge item=\{item\} style=\{styles\.rowMeta\} \/>/);
+    // `SEARCH_RESULT_META_STYLE` since 2026-10-15, not `styles.rowMeta`: the
+    // row is `<SearchResultRow>` now and the meta line's typography went with
+    // it. The badge stays here, because what it renders is this section's
+    // (a collection name and a cost) and not every row's.
+    assert.match(BODY, /<CostBadge item=\{item\} style=\{SEARCH_RESULT_META_STYLE\} \/>/);
     assert.doesNotMatch(
       BODY,
       /\$\{item\.cost\}/,
@@ -103,7 +107,22 @@ describe("the search result row", () => {
 
   it("the badge takes the row's own text style", () => {
     // It renders a <Text> inside the meta <Text>; without the style it would
-    // inherit the platform default rather than the row's 12px muted line.
-    assert.match(BODY, /<CostBadge item=\{item\} style=\{styles\.rowMeta\} \/>/);
+    // inherit the platform default rather than the row's 13px muted line.
+    //
+    // The style is exported from the row component rather than copied here,
+    // which is the half of the extraction that could have gone wrong quietly:
+    // a second local copy of `{ color: MUTED, fontSize: 13 }` would render
+    // identically today and drift the first time the row's typography moves.
+    assert.match(BODY, /<CostBadge item=\{item\} style=\{SEARCH_RESULT_META_STYLE\} \/>/);
+    assert.match(
+      BODY,
+      /import \{\s*SEARCH_RESULT_META_STYLE,\s*SearchResultRow,\s*\} from "@\/components\/search-result-row";/,
+      "the meta style must come from the row component, not from a local copy",
+    );
+    assert.doesNotMatch(
+      readRepoFile("components/search-overlay.tsx"),
+      /rowMeta: \{/,
+      "the overlay declared the meta style again",
+    );
   });
 });

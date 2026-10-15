@@ -45,7 +45,10 @@ const MIGRATED_FILES: readonly {
   { rel: "app/_layout.tsx", list: false, card: true, inline: true },
   // batch 5/6
   { rel: "components/item-filters.tsx", list: true, card: true, inline: true },
-  { rel: "components/search-overlay.tsx", list: true, card: true, inline: true },
+  // card: false since 2026-10-15 — the result row's gap left with
+  // <SearchResultRow>
+  { rel: "components/search-overlay.tsx", list: true, card: false, inline: true },
+  { rel: "components/search-result-row.tsx", list: false, card: true, inline: false },
   { rel: "components/currency-sheet.tsx", list: true, card: true, inline: false },
   { rel: "components/skeleton.tsx", list: true, card: true, inline: false },
   { rel: "components/premium-upsell-sheet.tsx", list: true, card: true, inline: true },

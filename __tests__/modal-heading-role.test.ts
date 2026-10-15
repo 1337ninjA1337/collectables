@@ -65,19 +65,24 @@ function modalTitleTexts(file: string): HeadingText[] {
 /**
  * The `…Title` styles inside a modal that are NOT headings.
  *
- * `components/search-overlay.tsx` is a full-screen `<Modal>` whose results are
- * rows, and `rowTitle` is the name of the thing each row is about. Marking
- * those as headings would put one heading per search result into the rotor
- * and leave the overlay itself with none — the opposite of what the role is
- * for.
+ * Empty since 2026-10-15, and the emptiness is the current state of the tree
+ * rather than a rule nobody needed. It held `styles.rowTitle` for
+ * `components/search-overlay.tsx`: a full-screen `<Modal>` whose results are
+ * rows, where `rowTitle` is the name of the thing each row is about, and
+ * marking those as headings would have put one heading per search result into
+ * the rotor. The three sections' `sectionLabel`s carry the role instead.
  *
- * That sentence used to be the whole story about this file, and the second
- * half of it was a description of the bug rather than of the design: the
- * overlay HAD no heading. Its three `sectionLabel`s carry the role now, so the
- * exemption is what it always claimed to be — a rule about rows, inside a file
- * that has landmarks of its own.
+ * Those rows are `<SearchResultRow>` now — a component of its own, outside
+ * every `<Modal>` subtree — so the scan below no longer reaches the style and
+ * an entry for it would be an exemption for nothing. The claim did not go
+ * with it: "a search result row is not a heading" is asked of the component
+ * directly, in the case under the sections one, because that is where the
+ * markup is.
+ *
+ * A modal that grows a row-shaped `…Title` of its own belongs back on this
+ * list, with its reason.
  */
-const NOT_A_HEADING: readonly string[] = ["styles.rowTitle"];
+const NOT_A_HEADING: readonly string[] = [];
 
 function isExempt(attrs: string): boolean {
   return NOT_A_HEADING.some((style) => attrs.includes(style));
@@ -104,15 +109,19 @@ describe("every modal heading is announced as a header", () => {
   });
 
   it("does not make a heading of a search result row", () => {
-    // The exemption is a claim about the tree too: if search-overlay's rows
-    // ever DO get the role, this list is stale and says the opposite of what
-    // the file does.
-    const rows = FOUND.filter((text) => isExempt(text.attrs));
-    assert.ok(rows.length > 0, "NOT_A_HEADING lists a style nothing renders any more");
+    // Asked of `<SearchResultRow>` rather than of the modal scan, because the
+    // row moved out of the overlay's JSX and the claim did not move with it:
+    // one heading per result would fill the rotor with the twenty items a
+    // reader is trying to skip past to reach the two people.
+    //
+    // No `inModal` filter — the component IS the subtree, and whether its one
+    // caller happens to be a `<Modal>` is not what makes a row a row.
+    const rows = headingTexts("components/search-result-row.tsx", TITLE_STYLE);
+    assert.ok(rows.length > 0, "the row component renders no title-styled text at all");
     for (const row of rows) {
       assert.ok(
         !isHeader(row),
-        `${row.file}:${String(row.line)} is listed as not a heading and carries the role`,
+        `${row.file}:${String(row.line)} is a search result row's title and carries the header role`,
       );
     }
   });
