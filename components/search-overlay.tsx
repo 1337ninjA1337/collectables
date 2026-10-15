@@ -44,7 +44,11 @@ import {
 } from "@/lib/design-tokens";
 import { catalogueSearchNeedle, collectionMatchesSearch, itemMatchesSearch } from "@/lib/catalogue-search";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
-import { profileMatchesSearch, profileSearchNeedle } from "@/lib/profile-search";
+import {
+  mergeProfileMatches,
+  profileMatchesSearch,
+  profileSearchNeedle,
+} from "@/lib/profile-search";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useI18n } from "@/lib/i18n-context";
 import { announceMessage } from "@/lib/announce";
@@ -150,9 +154,10 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // the client holds and the rest of the table have to answer one question.
     const needle = profileSearchNeedle(q);
     const local = profiles.filter((p) => profileMatchesSearch(p, needle));
-    const seen = new Set(local.map((p) => p.id));
-    const merged = [...local, ...remoteMatches.filter((p) => !seen.has(p.id))];
-    return merged.slice(0, 20);
+    // Ordered before the slice, not after: a twenty-row cut off the front of
+    // an unordered union can drop the exact match outright, which is a
+    // stronger version of the bug the ordering fixes.
+    return mergeProfileMatches(local, remoteMatches, needle).slice(0, 20);
   }, [profiles, q, filter, remoteMatches]);
 
   // Get collection name for an item

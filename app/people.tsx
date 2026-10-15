@@ -31,7 +31,11 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
-import { profileMatchesSearch, profileSearchNeedle } from "@/lib/profile-search";
+import {
+  mergeProfileMatches,
+  profileMatchesSearch,
+  profileSearchNeedle,
+} from "@/lib/profile-search";
 import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
@@ -133,12 +137,21 @@ export default function PeopleScreen() {
     // because the page the client holds and the rest of the table have to
     // answer one question — and all three used to leave `publicId` out, under
     // a field this screen labels "search by profile ID".
+    //
+    // `mergeProfileMatches` dedupes by id and orders by how well each row
+    // answers: an exact handle or profile ID first, then a prefix, then a
+    // substring, stable within each band so the loaded page still leads among
+    // equally good matches. The union used to be a bare spread of the loaded
+    // page followed by the server's rows, which put a page-one substring
+    // match above the exact row only the server knew about — under a field
+    // this screen labels "search by profile ID", where pasting a whole one is
+    // the commonest use.
     const local = others.filter((p) => profileMatchesSearch(p, needle));
-    const seen = new Set(local.map((p) => p.id));
-    const remote = searchResults.filter(
-      (p) => p.id !== myProfile?.id && !seen.has(p.id),
+    return mergeProfileMatches(
+      local,
+      searchResults.filter((p) => p.id !== myProfile?.id),
+      needle,
     );
-    return [...local, ...remote];
   }, [others, query, searchResults, myProfile]);
 
   /**

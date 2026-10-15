@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   PROFILE_SEARCH_COLUMNS,
+  mergeProfileMatches,
   profileMatchesSearch,
   profileSearchNeedle,
+  rankProfileMatch,
   sanitizeProfileSearchQuery,
 } from "@/lib/profile-search";
 import { profilesSearchUrl } from "@/lib/supabase-profiles-shapes";
@@ -178,11 +180,17 @@ describe("the client half of the same question", () => {
     // disagreed, so nothing looked wrong.
     for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
       const src = readRepoFile(file);
-      assert.match(
-        src,
-        /import \{ profileMatchesSearch, profileSearchNeedle \} from "@\/lib\/profile-search";/,
-        `${file} does not import the shared predicate`,
-      );
+      // The import is a multi-line list since `mergeProfileMatches` joined
+      // it, so the claim is about the two names and the module rather than
+      // about one line's text.
+      const importList = /import \{([^}]+)\} from "@\/lib\/profile-search";/.exec(src);
+      assert.ok(importList, `${file} does not import from lib/profile-search`);
+      for (const name of ["profileMatchesSearch", "profileSearchNeedle"]) {
+        assert.ok(
+          importList[1].includes(name),
+          `${file} does not import ${name} from the shared module`,
+        );
+      }
       assert.match(src, /profileMatchesSearch\(p, needle\)/, `${file} filters by hand`);
       assert.ok(
         !/p\.displayName\.toLowerCase\(\)\.includes\(needle\)/.test(src),
@@ -307,6 +315,135 @@ describe("the brand, which is a compile error nothing here can assert", () => {
       shapes,
       /sanitizeProfileSearchQuery\(/,
       "the URL builder strips the query again, off a needle that is already stripped",
+    );
+  });
+});
+
+describe("rankProfileMatch", () => {
+  const ROW = { username: "anna", displayName: "Anna Petrova", publicId: "anna-collects" };
+
+  it("ranks a field that IS the needle first", () => {
+    assert.equal(rankProfileMatch(ROW, "anna"), 0);
+    assert.equal(rankProfileMatch(ROW, "anna-collects"), 0);
+    assert.equal(rankProfileMatch(ROW, "anna petrova"), 0);
+  });
+
+  it("ranks a prefix second", () => {
+    assert.equal(rankProfileMatch(ROW, "ann"), 1);
+    assert.equal(rankProfileMatch(ROW, "anna-coll"), 1);
+  });
+
+  it("ranks a substring last", () => {
+    assert.equal(rankProfileMatch(ROW, "petrova"), 2);
+    assert.equal(rankProfileMatch(ROW, "collects"), 2);
+  });
+
+  it("is case-insensitive, like both halves of the search", () => {
+    // The needle arrives lower-cased from `profileSearchNeedle`; the ROW does
+    // not, because a stored displayName keeps its capitals.
+    assert.equal(rankProfileMatch(ROW, profileSearchNeedle("ANNA")), 0);
+    assert.equal(rankProfileMatch(ROW, profileSearchNeedle("@Anna-Collects")), 0);
+  });
+
+  it("is 0 for an empty needle, consistent with matching everything", () => {
+    // Answered before the comparisons rather than falling out of them: every
+    // field starts with "", so without the early return a row would be a
+    // prefix match (1) while a row with an empty username would be exact (0),
+    // and the two would sort against each other for no reason.
+    assert.equal(rankProfileMatch(ROW, ""), 0);
+    assert.equal(rankProfileMatch({ username: "", displayName: "", publicId: "" }, ""), 0);
+  });
+});
+
+describe("mergeProfileMatches", () => {
+  const row = (id: string, username: string, publicId: string) => ({
+    id,
+    username,
+    displayName: username,
+    publicId,
+  });
+
+  it("puts the exact match first even when it only came from the server", () => {
+    // The bug. The loaded page held a substring match and the exact row was
+    // past it, so pasting a whole profile ID answered with somebody else —
+    // under a field labelled "search by profile ID".
+    const local = [row("1", "banna-fan", "banna-fan-id")];
+    const remote = [row("2", "anna", "anna-id")];
+    const merged = mergeProfileMatches(local, remote, "anna");
+    assert.deepEqual(
+      merged.map((p) => p.id),
+      ["2", "1"],
+    );
+  });
+
+  it("keeps the loaded page first among equally good matches", () => {
+    // The half of the old behaviour worth keeping: a row already on screen
+    // should not be pushed down by a server row that answers no better.
+    const local = [row("1", "anna-one", "one-id")];
+    const remote = [row("2", "anna-two", "two-id")];
+    const merged = mergeProfileMatches(local, remote, "anna");
+    assert.deepEqual(
+      merged.map((p) => p.id),
+      ["1", "2"],
+    );
+  });
+
+  it("dedupes by id and lets the local copy win", () => {
+    const local = [row("1", "anna", "anna-id")];
+    const remote = [row("1", "anna-stale", "anna-id"), row("2", "annabel", "annabel-id")];
+    const merged = mergeProfileMatches(local, remote, "anna");
+    assert.deepEqual(
+      merged.map((p) => p.id),
+      ["1", "2"],
+    );
+    assert.equal(merged[0].username, "anna", "the server's copy replaced the page's");
+  });
+
+  it("preserves the server's own order within a band", () => {
+    const remote = [
+      row("a", "x-anna", "x-id"),
+      row("b", "y-anna", "y-id"),
+      row("c", "z-anna", "z-id"),
+    ];
+    assert.deepEqual(
+      mergeProfileMatches([], remote, "anna").map((p) => p.id),
+      ["a", "b", "c"],
+    );
+  });
+
+  it("returns every input row — ordering is not filtering", () => {
+    const local = [row("1", "anna", "anna-id")];
+    const remote = [row("2", "bob", "bob-id")];
+    assert.equal(mergeProfileMatches(local, remote, "anna").length, 2);
+  });
+});
+
+describe("both readers merge through the shared function", () => {
+  const READERS = ["app/people.tsx", "components/search-overlay.tsx"];
+
+  it("neither spreads the two lists together itself", () => {
+    for (const file of READERS) {
+      const source = readRepoFile(file);
+      assert.match(source, /mergeProfileMatches\(/, `${file} does not use the shared merge`);
+      assert.doesNotMatch(
+        source,
+        /\[\.\.\.local, \.\.\.remote/,
+        `${file} unions the two halves itself, in the order that hid the exact match`,
+      );
+      assert.doesNotMatch(
+        source,
+        /new Set\(local\.map/,
+        `${file} dedupes by id itself`,
+      );
+    }
+  });
+
+  it("the overlay orders before it slices", () => {
+    // A twenty-row cut off the front of an unordered union can drop the
+    // exact match outright.
+    assert.match(
+      readRepoFile("components/search-overlay.tsx"),
+      /mergeProfileMatches\(local, remoteMatches, needle\)\.slice\(0, 20\)/,
     );
   });
 });
