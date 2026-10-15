@@ -108,6 +108,25 @@ describe("every modal heading is announced as a header", () => {
     );
   });
 
+  it("exempts nothing, and says so rather than leaving it to be noticed", () => {
+    // An empty exemption list has two readings — "nothing in the tree needs
+    // one" and "somebody deleted the rule" — and they look identical. This
+    // is the first: every modal title the scan finds carries the role, so
+    // `isExempt` is asked and answers no, which is a different claim from the
+    // classification case above (that one passes whether the exemption did
+    // the work or the role did).
+    assert.deepEqual(NOT_A_HEADING, [], "an entry here needs its reason in the header");
+    assert.deepEqual(
+      FOUND.filter((text) => isExempt(text.attrs)).map((text) => text.file),
+      [],
+      "the list is empty and something matched it anyway",
+    );
+    assert.ok(
+      FOUND.every((text) => isHeader(text)),
+      "a modal title is unclassified — it needs the role or an entry in NOT_A_HEADING",
+    );
+  });
+
   it("does not make a heading of a search result row", () => {
     // Asked of `<SearchResultRow>` rather than of the modal scan, because the
     // row moved out of the overlay's JSX and the claim did not move with it:

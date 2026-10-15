@@ -9,6 +9,7 @@ import {
   rankProfileMatch,
   sanitizeProfileSearchQuery,
 } from "@/lib/profile-search";
+import { GUARDED_FIELDS } from "@/lib/check-profile-id-pii";
 import { profilesSearchUrl } from "@/lib/supabase-profiles-shapes";
 
 import { readRepoFile } from "./helpers/repo-file";
@@ -445,5 +446,110 @@ describe("both readers merge through the shared function", () => {
       readRepoFile("components/search-overlay.tsx"),
       /mergeProfileMatches\(local, remoteMatches, needle\)\.slice\(0, 20\)/,
     );
+  });
+});
+
+describe("the seam with two rows, which is the question it actually gets asked", () => {
+  // Every case above drives ONE row, which answers "do the two halves agree
+  // about this profile". What a user does is paste a profile ID and get a
+  // LIST, and until the ordering landed nothing stated what that list looks
+  // like when the two halves each contribute a row.
+  //
+  // The arrangement is the one that used to be wrong: the loaded page holds a
+  // weaker match and the exact row arrives from the server.
+  //
+  // The page row is a SUPERSTRING of what was typed, which is what makes it a
+  // match at all: `profileMatchesSearch` is `includes` on both halves, so a
+  // profile ID that merely contains somebody else's whole profile ID answers
+  // the query. That is the band-2 case, and it was sorting first.
+  const PAGE_ROW = {
+    id: "page",
+    username: "collectables-fan",
+    displayName: "Collectables Fan",
+    publicId: "not-my-collectables-id",
+  };
+  const SERVER_ROW = {
+    id: "server",
+    username: "anna_2",
+    displayName: "Anna Petrova",
+    publicId: "my-collectables-id",
+  };
+  const TYPED = "my-collectables-id";
+
+  it("both rows are matches, so the order is the whole question", () => {
+    const needle = profileSearchNeedle(TYPED);
+    assert.ok(
+      profileMatchesSearch(PAGE_ROW, needle),
+      "the page row must match, or this case is about one row again",
+    );
+    assert.ok(profileMatchesSearch(SERVER_ROW, needle));
+  });
+
+  it("the server would return the exact row for what was typed", () => {
+    // The other half's premise, so the arrangement is not a fiction: the row
+    // the page cannot see is one the table answers with.
+    const url = profilesSearchUrl(
+      "https://proj.supabase.co",
+      sanitizeProfileSearchQuery(TYPED),
+      20,
+    );
+    assert.ok(url.includes(`public_id.ilike.*${TYPED}*`));
+  });
+
+  it("answers with the pasted profile ID first", () => {
+    const merged = mergeProfileMatches([PAGE_ROW], [SERVER_ROW], profileSearchNeedle(TYPED));
+    assert.deepEqual(
+      merged.map((p) => p.id),
+      ["server", "page"],
+      "a page-one substring match is above the profile ID that was pasted",
+    );
+  });
+
+  it("keeps the page row, because ordering is not filtering", () => {
+    const merged = mergeProfileMatches([PAGE_ROW], [SERVER_ROW], profileSearchNeedle(TYPED));
+    assert.equal(merged.length, 2);
+  });
+});
+
+describe("what is safe to expose about a profile, decided in two lists", () => {
+  // `PROFILE_SEARCH_COLUMNS` is the third list in the tree with an opinion
+  // about profile fields, and `lib/check-profile-id-pii.ts`' GUARDED_FIELDS
+  // is the second. The guard is about identifiers DERIVED from an email, so
+  // the overlap is not a hole — but a searchable column the guard has never
+  // heard of is worth being deliberate about rather than discovering.
+  const UNGUARDED: Readonly<Record<string, string>> = {
+    display_name: "prose the user types, not an identifier derived from their email — the guard's whole subject is a publicId or handle built out of an address, and a display name is whatever somebody chose to be called",
+  };
+
+  it("classifies every searchable column", () => {
+    const unclassified = PROFILE_SEARCH_COLUMNS.filter(
+      (column) => !GUARDED_FIELDS.includes(column as (typeof GUARDED_FIELDS)[number]) &&
+        UNGUARDED[column] === undefined,
+    );
+    assert.deepEqual(
+      unclassified,
+      [],
+      "a column the profile search exposes is either watched by the PII guard or listed here with the reason",
+    );
+  });
+
+  it("the exemption list is not stale", () => {
+    for (const column of Object.keys(UNGUARDED)) {
+      assert.ok(
+        (PROFILE_SEARCH_COLUMNS as readonly string[]).includes(column),
+        `${column} is exempted and is not a searchable column any more`,
+      );
+      assert.ok(
+        !(GUARDED_FIELDS as readonly string[]).includes(column),
+        `${column} is exempted and the guard watches it now`,
+      );
+    }
+  });
+
+  it("the identifier the UI invites people to share IS guarded", () => {
+    // The field this search exists for, and the one an email could have been
+    // slugified into.
+    assert.ok((GUARDED_FIELDS as readonly string[]).includes("public_id"));
+    assert.ok((GUARDED_FIELDS as readonly string[]).includes("username"));
   });
 });
