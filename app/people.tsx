@@ -133,9 +133,10 @@ export default function PeopleScreen() {
     // The loaded page and the (debounced) server-wide results as one list,
     // through `profileSearchUnion`: it filters BOTH halves with the predicate
     // the overlay and the server's `or=` list are derived from, dedupes by id
-    // and orders by how well each row answers — exact handle or profile ID
-    // first, then prefix, then substring, stable within each band so a row
-    // already on screen leads among equally good matches.
+    // and orders by how well each row answers — a handle or profile ID that
+    // IS what was typed, then an exact display name (which two people can
+    // share), then a prefix, then a substring, stable within each band so a
+    // row already on screen leads among equally good matches.
     //
     // Everything in that sentence was once this screen's own code and one
     // half of it was wrong twice: the union was a bare spread (a page-one

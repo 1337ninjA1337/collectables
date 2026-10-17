@@ -204,9 +204,9 @@ async function fetchProfilesByUrl(url: string, label: string): Promise<UserProfi
  * client and no amount of client-side ranking can promote it — under a field
  * whose placeholder is `my-collectables-id` and whose commonest use is pasting
  * a whole profile ID somebody sent you. `profilesExactSearchUrl` asks for the
- * band-0 rows directly, and the two lists are merged by the same function the
- * screens use to fold in the page they already hold: exact first, dedupe by
- * id, stable within a band.
+ * exact-match rows directly, and the two lists are merged by the same
+ * function the screens use to fold in the page they already hold: exact
+ * first, dedupe by id, stable within a band.
  *
  * They are fired together rather than in sequence: the exact query is the
  * cheaper of the two and waiting for one before starting the other would add a

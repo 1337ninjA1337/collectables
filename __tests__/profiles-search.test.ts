@@ -333,20 +333,45 @@ describe("the brand, which is a compile error nothing here can assert", () => {
 describe("rankProfileMatch", () => {
   const ROW = { username: "anna", displayName: "Anna Petrova", publicId: "anna-collects" };
 
-  it("ranks a field that IS the needle first", () => {
+  it("ranks a UNIQUE identifier that IS the needle first", () => {
     assert.equal(rankProfileMatch(ROW, "anna"), 0);
     assert.equal(rankProfileMatch(ROW, "anna-collects"), 0);
-    assert.equal(rankProfileMatch(ROW, "anna petrova"), 0);
   });
 
-  it("ranks a prefix second", () => {
-    assert.equal(rankProfileMatch(ROW, "ann"), 1);
-    assert.equal(rankProfileMatch(ROW, "anna-coll"), 1);
+  it("ranks an exact display name second, because it is not a single answer", () => {
+    // `displayName` is the one searchable column with no unique index: two
+    // people may both be called "Anna Petrova". It was band 0 until
+    // 2026-10-17, which made the band's own description ("the one case where
+    // there is a single right answer") untrue.
+    assert.equal(rankProfileMatch(ROW, "anna petrova"), 1);
+  });
+
+  it("ranks a prefix third, whichever field it is a prefix of", () => {
+    // A guess about a unique column is still a guess.
+    assert.equal(rankProfileMatch(ROW, "ann"), 2);
+    assert.equal(rankProfileMatch(ROW, "anna-coll"), 2);
+    assert.equal(rankProfileMatch(ROW, "anna pet"), 2);
   });
 
   it("ranks a substring last", () => {
-    assert.equal(rankProfileMatch(ROW, "petrova"), 2);
-    assert.equal(rankProfileMatch(ROW, "collects"), 2);
+    assert.equal(rankProfileMatch(ROW, "petrova"), 3);
+    assert.equal(rankProfileMatch(ROW, "collects"), 3);
+  });
+
+  it("puts the handle's owner above every namesake", () => {
+    // The ordering the split exists for, over the rows it goes wrong on: one
+    // person whose handle IS `anna`, two people called Anna. All three are
+    // exact matches on some field; only one of them is THE answer.
+    const owner = { id: "owner", username: "anna", displayName: "A. Petrova", publicId: "x-id" };
+    const namesakes = [
+      { id: "n1", username: "anna_k", displayName: "Anna", publicId: "n1-id" },
+      { id: "n2", username: "anna_v", displayName: "Anna", publicId: "n2-id" },
+    ];
+    assert.deepEqual(
+      // The namesakes lead the input, so a tie would leave them leading.
+      mergeProfileMatches(namesakes, [owner], "anna").map((p) => p.id),
+      ["owner", "n1", "n2"],
+    );
   });
 
   it("is case-insensitive, like both halves of the search", () => {
@@ -354,15 +379,30 @@ describe("rankProfileMatch", () => {
     // not, because a stored displayName keeps its capitals.
     assert.equal(rankProfileMatch(ROW, profileSearchNeedle("ANNA")), 0);
     assert.equal(rankProfileMatch(ROW, profileSearchNeedle("@Anna-Collects")), 0);
+    assert.equal(rankProfileMatch(ROW, profileSearchNeedle("ANNA PETROVA")), 1);
   });
 
   it("is 0 for an empty needle, consistent with matching everything", () => {
     // Answered before the comparisons rather than falling out of them: every
     // field starts with "", so without the early return a row would be a
-    // prefix match (1) while a row with an empty username would be exact (0),
+    // prefix match (2) while a row with an empty username would be exact (0),
     // and the two would sort against each other for no reason.
     assert.equal(rankProfileMatch(ROW, ""), 0);
     assert.equal(rankProfileMatch({ username: "", displayName: "", publicId: "" }, ""), 0);
+  });
+
+  it("names the unique fields from the columns the schema makes unique", () => {
+    // The band split is an argument about uniqueness, and the uniqueness is
+    // in a migration (see the PROFILE_EXACT_SEARCH_LIMIT cases below). This
+    // is the same claim from the other end: the fields band 0 is about are
+    // the camel-case spellings of those columns, and `displayName` is not
+    // among them.
+    const module = readRepoFile("lib/profile-search.ts");
+    assert.match(module, /const UNIQUE_SEARCH_FIELDS = \["username", "publicId"\] as const/);
+    assert.ok(
+      !/UNIQUE_SEARCH_FIELDS = \[[^\]]*displayName/.test(module),
+      "displayName has no unique index — an exact match on it is band 1",
+    );
   });
 });
 
@@ -610,10 +650,13 @@ describe("the exact match the substring query could never return", () => {
     );
   });
 
-  // The tie that matters: this query's job is to fetch exactly the rows
-  // `rankProfileMatch` calls band 0, so the two have to agree about every
-  // typed string or the request fetches rows the ranking does not promote
-  // (or misses the ones it would).
+  // The tie that matters: this query's job is to fetch exactly the rows the
+  // ranking calls an EXACT match — band 0 (a unique identifier is the needle)
+  // or band 1 (the display name is) — so the two have to agree about every
+  // typed string, or the request fetches rows the ranking does not promote
+  // (or misses the ones it would). The `or=` is over all three columns and
+  // cannot tell the two bands apart; the ranking is what separates them once
+  // the rows are here.
   const ROW = {
     username: "anna_2",
     displayName: "Anna Petrova",
@@ -652,13 +695,13 @@ describe("the exact match the substring query could never return", () => {
     "my-collectables-id-2",
     "nobody-here",
   ]) {
-    it(`fetches ${JSON.stringify(typed)} exactly when the ranking calls it band 0`, () => {
+    it(`fetches ${JSON.stringify(typed)} exactly when the ranking calls it exact`, () => {
       const needle = sanitizeProfileSearchQuery(typed);
       assert.ok(needle.length > 0, "this case is about queries that reach the server");
       assert.equal(
-        rankProfileMatch(ROW, profileSearchNeedle(typed)) === 0,
+        rankProfileMatch(ROW, profileSearchNeedle(typed)) <= 1,
         serverWouldMatchExactly(profilesExactSearchUrl(BASE, needle, PROFILE_EXACT_SEARCH_LIMIT)),
-        "the exact query and the ranking's top band disagree about this query",
+        "the exact query and the ranking's exact bands disagree about this query",
       );
     });
   }

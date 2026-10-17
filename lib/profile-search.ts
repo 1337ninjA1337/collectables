@@ -125,17 +125,36 @@ export interface IdentifiedProfile extends SearchableProfile {
 }
 
 /**
- * How well a profile answers the needle: 0 best, 2 worst.
+ * The searchable fields that identify exactly one person.
  *
- * Three bands rather than a score, because the only ordering question this
+ * `profiles_username_key` and `profiles_public_id_key` are UNIQUE indexes
+ * (`supabase/migrations/20260423_base_schema.sql`, and a case in
+ * `profiles-search.test.ts` holds that), so an exact match on either is THE
+ * answer rather than an answer. `displayName` is whatever somebody chose to
+ * be called and two people may share one — which is the whole reason
+ * {@link rankProfileMatch} has four bands and not three.
+ */
+const UNIQUE_SEARCH_FIELDS = ["username", "publicId"] as const satisfies readonly (keyof SearchableProfile)[];
+
+/**
+ * How well a profile answers the needle: 0 best, 3 worst.
+ *
+ * Four bands rather than a score, because the only ordering question this
  * search has is the one a user can see going wrong:
  *
- *  - 0 — a searchable field IS the needle. Pasting a whole `publicId` or a
+ *  - 0 — a UNIQUE identifier IS the needle. Pasting a whole `publicId` or a
  *    whole handle is the commonest way this box is used (somebody sent it to
  *    you), and it is the one case where there is a single right answer.
- *  - 1 — a field STARTS with the needle. "ann" for "anna" is what typing
- *    looks like before you have finished.
- *  - 2 — a field contains it somewhere. Still a match, because both halves of
+ *  - 1 — the display name IS the needle. An exact match, and not a single
+ *    right answer: two people called "Anna" both land here. This band was
+ *    band 0 until 2026-10-17, which made the sentence above untrue — the
+ *    person whose handle IS `anna` tied with every namesake, and
+ *    `Array.prototype.sort` being stable meant whoever was on page one won.
+ *  - 2 — a field STARTS with the needle. "ann" for "anna" is what typing
+ *    looks like before you have finished. Any of the three fields: a prefix
+ *    is a guess at what is being typed, and a guess about a unique column is
+ *    not better than a guess about a name.
+ *  - 3 — a field contains it somewhere. Still a match, because both halves of
  *    this search are substring matches by construction, but the weakest kind:
  *    `profileMatchesSearch` is what admits it and this is what ranks it last.
  *
@@ -143,18 +162,18 @@ export interface IdentifiedProfile extends SearchableProfile {
  * `profileMatchesSearch` matching everything on one — and the callers skip
  * the whole filter in that state anyway. It is answered before the
  * comparisons rather than left to fall out of them: every field starts with
- * `""`, so the bands would otherwise read 1 for an ordinary row and 0 for one
+ * `""`, so the bands would otherwise read 2 for an ordinary row and 0 for one
  * with an empty username, and those two would sort against each other for no
  * reason at all.
  */
-export function rankProfileMatch(profile: SearchableProfile, needle: string): 0 | 1 | 2 {
+export function rankProfileMatch(profile: SearchableProfile, needle: string): 0 | 1 | 2 | 3 {
   if (needle.length === 0) return 0;
-  const fields = [profile.username, profile.displayName, profile.publicId].map((field) =>
-    field.toLowerCase(),
-  );
-  if (fields.some((field) => field === needle)) return 0;
-  if (fields.some((field) => field.startsWith(needle))) return 1;
-  return 2;
+  const unique = UNIQUE_SEARCH_FIELDS.map((field) => profile[field].toLowerCase());
+  const displayName = profile.displayName.toLowerCase();
+  if (unique.some((field) => field === needle)) return 0;
+  if (displayName === needle) return 1;
+  if ([...unique, displayName].some((field) => field.startsWith(needle))) return 2;
+  return 3;
 }
 
 /**

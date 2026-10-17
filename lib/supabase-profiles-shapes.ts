@@ -169,9 +169,12 @@ export const PROFILE_EXACT_SEARCH_LIMIT = 5;
  * PostgREST has no "order by this expression" for a computed rank, so the fix
  * is a second, tiny request rather than a cleverer one: `ilike` with NO
  * wildcards is an exact comparison that ignores case, which is precisely the
- * band-0 test `rankProfileMatch` applies (it lower-cases both sides). The
- * column list and the needle's sanitisation are the same ones the substring
- * query uses, so the two halves cannot drift apart.
+ * test `rankProfileMatch`'s two exact bands apply (it lower-cases both
+ * sides). Which of those two a row lands in — 0 for a unique identifier, 1
+ * for a display name two people may share — is the ranking's business once
+ * the rows are here; this `or=` is over all three columns and fetches both.
+ * The column list and the needle's sanitisation are the same ones the
+ * substring query uses, so the two halves cannot drift apart.
  *
  * `limit` is small by construction at the call site: `username` and
  * `public_id` are unique, so only `display_name` can answer with a crowd.
