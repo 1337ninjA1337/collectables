@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 
 import {
   PROFILE_SEARCH_COLUMNS,
@@ -16,7 +17,7 @@ import {
   profilesSearchUrl,
 } from "@/lib/supabase-profiles-shapes";
 
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 
 describe("sanitizeProfileSearchQuery", () => {
@@ -758,5 +759,88 @@ describe("the server's rows answer an older query than the one on screen", () =>
         `${file} runs the predicate over one half of the union only`,
       );
     }
+  });
+});
+
+describe("the two profile queries are one URL shape with one difference", () => {
+  // Both builders went through `profilesIlikeUrl` on 2026-10-17, because the
+  // template was written twice and the only difference between the copies was
+  // the wildcards. This is that claim, stated so a third copy cannot appear
+  // quietly: everything but the pattern has to match, character for
+  // character.
+  const BASE = "https://proj.supabase.co";
+  const NEEDLE = sanitizeProfileSearchQuery("my-collectables-id");
+
+  it("differ only by the wildcards around the pattern", () => {
+    const exact = profilesExactSearchUrl(BASE, NEEDLE, 20);
+    const substring = profilesSearchUrl(BASE, NEEDLE, 20);
+    assert.equal(
+      exact.split(`ilike.${NEEDLE}`).join(`ilike.*${NEEDLE}*`),
+      substring,
+      "the two queries differ somewhere other than the pattern",
+    );
+  });
+
+  it("neither spells the profiles URL template for itself", () => {
+    // What makes the sentence above true going forward: one template, and the
+    // two exported builders are the pattern they pass to it.
+    const module = readRepoFile("lib/supabase-profiles-shapes.ts");
+    // The `or=` is what makes it a SEARCH URL: `profilesPageUrl` shares the
+    // `select=` prefix and is a different question (one page of the table, in
+    // table order), so the prefix alone would count it in.
+    assert.equal(
+      module.split("&or=(${or})").length - 1,
+      1,
+      "the profile search URL template is written more than once",
+    );
+    assert.match(module, /return profilesIlikeUrl\(baseUrl, `\*\$\{needle\}\*`, limit\);/);
+    assert.match(module, /return profilesIlikeUrl\(baseUrl, needle, limit\);/);
+  });
+});
+
+describe("why PROFILE_EXACT_SEARCH_LIMIT is allowed to be 5", () => {
+  // The constant's header says "`username` and `public_id` are unique, so the
+  // only column that can answer with a crowd is `display_name`". That is a
+  // claim about the DATABASE, and the database is in this repository — so it
+  // is checkable rather than a remembered fact. A migration that dropped
+  // either unique index would turn 5 from a comfortable margin into a silent
+  // cap on correct answers.
+  const UNIQUE_ON_PROFILES = (() => {
+    const found = new Set<string>();
+    for (const file of readdirSync(repoPath("supabase", "migrations"))) {
+      if (!file.endsWith(".sql")) continue;
+      const sql = readRepoFile("supabase", "migrations", file);
+      for (const match of sql.matchAll(
+        /CREATE\s+UNIQUE\s+INDEX[^;]*?\s+ON\s+(?:public\.)?profiles\s*\(\s*([a-z_]+)\s*\)/gi,
+      )) {
+        found.add(match[1].toLowerCase());
+      }
+    }
+    return found;
+  })();
+
+  it("finds the unique indexes the constant's reason rests on", () => {
+    // The premise, checked before it is argued from: a regex that matched
+    // nothing would make every assertion below vacuously agreeable.
+    assert.ok(UNIQUE_ON_PROFILES.size > 0, "no UNIQUE INDEX on profiles was found at all");
+  });
+
+  it("every searchable column is unique except the one that can hold a crowd", () => {
+    const notUnique = PROFILE_SEARCH_COLUMNS.filter((c) => !UNIQUE_ON_PROFILES.has(c));
+    assert.deepEqual(
+      notUnique,
+      ["display_name"],
+      "a searchable column stopped being unique (or display_name became unique) — PROFILE_EXACT_SEARCH_LIMIT's reason moved",
+    );
+  });
+
+  it("leaves room for more than one of the column that is not unique", () => {
+    // One unique row per unique column, plus whatever `display_name` adds.
+    // Five is "the handful at the top of the list"; two would be the cap the
+    // header says it is not.
+    assert.ok(
+      PROFILE_EXACT_SEARCH_LIMIT > PROFILE_SEARCH_COLUMNS.length - 1,
+      "the limit cannot hold one row per unique column and any namesakes",
+    );
   });
 });

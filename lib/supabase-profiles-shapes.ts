@@ -94,6 +94,33 @@ export function profilesPageRangeHeader(page: number, pageSize: number): string 
 }
 
 /**
+ * The one URL shape both profile searches have: `or=` over every searchable
+ * column, newest first, capped.
+ *
+ * The two exported builders below were this template written twice with one
+ * difference — whether the `ilike` pattern carries wildcards — and that is a
+ * difference worth naming rather than a reason for a second copy. Everything
+ * else about them has to stay identical: the same column list (or the page the
+ * client holds answers differently from the table), the same encoding (or a
+ * metacharacter survives into the boolean tree in one of them), the same
+ * ordering and the same `&limit=` spelling the suites read. A copy drifts on
+ * the next edit; a parameter cannot.
+ *
+ * `pattern` is a PostgREST `ilike` pattern rather than a needle: it is
+ * percent-encoded here and nowhere else, and the callers are what decide
+ * whether `*` is part of it.
+ */
+function profilesIlikeUrl(baseUrl: string, pattern: string, limit: number): string {
+  const q = encodeURIComponent(pattern);
+  const or = PROFILE_SEARCH_COLUMNS.map((column) => `${column}.ilike.${q}`).join(",");
+  return (
+    `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}` +
+    `&or=(${or})` +
+    `&order=created_at.desc&limit=${limit}`
+  );
+}
+
+/**
  * Server-side profile search: any of {@link PROFILE_SEARCH_COLUMNS} contains
  * the query (case-insensitive). Search must hit the SERVER — the people
  * browser only holds one page client-side, so filtering that page silently
@@ -115,13 +142,7 @@ export function profilesSearchUrl(
   needle: SanitizedProfileQuery,
   limit: number,
 ): string {
-  const q = encodeURIComponent(`*${needle}*`);
-  const or = PROFILE_SEARCH_COLUMNS.map((column) => `${column}.ilike.${q}`).join(",");
-  return (
-    `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}` +
-    `&or=(${or})` +
-    `&order=created_at.desc&limit=${limit}`
-  );
+  return profilesIlikeUrl(baseUrl, `*${needle}*`, limit);
 }
 
 /**
@@ -160,13 +181,7 @@ export function profilesExactSearchUrl(
   needle: SanitizedProfileQuery,
   limit: number,
 ): string {
-  const q = encodeURIComponent(needle);
-  const or = PROFILE_SEARCH_COLUMNS.map((column) => `${column}.ilike.${q}`).join(",");
-  return (
-    `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}` +
-    `&or=(${or})` +
-    `&order=created_at.desc&limit=${limit}`
-  );
+  return profilesIlikeUrl(baseUrl, needle, limit);
 }
 
 export function upsertProfileBody(profile: UserProfile): Record<string, unknown> {
