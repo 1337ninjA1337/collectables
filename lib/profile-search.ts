@@ -190,3 +190,32 @@ export function mergeProfileMatches<T extends IdentifiedProfile>(
     (a, b) => rankProfileMatch(a, needle) - rankProfileMatch(b, needle),
   );
 }
+
+/**
+ * What a screen actually wants: the two lists it holds, as one list of the
+ * rows that answer the needle, best first.
+ *
+ * {@link mergeProfileMatches} dedupes and ORDERS, deliberately — "ordering is
+ * not filtering" is a case with its reason. Filtering is the caller's job, and
+ * for two days each caller did half of it: the local half is recomputed from
+ * the live query on every keystroke, and the remote half — fetched for
+ * `debouncedQuery`, which is what was typed a debounce window ago — was
+ * merged in unchecked. So narrowing "ann" to "annz" rendered profiles that
+ * answer nothing on screen until the next round trip landed, in both readers,
+ * because each had written the filter once and the union twice.
+ *
+ * Both halves through one predicate, named once. The remote half keeps a
+ * stale row that STILL answers (that is the responsiveness the union is for)
+ * and drops one that no longer does with the keystroke that stops matching
+ * it. A third reader gets that for free rather than having to remember it,
+ * which is the whole difference between this function and the two lines it
+ * replaces.
+ */
+export function profileSearchUnion<T extends IdentifiedProfile>(
+  local: readonly T[],
+  remote: readonly T[],
+  needle: string,
+): T[] {
+  const answers = (list: readonly T[]) => list.filter((p) => profileMatchesSearch(p, needle));
+  return mergeProfileMatches(answers(local), answers(remote), needle);
+}

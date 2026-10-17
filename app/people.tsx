@@ -32,9 +32,8 @@ import {
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import {
-  mergeProfileMatches,
-  profileMatchesSearch,
   profileSearchNeedle,
+  profileSearchUnion,
 } from "@/lib/profile-search";
 import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -131,35 +130,23 @@ export default function PeopleScreen() {
   const filteredPeople = useMemo(() => {
     const needle = profileSearchNeedle(query);
     if (!needle) return others;
-    // Instant pass over the already-loaded page, unioned with the (debounced)
-    // server-wide results so matches beyond the current page appear too. The
-    // predicate is shared with the overlay and with the server's `or=` list,
-    // because the page the client holds and the rest of the table have to
-    // answer one question — and all three used to leave `publicId` out, under
-    // a field this screen labels "search by profile ID".
+    // The loaded page and the (debounced) server-wide results as one list,
+    // through `profileSearchUnion`: it filters BOTH halves with the predicate
+    // the overlay and the server's `or=` list are derived from, dedupes by id
+    // and orders by how well each row answers — exact handle or profile ID
+    // first, then prefix, then substring, stable within each band so a row
+    // already on screen leads among equally good matches.
     //
-    // `mergeProfileMatches` dedupes by id and orders by how well each row
-    // answers: an exact handle or profile ID first, then a prefix, then a
-    // substring, stable within each band so the loaded page still leads among
-    // equally good matches. The union used to be a bare spread of the loaded
-    // page followed by the server's rows, which put a page-one substring
-    // match above the exact row only the server knew about — under a field
-    // this screen labels "search by profile ID", where pasting a whole one is
-    // the commonest use.
-    //
-    // BOTH halves go through the predicate, and the second one is the fix
-    // rather than a tidy-up: `searchResults` was fetched for
-    // `debouncedQuery`, which is what was typed a debounce window ago. While
-    // somebody narrows "ann" to "annz" the loaded page stops matching
-    // immediately and the server's rows did not, so the list rendered
-    // profiles that answer nothing on screen until the next round trip
-    // landed. The predicate is the same one the local half uses, so a stale
-    // row that STILL answers is kept (that is the responsiveness the union is
-    // for) and one that no longer does goes away with the keystroke.
-    const local = others.filter((p) => profileMatchesSearch(p, needle));
-    return mergeProfileMatches(
-      local,
-      searchResults.filter((p) => p.id !== myProfile?.id && profileMatchesSearch(p, needle)),
+    // Everything in that sentence was once this screen's own code and one
+    // half of it was wrong twice: the union was a bare spread (a page-one
+    // substring match above the exact row only the server knew about) and the
+    // remote half went unfiltered (`searchResults` answers `debouncedQuery`,
+    // so narrowing "ann" to "annz" rendered rows that answer nothing on
+    // screen until the next round trip landed). Only "not me" is left here,
+    // which is genuinely this screen's rule.
+    return profileSearchUnion(
+      others,
+      searchResults.filter((p) => p.id !== myProfile?.id),
       needle,
     );
   }, [others, query, searchResults, myProfile]);

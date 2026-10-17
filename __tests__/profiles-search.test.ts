@@ -7,6 +7,7 @@ import {
   mergeProfileMatches,
   profileMatchesSearch,
   profileSearchNeedle,
+  profileSearchUnion,
   rankProfileMatch,
   sanitizeProfileSearchQuery,
 } from "@/lib/profile-search";
@@ -183,21 +184,25 @@ describe("the client half of the same question", () => {
   it("both client readers go through the shared predicate", () => {
     // Two identical five-line filters is how `publicId` came to be missing
     // from one of them — in fact from both, which is worse: nothing
-    // disagreed, so nothing looked wrong.
+    // disagreed, so nothing looked wrong. The readers reach the predicate
+    // through `profileSearchUnion` since 2026-10-17, which is the same claim
+    // one level up: neither screen decides what a match is, and neither
+    // decides WHICH HALF gets asked.
     for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
       const src = readRepoFile(file);
-      // The import is a multi-line list since `mergeProfileMatches` joined
-      // it, so the claim is about the two names and the module rather than
-      // about one line's text.
       const importList = /import \{([^}]+)\} from "@\/lib\/profile-search";/.exec(src);
       assert.ok(importList, `${file} does not import from lib/profile-search`);
-      for (const name of ["profileMatchesSearch", "profileSearchNeedle"]) {
+      for (const name of ["profileSearchNeedle", "profileSearchUnion"]) {
         assert.ok(
           importList[1].includes(name),
           `${file} does not import ${name} from the shared module`,
         );
       }
-      assert.match(src, /profileMatchesSearch\(p, needle\)/, `${file} filters by hand`);
+      assert.match(src, /profileSearchUnion\(/, `${file} builds the union itself`);
+      assert.ok(
+        !/\.filter\(\(p\) => profileMatchesSearch\(p, needle\)\)/.test(src),
+        `${file} filters a half by hand — which half is the question that went wrong`,
+      );
       assert.ok(
         !/p\.displayName\.toLowerCase\(\)\.includes\(needle\)/.test(src),
         `${file} still has the hand-rolled filter the predicate replaced`,
@@ -430,7 +435,7 @@ describe("both readers merge through the shared function", () => {
   it("neither spreads the two lists together itself", () => {
     for (const file of READERS) {
       const source = readRepoFile(file);
-      assert.match(source, /mergeProfileMatches\(/, `${file} does not use the shared merge`);
+      assert.match(source, /profileSearchUnion\(/, `${file} does not use the shared union`);
       assert.doesNotMatch(
         source,
         /\[\.\.\.local, \.\.\.remote/,
@@ -449,7 +454,7 @@ describe("both readers merge through the shared function", () => {
     // exact match outright.
     assert.match(
       readRepoFile("components/search-overlay.tsx"),
-      /mergeProfileMatches\(local, remote, needle\)\.slice\(0, 20\)/,
+      /profileSearchUnion\(profiles, remoteMatches, needle\)\.slice\(0, 20\)/,
     );
   });
 });
@@ -723,14 +728,9 @@ describe("the server's rows answer an older query than the one on screen", () =>
   // recomputed per keystroke.
   const FETCHED_FOR_ANN = [row("1", "ann"), row("2", "annz")];
 
-  /** What a screen renders, with the fix: both halves through the predicate. */
+  /** What a screen renders: exactly the call both of them make. */
   function rendered(typed: string, remote: readonly ReturnType<typeof row>[]): string[] {
-    const needle = profileSearchNeedle(typed);
-    return mergeProfileMatches(
-      [],
-      remote.filter((p) => profileMatchesSearch(p, needle)),
-      needle,
-    ).map((p) => p.id);
+    return profileSearchUnion([], remote, profileSearchNeedle(typed)).map((p) => p.id);
   }
 
   it("drops the stale row that no longer answers what is typed", () => {
@@ -747,18 +747,23 @@ describe("the server's rows answer an older query than the one on screen", () =>
     assert.deepEqual(rendered("boris", FETCHED_FOR_ANN), []);
   });
 
-  it("both screens filter the remote half, not only the loaded page", () => {
-    // The claim the two `useMemo`s make, read from the source: a screen that
-    // filters one half of its union and spreads the other is the arrangement
-    // this case exists about.
+  it("neither screen can filter one half and forget the other", () => {
+    // The fix that outlasts this case: the predicate is not at either call
+    // site any more, so "which half gets filtered" is not a question a screen
+    // can answer wrongly. `profileSearchUnion` is where it is answered, once.
     for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
       const src = readRepoFile(file);
       assert.equal(
-        src.split("profileMatchesSearch(p, needle)").length - 1,
-        2,
-        `${file} runs the predicate over one half of the union only`,
+        src.split("profileMatchesSearch").length - 1,
+        0,
+        `${file} names the predicate again — the union is what decides both halves`,
       );
     }
+    assert.equal(
+      readRepoFile("lib/profile-search.ts").split("profileMatchesSearch(p, needle)").length - 1,
+      1,
+      "the union filters its two halves with one expression or none",
+    );
   });
 });
 
@@ -842,5 +847,56 @@ describe("why PROFILE_EXACT_SEARCH_LIMIT is allowed to be 5", () => {
       PROFILE_EXACT_SEARCH_LIMIT > PROFILE_SEARCH_COLUMNS.length - 1,
       "the limit cannot hold one row per unique column and any namesakes",
     );
+  });
+});
+
+describe("profileSearchUnion", () => {
+  const row = (id: string, username: string) => ({
+    id,
+    username,
+    displayName: username,
+    publicId: `${username}-id`,
+  });
+
+  it("filters both halves, which is the whole difference from the merge", () => {
+    // `mergeProfileMatches` keeps every input row by design ("ordering is not
+    // filtering", with its reason). This is the function the screens want,
+    // and it is the one that decides which rows answer.
+    const local = [row("1", "anna"), row("2", "boris")];
+    const remote = [row("3", "annabel"), row("4", "clara")];
+    assert.deepEqual(
+      profileSearchUnion(local, remote, "anna").map((p) => p.id),
+      ["1", "3"],
+    );
+    assert.equal(
+      mergeProfileMatches(local, remote, "anna").length,
+      4,
+      "the merge still keeps everything — the two functions have different jobs",
+    );
+  });
+
+  it("puts an exact match from the server above a substring match on the page", () => {
+    // The ordering the merge brought, unchanged by the filtering above it.
+    const local = [row("1", "banna-fan")];
+    const remote = [row("2", "anna")];
+    assert.deepEqual(
+      profileSearchUnion(local, remote, "anna").map((p) => p.id),
+      ["2", "1"],
+    );
+  });
+
+  it("lets the local copy of a duplicate win", () => {
+    const local = [row("1", "anna")];
+    const remote = [{ ...row("1", "anna-stale"), publicId: "anna-id" }];
+    const merged = profileSearchUnion(local, remote, "anna");
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].username, "anna");
+  });
+
+  it("returns both halves on an empty needle, as the predicate does", () => {
+    // Consistent rather than meaningful: the callers skip the whole filter in
+    // that state. An empty needle that silently emptied the list would be the
+    // worse of the two answers.
+    assert.equal(profileSearchUnion([row("1", "anna")], [row("2", "boris")], "").length, 2);
   });
 });

@@ -45,9 +45,8 @@ import {
 import { catalogueSearchNeedle, collectionMatchesSearch, itemMatchesSearch } from "@/lib/catalogue-search";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import {
-  mergeProfileMatches,
-  profileMatchesSearch,
   profileSearchNeedle,
+  profileSearchUnion,
 } from "@/lib/profile-search";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useI18n } from "@/lib/i18n-context";
@@ -153,18 +152,15 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // Shared with `app/people.tsx` and with the server's `or=` list: the page
     // the client holds and the rest of the table have to answer one question.
     const needle = profileSearchNeedle(q);
-    const local = profiles.filter((p) => profileMatchesSearch(p, needle));
+    // `profileSearchUnion` filters both halves through the one predicate:
     // `remoteMatches` was fetched for `debouncedQuery` — what was typed a
-    // debounce window ago — so it goes through the same predicate as the
-    // local half. Without it, narrowing a query rendered server rows that
-    // answer nothing on screen until the next round trip landed; with it, a
-    // stale row that still answers is kept and one that does not goes away
-    // with the keystroke.
-    const remote = remoteMatches.filter((p) => profileMatchesSearch(p, needle));
+    // debounce window ago — so without it, narrowing a query rendered server
+    // rows that answer nothing on screen until the next round trip landed.
+    //
     // Ordered before the slice, not after: a twenty-row cut off the front of
     // an unordered union can drop the exact match outright, which is a
     // stronger version of the bug the ordering fixes.
-    return mergeProfileMatches(local, remote, needle).slice(0, 20);
+    return profileSearchUnion(profiles, remoteMatches, needle).slice(0, 20);
   }, [profiles, q, filter, remoteMatches]);
 
   // Get collection name for an item
