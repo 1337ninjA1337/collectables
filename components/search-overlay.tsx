@@ -154,10 +154,17 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // the client holds and the rest of the table have to answer one question.
     const needle = profileSearchNeedle(q);
     const local = profiles.filter((p) => profileMatchesSearch(p, needle));
+    // `remoteMatches` was fetched for `debouncedQuery` — what was typed a
+    // debounce window ago — so it goes through the same predicate as the
+    // local half. Without it, narrowing a query rendered server rows that
+    // answer nothing on screen until the next round trip landed; with it, a
+    // stale row that still answers is kept and one that does not goes away
+    // with the keystroke.
+    const remote = remoteMatches.filter((p) => profileMatchesSearch(p, needle));
     // Ordered before the slice, not after: a twenty-row cut off the front of
     // an unordered union can drop the exact match outright, which is a
     // stronger version of the bug the ordering fixes.
-    return mergeProfileMatches(local, remoteMatches, needle).slice(0, 20);
+    return mergeProfileMatches(local, remote, needle).slice(0, 20);
   }, [profiles, q, filter, remoteMatches]);
 
   // Get collection name for an item

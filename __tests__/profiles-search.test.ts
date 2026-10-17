@@ -10,7 +10,11 @@ import {
   sanitizeProfileSearchQuery,
 } from "@/lib/profile-search";
 import { GUARDED_FIELDS } from "@/lib/check-profile-id-pii";
-import { profilesSearchUrl } from "@/lib/supabase-profiles-shapes";
+import {
+  PROFILE_EXACT_SEARCH_LIMIT,
+  profilesExactSearchUrl,
+  profilesSearchUrl,
+} from "@/lib/supabase-profiles-shapes";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -444,7 +448,7 @@ describe("both readers merge through the shared function", () => {
     // exact match outright.
     assert.match(
       readRepoFile("components/search-overlay.tsx"),
-      /mergeProfileMatches\(local, remoteMatches, needle\)\.slice\(0, 20\)/,
+      /mergeProfileMatches\(local, remote, needle\)\.slice\(0, 20\)/,
     );
   });
 });
@@ -551,5 +555,208 @@ describe("what is safe to expose about a profile, decided in two lists", () => {
     // slugified into.
     assert.ok((GUARDED_FIELDS as readonly string[]).includes("public_id"));
     assert.ok((GUARDED_FIELDS as readonly string[]).includes("username"));
+  });
+});
+
+describe("the exact match the substring query could never return", () => {
+  // `profilesSearchUrl` is `created_at.desc` cut at `limit`, so the ranking
+  // the client applies afterwards can only reorder what arrived. An exact
+  // `publicId` match that sits past that cut is not in the response at all —
+  // under a field whose placeholder is `my-collectables-id`. The second,
+  // tiny request is what puts it there.
+  const BASE = "https://proj.supabase.co";
+
+  it("builds an or=() over every searchable column, with no wildcards", () => {
+    const url = profilesExactSearchUrl(BASE, sanitizeProfileSearchQuery("juno"), 5);
+    assert.match(url, /\/rest\/v1\/profiles\?select=/);
+    assert.match(
+      url,
+      /or=\(username\.ilike\.juno,display_name\.ilike\.juno,public_id\.ilike\.juno\)/,
+    );
+    assert.ok(!url.includes("*"), "a wildcard would make this the substring query again");
+  });
+
+  it("derives the or= list from PROFILE_SEARCH_COLUMNS rather than restating it", () => {
+    // The same claim the substring builder carries: the two server queries
+    // and the two client filters are halves of one question.
+    const url = profilesExactSearchUrl(BASE, sanitizeProfileSearchQuery("juno"), 5);
+    for (const column of PROFILE_SEARCH_COLUMNS) {
+      assert.ok(url.includes(`${column}.ilike.juno`), `${column} is not searched`);
+    }
+    assert.equal(
+      url.split(".ilike.").length - 1,
+      PROFILE_SEARCH_COLUMNS.length,
+      "the or= list is exactly the shared column list",
+    );
+  });
+
+  it("takes a needle already sanitised, so nothing strips the query twice", () => {
+    const url = profilesExactSearchUrl(BASE, sanitizeProfileSearchQuery("@ju,no(1)"), 5);
+    assert.match(url, /ilike\.juno1/);
+    assert.ok(!url.includes("no(1)"), "unsanitized query leaked into the URL");
+  });
+
+  it("asks for a handful, because only display_name can answer with a crowd", () => {
+    assert.equal(PROFILE_EXACT_SEARCH_LIMIT, 5);
+    assert.match(
+      profilesExactSearchUrl(BASE, sanitizeProfileSearchQuery("juno"), PROFILE_EXACT_SEARCH_LIMIT),
+      /limit=5$/,
+    );
+  });
+
+  // The tie that matters: this query's job is to fetch exactly the rows
+  // `rankProfileMatch` calls band 0, so the two have to agree about every
+  // typed string or the request fetches rows the ranking does not promote
+  // (or misses the ones it would).
+  const ROW = {
+    username: "anna_2",
+    displayName: "Anna Petrova",
+    publicId: "my-collectables-id",
+  };
+  const COLUMN_OF: Readonly<Record<string, keyof typeof ROW>> = {
+    username: "username",
+    display_name: "displayName",
+    public_id: "publicId",
+  };
+
+  function serverWouldMatchExactly(url: string): boolean {
+    const or = /or=\(([^)]*)\)/.exec(url);
+    assert.ok(or, "no or= filter in the URL");
+    return or[1].split(",").some((clause) => {
+      const [column, operator, pattern] = clause.split(".");
+      const field = COLUMN_OF[column];
+      assert.ok(field, `the or= names a column this case does not know: ${column}`);
+      assert.equal(operator, "ilike", `this case cannot simulate ${operator}`);
+      assert.ok(!pattern.includes("*"), "a wildcard pattern is not an exact comparison");
+      // `ilike` with no wildcards is `=` that ignores case, which is what
+      // `rankProfileMatch`'s band 0 is: both sides lower-cased, then compared.
+      return ROW[field].toLowerCase() === decodeURIComponent(pattern).toLowerCase();
+    });
+  }
+
+  for (const typed of [
+    "anna_2",
+    "@anna_2",
+    "ANNA_2",
+    "anna",
+    "Anna Petrova",
+    "my-collectables-id",
+    "MY-COLLECTABLES-ID",
+    "collectables",
+    "my-collectables-id-2",
+    "nobody-here",
+  ]) {
+    it(`fetches ${JSON.stringify(typed)} exactly when the ranking calls it band 0`, () => {
+      const needle = sanitizeProfileSearchQuery(typed);
+      assert.ok(needle.length > 0, "this case is about queries that reach the server");
+      assert.equal(
+        rankProfileMatch(ROW, profileSearchNeedle(typed)) === 0,
+        serverWouldMatchExactly(profilesExactSearchUrl(BASE, needle, PROFILE_EXACT_SEARCH_LIMIT)),
+        "the exact query and the ranking's top band disagree about this query",
+      );
+    });
+  }
+
+  it("the exact row leads even when the substring query returned a page of others", () => {
+    // What the two requests buy, stated over the merge they are folded
+    // together by: the exact list is the `local` argument, so its rows win
+    // the dedupe and sort to the front.
+    const exact = [{ id: "exact", ...ROW }];
+    const substring = [
+      { id: "other-1", username: "fan", displayName: "Fan", publicId: "not-my-collectables-id" },
+      { id: "exact", ...ROW },
+    ];
+    const merged = mergeProfileMatches(exact, substring, profileSearchNeedle("my-collectables-id"));
+    assert.deepEqual(merged.map((p) => p.id), ["exact", "other-1"]);
+  });
+});
+
+describe("searchProfiles asks both halves of the question", () => {
+  const src = readRepoFile("lib/supabase-profiles.ts");
+
+  it("fires the exact and the substring query together", () => {
+    // In sequence would add a round trip to every keystroke that survives
+    // the debounce, for a request that is the cheaper of the two.
+    assert.match(
+      src,
+      /await Promise\.all\(\[\s*fetchProfilesByUrl\(\s*profilesExactSearchUrl\([\s\S]*?profilesSearchUrl\(/,
+    );
+  });
+
+  it("asks for PROFILE_EXACT_SEARCH_LIMIT rather than a number written here", () => {
+    assert.match(src, /profilesExactSearchUrl\(supabaseUrl!, needle, PROFILE_EXACT_SEARCH_LIMIT\)/);
+  });
+
+  it("merges through the function the screens use, exact first", () => {
+    assert.match(src, /mergeProfileMatches\(exact, substring, needle\.toLowerCase\(\)\)\.slice\(0, limit\)/);
+  });
+
+  it("reads both responses through one reader, so one failure cannot blank the other", () => {
+    // Two `res.ok` checks written twice is the shape this repository's
+    // history is about removing — and here the second copy would have had to
+    // decide what a half-failed search returns.
+    assert.equal(
+      src.split("async function fetchProfilesByUrl").length - 1,
+      1,
+      "one reader for both profile search requests",
+    );
+    assert.match(src, /if \(!res\.ok \|\| !Array\.isArray\(rows\)\) \{/);
+  });
+});
+
+describe("the server's rows answer an older query than the one on screen", () => {
+  // Both screens compute the local half from the LIVE query and hold the
+  // server half for `debouncedQuery` — what was typed a debounce window ago.
+  // So the two halves of the union answer different questions for as long as
+  // somebody is still typing, and until 2026-10-17 the remote half was
+  // merged in unchecked: narrowing a query rendered profiles that answer
+  // nothing on screen until the next round trip landed.
+  const row = (id: string, username: string) => ({
+    id,
+    username,
+    displayName: username,
+    publicId: `${username}-id`,
+  });
+
+  // The page is empty on purpose: this is about the half that is NOT
+  // recomputed per keystroke.
+  const FETCHED_FOR_ANN = [row("1", "ann"), row("2", "annz")];
+
+  /** What a screen renders, with the fix: both halves through the predicate. */
+  function rendered(typed: string, remote: readonly ReturnType<typeof row>[]): string[] {
+    const needle = profileSearchNeedle(typed);
+    return mergeProfileMatches(
+      [],
+      remote.filter((p) => profileMatchesSearch(p, needle)),
+      needle,
+    ).map((p) => p.id);
+  }
+
+  it("drops the stale row that no longer answers what is typed", () => {
+    assert.deepEqual(rendered("annz", FETCHED_FOR_ANN), ["2"]);
+  });
+
+  it("keeps the stale row that still answers, which is what the union is for", () => {
+    // The responsiveness half: a row fetched for a shorter query and still
+    // matching must not blink out while the next request is in flight.
+    assert.deepEqual(rendered("ann", FETCHED_FOR_ANN), ["1", "2"]);
+  });
+
+  it("renders nothing rather than everything when the query stops matching", () => {
+    assert.deepEqual(rendered("boris", FETCHED_FOR_ANN), []);
+  });
+
+  it("both screens filter the remote half, not only the loaded page", () => {
+    // The claim the two `useMemo`s make, read from the source: a screen that
+    // filters one half of its union and spreads the other is the arrangement
+    // this case exists about.
+    for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
+      const src = readRepoFile(file);
+      assert.equal(
+        src.split("profileMatchesSearch(p, needle)").length - 1,
+        2,
+        `${file} runs the predicate over one half of the union only`,
+      );
+    }
   });
 });

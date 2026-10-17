@@ -146,10 +146,20 @@ export default function PeopleScreen() {
     // match above the exact row only the server knew about — under a field
     // this screen labels "search by profile ID", where pasting a whole one is
     // the commonest use.
+    //
+    // BOTH halves go through the predicate, and the second one is the fix
+    // rather than a tidy-up: `searchResults` was fetched for
+    // `debouncedQuery`, which is what was typed a debounce window ago. While
+    // somebody narrows "ann" to "annz" the loaded page stops matching
+    // immediately and the server's rows did not, so the list rendered
+    // profiles that answer nothing on screen until the next round trip
+    // landed. The predicate is the same one the local half uses, so a stale
+    // row that STILL answers is kept (that is the responsiveness the union is
+    // for) and one that no longer does goes away with the keystroke.
     const local = others.filter((p) => profileMatchesSearch(p, needle));
     return mergeProfileMatches(
       local,
-      searchResults.filter((p) => p.id !== myProfile?.id),
+      searchResults.filter((p) => p.id !== myProfile?.id && profileMatchesSearch(p, needle)),
       needle,
     );
   }, [others, query, searchResults, myProfile]);

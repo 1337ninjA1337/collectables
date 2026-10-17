@@ -1464,3 +1464,32 @@ secret.
 Note: the CSP half of the upload failure IS fixed in-repo — `connect-src` now
 allow-lists `blob:` and `data:` so `fetch(uri).blob()` can read a
 web-picked image before upload (`lib/web-security-headers.ts`).
+
+## OPTIONAL (performance, 2026-10-17): case-insensitive indexes for profile search
+
+Not required — the app is correct without this. `searchProfiles` now fires a
+second, exact-match query alongside the substring one so that pasting a whole
+profile ID always returns the row it names, even when that row sits past the
+substring query's `created_at.desc` cut. That exact query compares with
+`ilike` and no wildcards (case-insensitive equality, which is what the
+client's ranking does), and **Postgres cannot use the unique btree indexes**
+`profiles_public_id_key` / `profiles_username_key` for a case-insensitive
+comparison. So each search is a sequential scan of `profiles`.
+
+That is free at this table size. If `profiles` grows, add expression indexes
+so the exact query becomes an index lookup:
+
+```sql
+CREATE INDEX IF NOT EXISTS profiles_public_id_lower_idx
+  ON public.profiles (lower(public_id));
+CREATE INDEX IF NOT EXISTS profiles_username_lower_idx
+  ON public.profiles (lower(username));
+CREATE INDEX IF NOT EXISTS profiles_display_name_lower_idx
+  ON public.profiles (lower(display_name));
+```
+
+Nothing in the app has to change: the planner picks these up for
+`lower(col) = lower($1)`, which is how PostgREST's wildcard-free `ilike`
+is executed. The substring half (`ilike '*needle*'`) stays a scan either way
+— a trigram index (`pg_trgm` + `gin (public_id gin_trgm_ops)`) is the tool
+for that one, and it is a bigger decision than this note.

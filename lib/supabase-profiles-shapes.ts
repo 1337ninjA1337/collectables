@@ -124,6 +124,51 @@ export function profilesSearchUrl(
   );
 }
 
+/**
+ * How many exact matches {@link profilesExactSearchUrl} is asked for.
+ *
+ * `username` and `public_id` are unique, so the only column that can answer
+ * with a crowd is `display_name` — five is "the handful at the top of the
+ * list", not a page. The number is here rather than at the call site because
+ * the reason it is small is a fact about the columns this URL searches.
+ */
+export const PROFILE_EXACT_SEARCH_LIMIT = 5;
+
+/**
+ * The companion query to {@link profilesSearchUrl}: the rows a searchable
+ * column EQUALS, case-insensitively.
+ *
+ * The substring query is ordered `created_at.desc` and cut at `limit`, so the
+ * ordering the client applies afterwards can only reorder what arrived. An
+ * exact `publicId` match that sits twenty-first in the table's own ordering is
+ * not in the response at all — and pasting a whole profile ID somebody sent
+ * you is both the commonest use of this box and the one query with a single
+ * right answer. `rankProfileMatch` could rank it first; it never saw the row.
+ *
+ * PostgREST has no "order by this expression" for a computed rank, so the fix
+ * is a second, tiny request rather than a cleverer one: `ilike` with NO
+ * wildcards is an exact comparison that ignores case, which is precisely the
+ * band-0 test `rankProfileMatch` applies (it lower-cases both sides). The
+ * column list and the needle's sanitisation are the same ones the substring
+ * query uses, so the two halves cannot drift apart.
+ *
+ * `limit` is small by construction at the call site: `username` and
+ * `public_id` are unique, so only `display_name` can answer with a crowd.
+ */
+export function profilesExactSearchUrl(
+  baseUrl: string,
+  needle: SanitizedProfileQuery,
+  limit: number,
+): string {
+  const q = encodeURIComponent(needle);
+  const or = PROFILE_SEARCH_COLUMNS.map((column) => `${column}.ilike.${q}`).join(",");
+  return (
+    `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}` +
+    `&or=(${or})` +
+    `&order=created_at.desc&limit=${limit}`
+  );
+}
+
 export function upsertProfileBody(profile: UserProfile): Record<string, unknown> {
   // `is_admin` is intentionally omitted: the column REVOKEs UPDATE from
   // authenticated/anon (see `20260616_core_tables_rls.sql`), so it is

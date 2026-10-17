@@ -23,8 +23,10 @@ import {
   profileUpdateUrl,
   profilesPageRangeHeader,
   profilesPageUrl,
+  profilesExactSearchUrl,
   profilesSearchUrl,
   profilesUrl,
+  PROFILE_EXACT_SEARCH_LIMIT,
   publicCollectionsByUserUrl,
   removeFriendRequestUrl,
   sendFriendRequestBody,
@@ -34,7 +36,7 @@ import {
   ownCollectionsSinceUrl,
   ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
-import { sanitizeProfileSearchQuery } from "@/lib/profile-search";
+import { mergeProfileMatches, sanitizeProfileSearchQuery } from "@/lib/profile-search";
 import { collectKeysetPages, withKeysetBefore, withPageLimit } from "@/lib/supabase-pagination";
 import { maxUpdatedAt } from "@/lib/sync-cursors";
 import { partitionByTombstone } from "@/lib/tombstones";
@@ -171,11 +173,44 @@ export async function fetchProfiles(
 }
 
 /**
- * Server-side profile search by username / display name substring. The people
- * browser and search overlay previously filtered ONLY the page of profiles
- * they had already fetched (25 and 100 rows respectively), so any user beyond
- * that page was unfindable. This queries the whole table with `ilike` and
- * returns up to `limit` matches.
+ * One profiles query, read into visible rows.
+ *
+ * A non-OK response, or a body that is not an array, is an empty list — so a
+ * search whose two requests half-answer still shows what the other half
+ * found. A rejected request (no network, unparseable body) still propagates,
+ * exactly as it did when this was one request inline: both callers wrap the
+ * search in `.catch(() => {})`, which leaves the results they already have on
+ * screen.
+ */
+async function fetchProfilesByUrl(url: string, label: string): Promise<UserProfile[]> {
+  const res = await supabaseRest(url);
+  const rows: unknown = await res.json();
+  if (!res.ok || !Array.isArray(rows)) {
+    devLog.debug(`[${label}] non-OK response`, res.status);
+    return [];
+  }
+  return (rows as DbProfile[]).filter((r) => !isHiddenProfile(r)).map(toUserProfile);
+}
+
+/**
+ * Server-side profile search by username / display name / profile ID
+ * substring. The people browser and search overlay previously filtered ONLY
+ * the page of profiles they had already fetched (25 and 100 rows
+ * respectively), so any user beyond that page was unfindable. This queries the
+ * whole table with `ilike` and returns up to `limit` matches, best first.
+ *
+ * TWO requests, not one. The substring query is ordered `created_at.desc` and
+ * cut at `limit`, so an exact match sitting past that cut never reaches the
+ * client and no amount of client-side ranking can promote it — under a field
+ * whose placeholder is `my-collectables-id` and whose commonest use is pasting
+ * a whole profile ID somebody sent you. `profilesExactSearchUrl` asks for the
+ * band-0 rows directly, and the two lists are merged by the same function the
+ * screens use to fold in the page they already hold: exact first, dedupe by
+ * id, stable within a band.
+ *
+ * They are fired together rather than in sequence: the exact query is the
+ * cheaper of the two and waiting for one before starting the other would add a
+ * round trip to every keystroke that survives the debounce.
  */
 export async function searchProfiles(
   query: string,
@@ -188,15 +223,17 @@ export async function searchProfiles(
   const needle = sanitizeProfileSearchQuery(query);
   if (needle.length === 0) return [];
 
-  const res = await supabaseRest(profilesSearchUrl(supabaseUrl!, needle, limit));
-  const rows: unknown = await res.json();
-  if (!res.ok || !Array.isArray(rows)) {
-    devLog.debug("[searchProfiles] non-OK response", res.status);
-    return [];
-  }
-  return (rows as DbProfile[])
-    .filter((r) => !isHiddenProfile(r))
-    .map(toUserProfile);
+  const [exact, substring] = await Promise.all([
+    fetchProfilesByUrl(
+      profilesExactSearchUrl(supabaseUrl!, needle, PROFILE_EXACT_SEARCH_LIMIT),
+      "searchProfiles:exact",
+    ),
+    fetchProfilesByUrl(profilesSearchUrl(supabaseUrl!, needle, limit), "searchProfiles"),
+  ]);
+
+  // `limit` stays the promise it was — "up to this many matches" — and the
+  // slice is safe because the merge has already sorted the best to the front.
+  return mergeProfileMatches(exact, substring, needle.toLowerCase()).slice(0, limit);
 }
 
 // --- Collections ---
