@@ -192,3 +192,46 @@ describe("the pager is hidden while a search is running", () => {
     assert.match(CODE, /\}, \[others, needle, searching, searchResults, myProfile\]\);/);
   });
 });
+
+describe("the search sheet had the same two defects, and the spoken one was worse", () => {
+  // `components/search-overlay.tsx` holds a 100-row snapshot and asks the
+  // server for the rest, exactly as the people screen does — so typing a
+  // profile ID only the server knows matched nothing locally, rendered
+  // "nothing found" for a debounce window plus a round trip, and then flipped
+  // to the answer. The announcement is gated on the debounce having caught up,
+  // so it SPOKE the zero: a screen-reader user was told "0 results" and then,
+  // a round trip later, "1 result".
+  const OVERLAY = stripComments(readRepoFile("components/search-overlay.tsx"));
+
+  it("knows when the people half is still in the air", () => {
+    assert.match(OVERLAY, /const \[peopleSearchInFlight, setPeopleSearchInFlight\] = useState\(false\);/);
+    assert.match(OVERLAY, /\(debouncedQuery !== q \|\| peopleSearchInFlight\)/);
+  });
+
+  it("mirrors the request's own filter condition exactly", () => {
+    // A `collections` or `items` filter sends no people request, so nothing
+    // is settling under it — and a flag that said otherwise would hide the
+    // empty state for a search that had already finished.
+    assert.match(OVERLAY, /if \(!debouncedQuery \|\| filter === "collections" \|\| filter === "items"\)/);
+    assert.match(
+      OVERLAY,
+      /q\.length > 0 &&\s*filter !== "collections" &&\s*filter !== "items" &&/,
+    );
+  });
+
+  it("renders nothing rather than 'nothing found' while it settles", () => {
+    assert.match(
+      OVERLAY,
+      /\{q\.length === 0 \|\| \(totalResults === 0 && peopleSearchSettling\) \? null : totalResults === 0 \? \(/,
+    );
+  });
+
+  it("does not speak a count that is about to change", () => {
+    assert.match(OVERLAY, /if \(peopleSearchSettling\) return;/);
+  });
+
+  it("clears the flag on success, on failure and on a filter that sends nothing", () => {
+    assert.match(OVERLAY, /\.finally\(\(\) => \{\s*if \(!cancelled\) setPeopleSearchInFlight\(false\);\s*\}\)/);
+    assert.match(OVERLAY, /setRemoteMatches\(\[\]\);\s*setPeopleSearchInFlight\(false\);/);
+  });
+});

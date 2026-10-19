@@ -153,21 +153,50 @@ export function SearchOverlay({ visible, onClose }: Props) {
   // raw `q` is empty, so the stale matches are never rendered.
   const debouncedQuery = useDebouncedValue(q, PROFILE_SEARCH_DEBOUNCE_MS);
   const [remoteMatches, setRemoteMatches] = useState<UserProfile[]>([]);
+  const [peopleSearchInFlight, setPeopleSearchInFlight] = useState(false);
   useEffect(() => {
     if (!debouncedQuery || filter === "collections" || filter === "items") {
       setRemoteMatches([]);
+      setPeopleSearchInFlight(false);
       return;
     }
     let cancelled = false;
+    setPeopleSearchInFlight(true);
     searchProfiles(debouncedQuery, SECTION_LIMIT)
       .then((results) => {
         if (!cancelled) setRemoteMatches(results);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setPeopleSearchInFlight(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [debouncedQuery, filter]);
+
+  /**
+   * The people half has been asked for and has not answered yet.
+   *
+   * The same two windows `app/people.tsx` names: the debounce, during which
+   * nothing has been sent at all, and the round trip. The condition mirrors
+   * the effect above exactly — a `collections` or `items` filter sends no
+   * people request, so nothing is settling under it.
+   *
+   * It exists because this sheet had the people screen's defect of 2026-10-19
+   * twice over. Typing a profile ID that only the server knows matched nothing
+   * in the 100-row snapshot, so "nothing found" rendered for a debounce window
+   * plus a round trip and then flipped to the answer — in a sheet whose people
+   * section exists precisely to find somebody who is NOT in that snapshot. And
+   * the announcement, which is gated on the debounce having caught up, SPOKE
+   * the zero: a screen-reader user was told "0 results" and then, a round trip
+   * later, "1 result". A wrong number out loud is the worse half.
+   */
+  const peopleSearchSettling =
+    q.length > 0 &&
+    filter !== "collections" &&
+    filter !== "items" &&
+    (debouncedQuery !== q || peopleSearchInFlight);
 
   const matchedProfiles = useMemo(() => {
     if (!q || filter === "collections" || filter === "items") return [];
@@ -230,10 +259,16 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // an announcement per keystroke interrupts the reader mid-word, which is
     // the failure this is supposed to prevent rather than cause.
     if (debouncedQuery !== q) return;
+    // And not while the people request for that settled query is still in
+    // flight: `totalResults` is then the catalogue halves plus whatever the
+    // PREVIOUS query's rows still answer, which is a number about to change.
+    // Speaking it means "0 results" followed by "1 result" for the commonest
+    // use of this box — pasting a profile ID only the server knows.
+    if (peopleSearchSettling) return;
     const decision = searchAnnouncement({ query: q, total: totalResults }, spokenResults.current);
     spokenResults.current = decision.spoken;
     if (decision.speak) announceMessage(t("searchResultsAnnouncement", { count: totalResults }));
-  }, [debouncedQuery, q, totalResults, t]);
+  }, [debouncedQuery, peopleSearchSettling, q, totalResults, t]);
 
   const filters: { key: FilterType; label: string }[] = [
     { key: "all", label: t("searchFilterAll") },
@@ -397,7 +432,13 @@ export function SearchOverlay({ visible, onClose }: Props) {
           ) : null}
 
           {/* Results */}
-          {q.length === 0 ? null : totalResults === 0 ? (
+          {/*
+            Nothing while the people half is still in the air, rather than
+            "nothing found": the sections win when there is anything to show,
+            and the empty state only speaks once the search it would be
+            contradicting has answered. See `peopleSearchSettling`.
+          */}
+          {q.length === 0 || (totalResults === 0 && peopleSearchSettling) ? null : totalResults === 0 ? (
             <EmptyState
               icon="🔎"
               title={t("emptySearchTitle")}

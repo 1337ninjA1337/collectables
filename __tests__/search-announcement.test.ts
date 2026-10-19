@@ -144,6 +144,12 @@ describe("the overlay around it", () => {
     // An announcement per keystroke interrupts the reader mid-word, which is
     // the failure this feature exists to prevent rather than cause.
     assert.match(OVERLAY, /if \(debouncedQuery !== q\) return;/);
+    // And the second guard, added 2026-10-19: not while the people request
+    // for that settled query is still in flight. `totalResults` is then the
+    // catalogue halves plus whatever the PREVIOUS query's rows still answer,
+    // so speaking it meant "0 results" and then "1 result" for the commonest
+    // use of this box — pasting a profile ID only the server knows.
+    assert.match(OVERLAY, /if \(peopleSearchSettling\) return;/);
   });
 
   it("remembers what was spoken in a ref, not in state", () => {
