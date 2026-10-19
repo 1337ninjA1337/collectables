@@ -227,7 +227,12 @@ describe("the search sheet had the same two defects, and the spoken one was wors
   });
 
   it("does not speak a count that is about to change", () => {
-    assert.match(OVERLAY, /if \(peopleSearchSettling\) return;/);
+    // The gate moved into `lib/search-announcement.ts` on the same day it was
+    // added: "do not speak a number about to change" is the same policy as
+    // "do not repeat a number already spoken", and the module also decides
+    // what to REMEMBER on an unsettled round, which a call-site `return`
+    // cannot. `search-announcement.test.ts` holds the behaviour.
+    assert.match(OVERLAY, /\{ settled: !peopleSearchSettling \}/);
   });
 
   it("clears the flag on success, on failure and on a filter that sends nothing", () => {

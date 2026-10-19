@@ -259,13 +259,16 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // an announcement per keystroke interrupts the reader mid-word, which is
     // the failure this is supposed to prevent rather than cause.
     if (debouncedQuery !== q) return;
-    // And not while the people request for that settled query is still in
-    // flight: `totalResults` is then the catalogue halves plus whatever the
-    // PREVIOUS query's rows still answer, which is a number about to change.
-    // Speaking it means "0 results" followed by "1 result" for the commonest
-    // use of this box — pasting a profile ID only the server knows.
-    if (peopleSearchSettling) return;
-    const decision = searchAnnouncement({ query: q, total: totalResults }, spokenResults.current);
+    // `settled` rather than a second `return` here: "do not speak a number
+    // that is about to change" is the same policy as "do not repeat a number
+    // already spoken", and both belong in the module that has the cases for
+    // them. It also decides what to REMEMBER on an unsettled round, which a
+    // call-site guard cannot.
+    const decision = searchAnnouncement(
+      { query: q, total: totalResults },
+      spokenResults.current,
+      { settled: !peopleSearchSettling },
+    );
     spokenResults.current = decision.spoken;
     if (decision.speak) announceMessage(t("searchResultsAnnouncement", { count: totalResults }));
   }, [debouncedQuery, peopleSearchSettling, q, totalResults, t]);

@@ -26,6 +26,26 @@
  * the same query again audible: the second search is a new question and
  * deserves the same answer, even though the number has not changed since.
  *
+ * ## An unsettled count is not a count
+ *
+ * The caller's total is the rows it is rendering, and one of the sheet's three
+ * sections is fetched: people come from a 100-row snapshot PLUS a debounced
+ * server query. So between a settled keystroke and its answer the total is the
+ * catalogue halves plus whatever the previous query's rows still match — a
+ * number about to change. Speaking it meant "0 results" and then, a round trip
+ * later, "1 result", for the commonest use of that box: pasting a profile ID
+ * only the server knows.
+ *
+ * That gate was a `return` in the overlay's effect for a few hours on
+ * 2026-10-19, which put one half of this policy at the call site and the other
+ * half here, where the cases are. `settled` is a REQUIRED option for the
+ * reason the brand in `lib/profile-search.ts` is a type: a caller that forgets
+ * it would still work, and would be silently wrong only on the queries the
+ * server alone can answer.
+ *
+ * An unsettled round does not update the memory. The number was never said, so
+ * remembering it would make the real announcement a repeat and silence it.
+ *
  * The words are NOT here, deliberately: which noun agrees with which number is
  * `lib/plural.ts`'s business and the locale maps', and this module would have
  * to know six languages to hold a sentence. It decides WHETHER, the caller
@@ -49,14 +69,31 @@ export type SearchAnnouncementDecision = {
   readonly spoken: SearchResultsState | null;
 };
 
+/** Whether the caller's count is one it is entitled to speak yet. */
+export type SearchAnnouncementReadiness = {
+  /**
+   * False while a request the total depends on is still in flight, or has not
+   * been sent because a debounce has not elapsed.
+   */
+  readonly settled: boolean;
+};
+
 /** Whether `next` says anything the user has not already been told. */
 export function searchAnnouncement(
   next: SearchResultsState,
   spoken: SearchResultsState | null,
+  readiness: SearchAnnouncementReadiness,
 ): SearchAnnouncementDecision {
   // Whitespace is not a query: the overlay trims before matching, so " " finds
   // everything and would otherwise be announced as a result set.
+  //
+  // Answered BEFORE the readiness gate: clearing the field is not a search in
+  // any state, and the forget has to happen even if a request for the previous
+  // query is still in the air.
   if (next.query.trim() === "") return { speak: false, spoken: null };
+  // The memory is returned UNCHANGED: this total was never said, so recording
+  // it would make the real announcement a repeat and silence it.
+  if (!readiness.settled) return { speak: false, spoken };
   if (spoken === null) return { speak: true, spoken: next };
   // The query is still remembered on a silent round, so the memory tracks the
   // field rather than the last thing said out loud.
