@@ -119,7 +119,7 @@ describe("Crash #5 — auth-context wiring", () => {
   it("imports setSentryUser from @/lib/sentry", () => {
     assert.match(
       src,
-      /import\s*\{\s*setSentryUser\s*\}\s*from\s*["']@\/lib\/sentry["']/,
+      /import\s*\{[^}]*\bsetSentryUser\b[^}]*\}\s*from\s*["']@\/lib\/sentry["']/,
       "auth-context.tsx must import setSentryUser",
     );
   });

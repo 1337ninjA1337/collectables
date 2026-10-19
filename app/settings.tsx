@@ -200,19 +200,33 @@ export default function SettingsScreen() {
     ]);
   }
 
+  function reportDeleteFailed() {
+    if (Platform.OS === "web") {
+      globalThis.alert?.(t("deleteAccountFailed"));
+    } else {
+      Alert.alert(t("deleteAccountFailed"));
+    }
+  }
+
   async function performDelete() {
     setDeleting(true);
     try {
       const { error } = await deleteAccount();
       if (error) {
-        if (Platform.OS === "web") {
-          globalThis.alert?.(t("deleteAccountFailed"));
-        } else {
-          Alert.alert(t("deleteAccountFailed"));
-        }
+        reportDeleteFailed();
       } else {
         router.replace("/");
       }
+    } catch {
+      // The catch that was missing. `deleteAccount` returns an envelope for
+      // every failure it knows about (`lib/delete-account-flow.ts` decides
+      // which of its five steps a failure is the ANSWER to), so reaching here
+      // means something outside that flow threw — and this screen's `try` had
+      // only a `finally`, so the spinner stopped and the user was told
+      // nothing at all on the one action in this app that cannot be undone.
+      // Saying "it failed" is right whatever threw: the deletion did not
+      // complete as far as this screen can tell, and retrying is safe.
+      reportDeleteFailed();
     } finally {
       setDeleting(false);
     }

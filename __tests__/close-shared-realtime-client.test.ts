@@ -68,9 +68,27 @@ describe("auth-context wires closeSharedRealtimeClient into signOut + deleteAcco
   it("calls closeSharedRealtimeClient after authClient.signOut() in deleteAccount", () => {
     // Same ordering invariant on the account-deletion path so the socket
     // doesn't outlive the user it was authenticated for.
+    //
+    // The deletion path's five steps moved into `lib/delete-account-flow.ts`
+    // on 2026-10-19 (it was one `try … finally` with no `catch`, so any
+    // rejection threw past this provider AND past `app/settings.tsx`). The
+    // pair is now the provider's `signOut` STEP, and the local `client` is
+    // `authClient` captured after the non-null check, because narrowing does
+    // not survive into a callback. Same invariant, same order, one indirection
+    // named here rather than a dropped case.
     assert.match(
       src,
-      /deleteAccount:\s*async[\s\S]*?await\s+authClient\.signOut\(\);\s*\n\s*await\s+closeSharedRealtimeClient\(\)/,
+      /const client = authClient;/,
+      "the step must close over the checked authClient, not a re-read of it",
+    );
+    assert.match(
+      src,
+      /signOut:\s*async\s*\(\)\s*=>\s*\{\s*await\s+client\.signOut\(\);\s*await\s+closeSharedRealtimeClient\(\);\s*\}/,
+    );
+    assert.match(
+      src,
+      /await runDeleteAccount\(\{[\s\S]*?signOut:/,
+      "the step must be the one runDeleteAccount runs",
     );
   });
 });

@@ -256,8 +256,15 @@ describe("PII guard — captureException extra carries labels, never content", (
    * (`storageKeyLabel`), and `reason` is one of two literals from
    * `classifyStorageError`. Both are the app's own vocabulary rather than
    * anything a user typed or an account is identified by.
+   *
+   * `step` joined on 2026-10-19 and is the same kind: one of the four literals
+   * in `DELETE_ACCOUNT_STEPS` (`listImageUrls`, `deleteImages`,
+   * `clearLocalData`, `signOut`), naming which part of an account deletion
+   * failed. A function name from a closed list, not a value — and the case
+   * below that this list rules on names rather than values is what keeps it
+   * that way.
    */
-  const EXTRA_ALLOWED_KEYS = new Set(["keyspace", "reason"]);
+  const EXTRA_ALLOWED_KEYS = new Set(["keyspace", "reason", "step"]);
 
   /**
    * Every `extra:` object passed to a `captureException`, read through the

@@ -12,7 +12,8 @@ import {
   signupEventProps,
 } from "@/lib/auth-helpers";
 import { deleteCloudinaryImages } from "@/lib/cloudinary";
-import { setSentryUser } from "@/lib/sentry";
+import { captureException, setSentryUser } from "@/lib/sentry";
+import { runDeleteAccount } from "@/lib/delete-account-flow";
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
 import { clearAllUserData } from "@/lib/storage-keys";
 import { deleteAccountViaEdgeFunction, fetchAllUserImageUrls } from "@/lib/supabase-profiles";
@@ -236,21 +237,42 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
 
         const userId = session.user.id;
 
+        const client = authClient;
         setPending(true);
         try {
-          const imageUrls = await fetchAllUserImageUrls(userId);
-          await deleteCloudinaryImages(imageUrls);
-
-          const { error } = await deleteAccountViaEdgeFunction();
-          if (error) {
-            return { error };
+          // The five steps, their order and what a failure of each MEANS live
+          // in `lib/delete-account-flow.ts`, which is a pure module so the
+          // answers can be run: this block was one `try … finally` with no
+          // `catch`, so a rejection from any of them threw past `deleteAccount`
+          // AND past `app/settings.tsx`' own `try … finally`, and the user got
+          // no alert, no navigation and no record. The image sweep is
+          // best-effort, the Edge Function call is the answer, and everything
+          // after it runs on an account that is already gone.
+          const { error, warnings } = await runDeleteAccount({
+            listImageUrls: () => fetchAllUserImageUrls(userId),
+            deleteImages: (urls) => deleteCloudinaryImages([...urls]),
+            deleteAccount: deleteAccountViaEdgeFunction,
+            clearLocalData: () => clearAllUserData(userId),
+            signOut: async () => {
+              await client.signOut();
+              await closeSharedRealtimeClient();
+            },
+          });
+          for (const { step, reason, cause } of warnings) {
+            // Named, not swallowed: a cleanup step that failed after the
+            // account was deleted leaves local rows or an open socket behind,
+            // which is a real thing to know and not something to tell the user
+            // their deletion failed over.
+            //
+            // `step` and `reason` are shorthand because `analytics-pii.test.ts`
+            // rules on the NAME: `extra` reaches Sentry verbatim, so a value
+            // assembled at the call site says nothing about what it holds.
+            captureException(cause, {
+              scope: "auth-context.deleteAccount",
+              extra: { step, reason },
+            });
           }
-
-          await clearAllUserData(userId);
-
-          await authClient.signOut();
-          await closeSharedRealtimeClient();
-          return {};
+          return error === undefined ? {} : { error };
         } finally {
           setPending(false);
         }
