@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
 
 import {
   collectionByIdUrl,
@@ -39,7 +38,7 @@ import type {
   UserProfile,
 } from "@/lib/types";
 
-import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { ALL_MIGRATIONS_SQL, tableBody } from "./helpers/migration-schema";
 
 /**
  * BE-3 / BE-37 — schema-parity guard across EVERY `*-shapes.ts` module.
@@ -64,12 +63,11 @@ import { readRepoFile, repoPath } from "./helpers/repo-file";
 // marketplace creates, and later `ALTER … ADD COLUMN` additions like
 // `is_admin` / `updated_at` / `deleted_at` / `buyer_user_id`), so the parity
 // check works against the full concatenation rather than a single file.
-const ALL_MIGRATIONS_SQL = readdirSync(repoPath("supabase", "migrations"))
-  .filter((f) => f.endsWith(".sql"))
-  .map((f) =>
-    readRepoFile("supabase", "migrations", f).replace(/--.*$/gm, ""),
-  )
-  .join("\n");
+//
+// The read moved to `helpers/migration-schema.ts` on 2026-10-19: this walk and
+// `profiles-search.test.ts`' UNIQUE-INDEX walk were two readings of one
+// directory, and `tableBody` below was the half the other one would have
+// copied next.
 
 const BASE = "https://demo.supabase.co";
 
@@ -223,31 +221,6 @@ addBody("marketplace_listings", markSoldPayload("2026-02-01T00:00:00Z", "u2"));
 addUrl("marketplace_listings", fetchListingsUrl(BASE));
 addUrl("marketplace_listings", fetchListingByIdUrl(BASE, "l1"));
 addUrl("marketplace_listings", markSoldUrl(BASE, "l1"));
-
-/**
- * Extract the body of a `CREATE TABLE [IF NOT EXISTS] public.<name> ( ... );`
- * block from the concatenated migrations. Anchored on the CREATE TABLE keyword
- * (not a bare `public.<name> (`) so an index/policy/ALTER line that also names
- * the table can never be mistaken for its definition.
- */
-function tableBody(name: string): string {
-  const re = new RegExp(
-    `create\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?public\\.${name}\\s*\\(`,
-    "i",
-  );
-  const m = re.exec(ALL_MIGRATIONS_SQL);
-  assert.ok(m, `migrations are missing CREATE TABLE public.${name}`);
-  const open = ALL_MIGRATIONS_SQL.indexOf("(", m.index);
-  let depth = 0;
-  for (let i = open; i < ALL_MIGRATIONS_SQL.length; i++) {
-    if (ALL_MIGRATIONS_SQL[i] === "(") depth++;
-    else if (ALL_MIGRATIONS_SQL[i] === ")") {
-      depth--;
-      if (depth === 0) return ALL_MIGRATIONS_SQL.slice(open + 1, i);
-    }
-  }
-  throw new Error(`unterminated CREATE TABLE for ${name}`);
-}
 
 describe("schema column parity with the REST builders (BE-3 / BE-37)", () => {
   for (const [table, { columns }] of Object.entries(TABLES)) {

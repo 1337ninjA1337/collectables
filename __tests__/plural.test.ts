@@ -359,6 +359,15 @@ describe("the one-versus-many rule lives in one module", () => {
    * `<= 1`) is also in it, and rewriting a scanner to fool a sweep is worse
    * than naming it here.
    *
+   * The ninth is index arity, and it is the clearest instance of the pattern
+   * this list exists for: `helpers/migration-schema.ts` reads a UNIQUE index's
+   * column list and asks `columns.length === 1`, because an index covering one
+   * column makes THAT COLUMN unique while one covering two makes only the PAIR
+   * unique. The `1` is how many columns a constraint spans. Nothing is
+   * inflected, nothing is counted for a sentence, and every rewrite that would
+   * dodge the pattern (`rest.length === 0` after a destructure) is a worse
+   * reading of the same test.
+   *
    * So the hole is empty today, and closing it by widening the rule to
    * conditions would fail three bounds checks and put their names in an
    * exemption list — the arrangement the rule's own comment refuses. Pinning
@@ -368,7 +377,7 @@ describe("the one-versus-many rule lives in one module", () => {
    */
   const TWO_LINE_RULE = ifReader(COUNT_COMPARISON);
 
-  it("has an if-shaped hole, and these eight are what is in it", () => {
+  it("has an if-shaped hole, and these nine are what is in it", () => {
     assertOnlyTheseMatch({
       rule: TWO_LINE_RULE,
       files: sourceFiles("lib", "scripts", "__tests__/helpers"),
@@ -390,6 +399,10 @@ describe("the one-versus-many rule lives in one module", () => {
         "lib/guard-root.ts",
         "lib/privacy-translated-section.ts",
         "scripts/report-bundle-composition.ts",
+        // Index arity: a UNIQUE index over one column makes that column
+        // unique, one over two makes only the pair unique. The `1` counts
+        // columns in a constraint, not things in a sentence.
+        "__tests__/helpers/migration-schema.ts",
       ],
       subject: "modules",
       what: "compare a count against 1 or 2 in an `if`",

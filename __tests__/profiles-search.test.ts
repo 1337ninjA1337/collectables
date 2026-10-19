@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
 
 import {
   PROFILE_SEARCH_COLUMNS,
@@ -19,7 +18,8 @@ import {
   profilesSearchUrl,
 } from "@/lib/supabase-profiles-shapes";
 
-import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { columnsOf, uniqueIndexesOn } from "./helpers/migration-schema";
+import { readRepoFile } from "./helpers/repo-file";
 
 
 describe("sanitizeProfileSearchQuery", () => {
@@ -861,19 +861,13 @@ describe("why PROFILE_EXACT_SEARCH_LIMIT is allowed to be 5", () => {
   // is checkable rather than a remembered fact. A migration that dropped
   // either unique index would turn 5 from a comfortable margin into a silent
   // cap on correct answers.
-  const UNIQUE_ON_PROFILES = (() => {
-    const found = new Set<string>();
-    for (const file of readdirSync(repoPath("supabase", "migrations"))) {
-      if (!file.endsWith(".sql")) continue;
-      const sql = readRepoFile("supabase", "migrations", file);
-      for (const match of sql.matchAll(
-        /CREATE\s+UNIQUE\s+INDEX[^;]*?\s+ON\s+(?:public\.)?profiles\s*\(\s*([a-z_]+)\s*\)/gi,
-      )) {
-        found.add(match[1].toLowerCase());
-      }
-    }
-    return found;
-  })();
+  // The walk moved to `helpers/migration-schema.ts` on 2026-10-19 —
+  // `base-schema-parity.test.ts` read the same directory with its own regex,
+  // and the shared reader also sees the two shapes this one could not (an
+  // inline column `UNIQUE`, and an `ALTER TABLE … ADD CONSTRAINT … UNIQUE`)
+  // while refusing to report a member of a COMPOSITE unique index as unique
+  // on its own. The claim here is unchanged.
+  const UNIQUE_ON_PROFILES = uniqueIndexesOn("profiles");
 
   it("finds the unique indexes the constant's reason rests on", () => {
     // The premise, checked before it is argued from: a regex that matched
@@ -888,6 +882,24 @@ describe("why PROFILE_EXACT_SEARCH_LIMIT is allowed to be 5", () => {
       ["display_name"],
       "a searchable column stopped being unique (or display_name became unique) — PROFILE_EXACT_SEARCH_LIMIT's reason moved",
     );
+  });
+
+  it("names columns public.profiles actually has", () => {
+    // The one defect the table can still have: a row whose `snake` was
+    // `publicid` would typecheck, derive, build an `or=` clause and return
+    // nothing per keystroke, silently — the client half would keep matching
+    // on the camel field, so the page would answer and the table would not.
+    // That is precisely the appears-and-disappears bug `lib/profile-search.ts`
+    // exists to prevent, arriving through the module that was supposed to
+    // make it impossible.
+    const columns = columnsOf("profiles");
+    assert.ok(columns.size >= 7, "the profiles column read has probably broken");
+    for (const field of PROFILE_FIELDS) {
+      assert.ok(
+        columns.has(field.snake),
+        `PROFILE_FIELDS names ${field.snake} and public.profiles has no such column`,
+      );
+    }
   });
 
   it("agrees with PROFILE_FIELDS about which columns are unique", () => {
