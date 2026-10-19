@@ -55,6 +55,28 @@ import { searchAnnouncement, type SearchResultsState } from "@/lib/search-announ
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 
+/**
+ * How many rows one section of this sheet shows — and how many profiles it
+ * asks the server for.
+ *
+ * ONE number for both, which is the claim that makes the profile cut safe:
+ * the request and the cut are the same size, so the server cannot be paid for
+ * a row the slice is guaranteed to throw away, and the slice cannot leave the
+ * section short of rows the request already fetched. It was written four times
+ * as a bare `20` until 2026-10-19 — the request, and a `.slice(0, 20)` for
+ * each of the three sections — with nothing saying the four were one decision,
+ * which is the arrangement where somebody raises the request and the cut
+ * silently keeps the first twenty.
+ *
+ * `app/people.tsx` asks for `SEARCH_RESULT_LIMIT` (50) and renders every row
+ * it gets, because it is a full screen with a scroll rather than three
+ * sections sharing a sheet: there a cut would hide rows with nothing to say
+ * why. The two numbers differ because the surfaces do, and
+ * `profiles-search.test.ts` holds each to its own reason rather than to the
+ * other's.
+ */
+const SECTION_LIMIT = 20;
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -104,7 +126,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
         const matchesOwner = !ownerFilter || c.ownerUserId === ownerFilter;
         return matchesQuery && matchesOwner;
       })
-      .slice(0, 20);
+      .slice(0, SECTION_LIMIT);
   }, [collections, q, filter, ownerFilter]);
 
   const matchedItems = useMemo(() => {
@@ -120,7 +142,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
         const matchesOwner = !ownerFilter || item.createdByUserId === ownerFilter;
         return matchesQuery && matchesOwner;
       })
-      .slice(0, 20);
+      .slice(0, SECTION_LIMIT);
   }, [items, q, filter, ownerFilter]);
 
   // Server-side people search: the 100-row snapshot fetched on open misses
@@ -137,7 +159,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
       return;
     }
     let cancelled = false;
-    searchProfiles(debouncedQuery, 20)
+    searchProfiles(debouncedQuery, SECTION_LIMIT)
       .then((results) => {
         if (!cancelled) setRemoteMatches(results);
       })
@@ -157,10 +179,11 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // debounce window ago — so without it, narrowing a query rendered server
     // rows that answer nothing on screen until the next round trip landed.
     //
-    // Ordered before the slice, not after: a twenty-row cut off the front of
-    // an unordered union can drop the exact match outright, which is a
-    // stronger version of the bug the ordering fixes.
-    return profileSearchUnion(profiles, remoteMatches, needle).slice(0, 20);
+    // Ordered before the slice, not after: a `SECTION_LIMIT`-row cut off the
+    // front of an unordered union can drop the exact match outright, which is
+    // a stronger version of the bug the ordering fixes. The cut is the same
+    // number the request above asked for, deliberately — see SECTION_LIMIT.
+    return profileSearchUnion(profiles, remoteMatches, needle).slice(0, SECTION_LIMIT);
   }, [profiles, q, filter, remoteMatches]);
 
   // Get collection name for an item

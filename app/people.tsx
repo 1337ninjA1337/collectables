@@ -46,6 +46,20 @@ import { useMinimumVisible } from "@/lib/use-minimum-visible";
 
 const PAGE_SIZE = 25;
 
+/**
+ * How many server-wide matches the search asks for.
+ *
+ * Twice `PAGE_SIZE`, and the reason is the union it feeds: `filteredPeople`
+ * folds the loaded page into these rows and renders EVERY row of the result,
+ * so this number is the only cap on how much of the table a search can reach
+ * — not a slice the way `components/search-overlay.tsx`' `SECTION_LIMIT` is.
+ * The sheet's 20 is a display cut that doubles as its request size; this is a
+ * request size with no cut behind it, which is why the two are different
+ * numbers rather than one shared constant. It was a bare `50` until
+ * 2026-10-19.
+ */
+const SEARCH_RESULT_LIMIT = 50;
+
 export default function PeopleScreen() {
   const { t } = useI18n();
   const theme = useAppTheme();
@@ -98,7 +112,7 @@ export default function PeopleScreen() {
       return;
     }
     let cancelled = false;
-    searchProfiles(debouncedQuery, 50)
+    searchProfiles(debouncedQuery, SEARCH_RESULT_LIMIT)
       .then((results) => {
         if (!cancelled) setSearchResults(results);
       })

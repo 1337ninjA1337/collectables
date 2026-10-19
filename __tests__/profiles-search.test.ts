@@ -19,6 +19,8 @@ import {
 } from "@/lib/supabase-profiles-shapes";
 
 import { columnsOf, uniqueIndexesOn } from "./helpers/migration-schema";
+import { stripComments } from "@/lib/strip-comments";
+
 import { readRepoFile } from "./helpers/repo-file";
 
 
@@ -99,14 +101,63 @@ describe("people/search UI uses the server-side search", () => {
     assert.match(src, /import \{ fetchProfiles, searchProfiles \} from "@\/lib\/supabase-profiles"/);
     // The needle is the settled value from `useDebouncedValue`; the trimming
     // it used to do inline now happens at the hook's input.
-    assert.match(src, /searchProfiles\(debouncedQuery, 50\)/);
+    assert.match(src, /searchProfiles\(debouncedQuery, SEARCH_RESULT_LIMIT\)/);
     assert.match(src, /useDebouncedValue\(query\.trim\(\), PROFILE_SEARCH_DEBOUNCE_MS\)/);
   });
 
   it("components/search-overlay.tsx queries searchProfiles for the people section", () => {
     const src = readRepoFile("components/search-overlay.tsx");
-    assert.match(src, /searchProfiles\(debouncedQuery, 20\)/);
+    assert.match(src, /searchProfiles\(debouncedQuery, SECTION_LIMIT\)/);
     assert.match(src, /useDebouncedValue\(q, PROFILE_SEARCH_DEBOUNCE_MS\)/);
+  });
+
+  it("the sheet asks for exactly as many profiles as it will show", () => {
+    // The claim that makes the cut safe, and the reason the request size and
+    // the display size are one constant rather than two literals: a request
+    // larger than the cut pays for rows the slice throws away, and a request
+    // smaller than it leaves the section short with nothing saying why.
+    const src = readRepoFile("components/search-overlay.tsx");
+    assert.match(src, /const SECTION_LIMIT = 20;/);
+    assert.match(src, /searchProfiles\(debouncedQuery, SECTION_LIMIT\)/);
+    assert.match(src, /profileSearchUnion\([^)]*\)\.slice\(0, SECTION_LIMIT\)/);
+  });
+
+  it("all three sections of the sheet cut at the same number", () => {
+    // Items, collections and people are three sections of one sheet, so a
+    // section showing more rows than its neighbours would be a layout
+    // decision nobody made. Three slices, one constant.
+    //
+    // Comment-stripped, because `SECTION_LIMIT`'s own header quotes the four
+    // `.slice(0, 20)` literals it replaced — prose about a rule is the
+    // commonest way a source scan reports its own documentation.
+    const code = stripComments(readRepoFile("components/search-overlay.tsx"));
+    assert.equal(
+      code.split(".slice(0, SECTION_LIMIT)").length - 1,
+      3,
+      "a section of the sheet cuts at a number of its own",
+    );
+    assert.ok(
+      !/\.slice\(0, \d+\)/.test(code),
+      "a section still slices at a bare literal",
+    );
+  });
+
+  it("the people screen's request limit is named and is NOT the sheet's cut", () => {
+    // Two readers, two numbers, and the difference is the surface: the sheet
+    // slices what it shows, the screen renders every row it gets, so its
+    // limit is the only cap on how much of the table a search reaches. The
+    // numbers are allowed to differ; what is not allowed is their being two
+    // literals with nothing saying they were different decisions.
+    const src = readRepoFile("app/people.tsx");
+    assert.match(src, /const SEARCH_RESULT_LIMIT = 50;/);
+    assert.ok(
+      !/searchProfiles\(debouncedQuery, \d+\)/.test(src),
+      "the people screen asks for a bare literal again",
+    );
+    assert.ok(
+      !/\.slice\(0, SEARCH_RESULT_LIMIT\)/.test(src),
+      "the screen now cuts its union, which is the sheet's shape and needs the sheet's reason",
+    );
   });
 
   it("app/people.tsx catches fetchProfiles failures instead of blanking silently", () => {
@@ -502,7 +553,7 @@ describe("both readers merge through the shared function", () => {
     // exact match outright.
     assert.match(
       readRepoFile("components/search-overlay.tsx"),
-      /profileSearchUnion\(profiles, remoteMatches, needle\)\.slice\(0, 20\)/,
+      /profileSearchUnion\(profiles, remoteMatches, needle\)\.slice\(0, SECTION_LIMIT\)/,
     );
   });
 });

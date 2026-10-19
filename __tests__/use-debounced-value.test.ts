@@ -226,9 +226,15 @@ describe("useDebouncedValue — structure", () => {
 });
 
 describe("useDebouncedValue — adoption", () => {
+  // The limit is a NAME and a value since 2026-10-19: both were bare literals
+  // at the call site, and the sheet's was the same number written four times
+  // (its request plus a cut per section). The claim this suite makes is
+  // unchanged — this consumer asks the server for that many rows — and it now
+  // takes two assertions, because the number and the call are in two places
+  // on purpose.
   const CONSUMERS = [
-    { file: "app/people.tsx", limit: 50 },
-    { file: "components/search-overlay.tsx", limit: 20 },
+    { file: "app/people.tsx", limit: 50, limitName: "SEARCH_RESULT_LIMIT" },
+    { file: "components/search-overlay.tsx", limit: 20, limitName: "SECTION_LIMIT" },
   ];
 
   for (const consumer of CONSUMERS) {
@@ -238,7 +244,15 @@ describe("useDebouncedValue — adoption", () => {
       const code = stripComments(readRepoFile(consumer.file));
       assert.match(code, /import \{ useDebouncedValue \} from "@\/lib\/use-debounced-value";/);
       assert.match(code, /useDebouncedValue\([\s\S]{0,40}PROFILE_SEARCH_DEBOUNCE_MS\)/);
-      assert.match(code, new RegExp(`searchProfiles\\(debouncedQuery, ${consumer.limit}\\)`));
+      assert.match(
+        code,
+        new RegExp(`searchProfiles\\(debouncedQuery, ${consumer.limitName}\\)`),
+      );
+      assert.match(
+        code,
+        new RegExp(`const ${consumer.limitName} = ${String(consumer.limit)};`),
+        `${consumer.limitName} is not ${String(consumer.limit)} any more`,
+      );
     });
 
     it(`${label} no longer hand-rolls a debounce timer`, () => {
