@@ -12,6 +12,7 @@ import {
   sanitizeProfileSearchQuery,
 } from "@/lib/profile-search";
 import { GUARDED_FIELDS } from "@/lib/check-profile-id-pii";
+import { PROFILE_FIELDS, profileFieldNames } from "@/lib/profile-fields";
 import {
   PROFILE_EXACT_SEARCH_LIMIT,
   profilesExactSearchUrl,
@@ -397,10 +398,17 @@ describe("rankProfileMatch", () => {
     // is the same claim from the other end: the fields band 0 is about are
     // the camel-case spellings of those columns, and `displayName` is not
     // among them.
+    // Derived from `PROFILE_FIELDS` since 2026-10-19, so the claim is about
+    // the table's `unique` flags (tied to the migrations by the cases below)
+    // rather than about two words somebody typed into an array literal.
+    assert.deepEqual(
+      [...profileFieldNames((field) => field.searchable && field.unique)],
+      ["username", "publicId"],
+    );
     const module = readRepoFile("lib/profile-search.ts");
-    assert.match(module, /const UNIQUE_SEARCH_FIELDS = \["username", "publicId"\] as const/);
+    assert.match(module, /UNIQUE_SEARCH_FIELDS[^=]*= profileFieldNames\(/);
     assert.ok(
-      !/UNIQUE_SEARCH_FIELDS = \[[^\]]*displayName/.test(module),
+      !/UNIQUE_SEARCH_FIELDS[^;]*displayName/.test(module),
       "displayName has no unique index — an exact match on it is band 1",
     );
   });
@@ -880,6 +888,21 @@ describe("why PROFILE_EXACT_SEARCH_LIMIT is allowed to be 5", () => {
       ["display_name"],
       "a searchable column stopped being unique (or display_name became unique) — PROFILE_EXACT_SEARCH_LIMIT's reason moved",
     );
+  });
+
+  it("agrees with PROFILE_FIELDS about which columns are unique", () => {
+    // The table's `unique` flag is a claim about the database, and the
+    // database is in this repository. `rankProfileMatch`'s top band and
+    // `PROFILE_EXACT_SEARCH_LIMIT` both rest on it, and since 2026-10-19 they
+    // rest on it through the same three rows — so this is the one place that
+    // has to read the migrations to keep either honest.
+    for (const field of PROFILE_FIELDS) {
+      assert.equal(
+        field.unique,
+        UNIQUE_ON_PROFILES.has(field.snake),
+        `PROFILE_FIELDS says ${field.snake} is ${field.unique ? "" : "not "}unique and the migrations disagree`,
+      );
+    }
   });
 
   it("leaves room for more than one of the column that is not unique", () => {

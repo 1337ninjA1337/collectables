@@ -1,3 +1,4 @@
+import { profileFieldSpellings } from "@/lib/profile-fields";
 import { stripComments } from "@/lib/strip-comments";
 
 /**
@@ -41,8 +42,18 @@ import { stripComments } from "@/lib/strip-comments";
  * over, so the matcher is unit-testable under `node --test`.
  */
 
-/** A profile-identifier field an email address must not reach inline. */
-export const GUARDED_FIELDS = ["publicId", "public_id", "username"] as const;
+/**
+ * A profile-identifier field an email address must not reach inline.
+ *
+ * Both spellings of every `piiGuarded` row in `PROFILE_FIELDS`, because this
+ * scanner reads SOURCE: the same column is written `publicId:` in the app's
+ * own objects and `public_id:` in a row literal, and the matcher cannot know
+ * which file it has. Derived since 2026-10-19 — it was the list the search
+ * columns were compared against by a case-fold a reader performed in their
+ * head, and `displayName` stays out of it by being the one row whose
+ * `piiGuarded` is false, with the reason above rather than by omission.
+ */
+export const GUARDED_FIELDS = profileFieldSpellings((field) => field.piiGuarded);
 
 export type ProfileIdPiiMatch = {
   readonly file: string;

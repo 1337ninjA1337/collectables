@@ -1,3 +1,10 @@
+import {
+  profileFieldColumns,
+  profileFieldNames,
+  type ProfileFieldCamel,
+  type ProfileFieldSnake,
+} from "@/lib/profile-fields";
+
 /**
  * What "search by profile ID" matches, written once for the three places that
  * ask it.
@@ -17,12 +24,16 @@
  * so a fourth field cannot be added to one half only.
  */
 
-/** The fields a profile is findable by. */
-export interface SearchableProfile {
-  readonly username: string;
-  readonly displayName: string;
-  readonly publicId: string;
-}
+/**
+ * The fields a profile is findable by.
+ *
+ * Keyed by {@link ProfileFieldCamel} rather than by three hand-written
+ * properties, so the interface and `PROFILE_FIELDS` cannot disagree about
+ * which fields exist: a row added to the table makes every reader of this
+ * type require it, which is the compiler asking the question the three
+ * separate lists used to let a contributor skip.
+ */
+export type SearchableProfile = { readonly [K in ProfileFieldCamel]: string };
 
 /**
  * The columns the server searches, in the order the `or=` list spells them.
@@ -31,8 +42,15 @@ export interface SearchableProfile {
  * from a hand-written copy: the page the client already holds and the rest of
  * the table have to answer the same question, or a match appears and
  * disappears as the page scrolls.
+ *
+ * Derived from `PROFILE_FIELDS` since 2026-10-19 rather than written out: it
+ * was one of three hand-kept lists about the same set of fields, in two
+ * spellings, and the one a fourth searchable column would be added to while
+ * the PII guard never heard of it.
  */
-export const PROFILE_SEARCH_COLUMNS = ["username", "display_name", "public_id"] as const;
+export const PROFILE_SEARCH_COLUMNS: readonly ProfileFieldSnake[] = profileFieldColumns(
+  (field) => field.searchable,
+);
 
 /**
  * A query that has been through {@link sanitizeProfileSearchQuery}.
@@ -97,19 +115,29 @@ export function profileSearchNeedle(query: string): string {
 }
 
 /**
+ * The fields the client compares against, in table order.
+ *
+ * The camel half of {@link PROFILE_SEARCH_COLUMNS}, derived from the same rows
+ * rather than written out: the server's `or=` list was derived and the client
+ * predicate was not, so a fourth searchable row would have reached the table
+ * and missed the page — which is the match-appears-and-disappears defect this
+ * module was created to remove, one field along.
+ */
+const SEARCHABLE_FIELDS: readonly (keyof SearchableProfile)[] = profileFieldNames(
+  (field) => field.searchable,
+);
+
+/**
  * Whether this profile answers the needle.
  *
- * A substring match on all three fields, which is what both client readers
- * already did on two of them. An empty needle matches everything, and that is
- * the callers' cue to skip the filter entirely rather than a meaning of its
- * own — `"".includes("")` is `true`, so the answer is at least consistent.
+ * A substring match on every searchable field, which is what both client
+ * readers already did on two of the three. An empty needle matches
+ * everything, and that is the callers' cue to skip the filter entirely rather
+ * than a meaning of its own — `"".includes("")` is `true`, so the answer is at
+ * least consistent.
  */
 export function profileMatchesSearch(profile: SearchableProfile, needle: string): boolean {
-  return (
-    profile.username.toLowerCase().includes(needle) ||
-    profile.displayName.toLowerCase().includes(needle) ||
-    profile.publicId.toLowerCase().includes(needle)
-  );
+  return SEARCHABLE_FIELDS.some((field) => profile[field].toLowerCase().includes(needle));
 }
 
 /**
@@ -134,7 +162,23 @@ export interface IdentifiedProfile extends SearchableProfile {
  * be called and two people may share one — which is the whole reason
  * {@link rankProfileMatch} has four bands and not three.
  */
-const UNIQUE_SEARCH_FIELDS = ["username", "publicId"] as const satisfies readonly (keyof SearchableProfile)[];
+const UNIQUE_SEARCH_FIELDS: readonly (keyof SearchableProfile)[] = profileFieldNames(
+  (field) => field.searchable && field.unique,
+);
+
+/**
+ * The searchable fields an exact match does NOT identify one person by.
+ *
+ * The other half of the partition — today `displayName` alone, which is why
+ * band 1 used to name it directly. Derived so the two halves cover every
+ * searchable field between them: `rankProfileMatch`'s prefix band is the union
+ * of the two, so a field in neither list would be matched by
+ * {@link profileMatchesSearch} and ranked last by construction, which reads as
+ * a weak match rather than as a missing row.
+ */
+const AMBIGUOUS_SEARCH_FIELDS: readonly (keyof SearchableProfile)[] = profileFieldNames(
+  (field) => field.searchable && !field.unique,
+);
 
 /**
  * How well a profile answers the needle: 0 best, 3 worst.
@@ -145,15 +189,17 @@ const UNIQUE_SEARCH_FIELDS = ["username", "publicId"] as const satisfies readonl
  *  - 0 — a UNIQUE identifier IS the needle. Pasting a whole `publicId` or a
  *    whole handle is the commonest way this box is used (somebody sent it to
  *    you), and it is the one case where there is a single right answer.
- *  - 1 — the display name IS the needle. An exact match, and not a single
- *    right answer: two people called "Anna" both land here. This band was
- *    band 0 until 2026-10-17, which made the sentence above untrue — the
- *    person whose handle IS `anna` tied with every namesake, and
- *    `Array.prototype.sort` being stable meant whoever was on page one won.
+ *  - 1 — a searchable field with NO unique index is the needle; today that is
+ *    the display name alone. An exact match, and not a single right answer:
+ *    two people called "Anna" both land here. This band was band 0 until
+ *    2026-10-17, which made the sentence above untrue — the person whose
+ *    handle IS `anna` tied with every namesake, and `Array.prototype.sort`
+ *    being stable meant whoever was on page one won.
  *  - 2 — a field STARTS with the needle. "ann" for "anna" is what typing
- *    looks like before you have finished. Any of the three fields: a prefix
- *    is a guess at what is being typed, and a guess about a unique column is
- *    not better than a guess about a name.
+ *    looks like before you have finished. Any searchable field: a prefix is a
+ *    guess at what is being typed, and a guess about a unique column is not
+ *    better than a guess about a name. The union of the two lists above, which
+ *    is every searchable field by construction rather than by a third list.
  *  - 3 — a field contains it somewhere. Still a match, because both halves of
  *    this search are substring matches by construction, but the weakest kind:
  *    `profileMatchesSearch` is what admits it and this is what ranks it last.
@@ -168,11 +214,13 @@ const UNIQUE_SEARCH_FIELDS = ["username", "publicId"] as const satisfies readonl
  */
 export function rankProfileMatch(profile: SearchableProfile, needle: string): 0 | 1 | 2 | 3 {
   if (needle.length === 0) return 0;
-  const unique = UNIQUE_SEARCH_FIELDS.map((field) => profile[field].toLowerCase());
-  const displayName = profile.displayName.toLowerCase();
-  if (unique.some((field) => field === needle)) return 0;
-  if (displayName === needle) return 1;
-  if ([...unique, displayName].some((field) => field.startsWith(needle))) return 2;
+  const lower = (fields: readonly (keyof SearchableProfile)[]) =>
+    fields.map((field) => profile[field].toLowerCase());
+  const unique = lower(UNIQUE_SEARCH_FIELDS);
+  const ambiguous = lower(AMBIGUOUS_SEARCH_FIELDS);
+  if (unique.some((value) => value === needle)) return 0;
+  if (ambiguous.some((value) => value === needle)) return 1;
+  if ([...unique, ...ambiguous].some((value) => value.startsWith(needle))) return 2;
   return 3;
 }
 
