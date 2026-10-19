@@ -118,8 +118,8 @@ export default function FriendsScreen() {
    * the profile screen — this screen is the one that had a chat button before
    * the table existed.
    */
-  function runRelationshipAction(id: RelationshipActionId, profileId: string) {
-    switch (ACTION_METHOD[id]) {
+  function runRelationshipAction(action: RelationshipActionId, profileId: string) {
+    switch (ACTION_METHOD[action]) {
       case "chat":
         router.push(`/chat/${profileId}` as never);
         return;

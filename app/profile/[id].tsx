@@ -310,8 +310,8 @@ export default function ProfileScreen() {
    * the one that is navigation rather than a graph edit, which is why it is a
    * method name of its own.
    */
-  function runRelationshipAction(id: RelationshipActionId, profileId: string) {
-    switch (ACTION_METHOD[id]) {
+  function runRelationshipAction(action: RelationshipActionId, profileId: string) {
+    switch (ACTION_METHOD[action]) {
       case "chat":
         router.push(`/chat/${profileId}` as never);
         return;

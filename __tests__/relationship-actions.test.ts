@@ -298,11 +298,31 @@ describe("all three screens render from the table", () => {
   it("dispatches through ACTION_METHOD rather than on the intent", () => {
     // Switching on the intent id would put the three-removals-one-method fact
     // in two screens instead of in the table.
+    //
+    // The parameter is matched as an identifier rather than as the literal
+    // `id`: all three were renamed to `action` on 2026-10-19 so that
+    // `app/people.tsx` could report it to Sentry as a shorthand `{ action }`
+    // — `analytics-pii.test.ts` rules on the NAME of a `captureException`
+    // extra, and `id` is exactly the kind of word that list exists to keep
+    // out. What this case is about is the dispatch going through the map.
     for (const [name, src] of SCREENS) {
       assert.match(
         src,
-        /switch \(ACTION_METHOD\[id\]\)/,
+        /switch \(ACTION_METHOD\[[A-Za-z_]\w*\]\)/,
         `${name} does not dispatch through the method map`,
+      );
+    }
+  });
+
+  it("names the dispatch parameter the same thing in all three screens", () => {
+    // Three copies of one dispatcher, which is what the rest of this suite is
+    // about; a parameter spelled differently in one of them is the first step
+    // back to three dispatchers that only look alike.
+    for (const [name, src] of SCREENS) {
+      assert.match(
+        src,
+        /function runRelationshipAction\(action: RelationshipActionId, profileId: string\)/,
+        `${name} spells the dispatch parameter differently`,
       );
     }
   });

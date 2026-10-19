@@ -90,6 +90,65 @@ describe("the empty state waits for the search it is contradicting", () => {
   });
 });
 
+describe("the page total does not move as you page", () => {
+  // `fetchProfiles` subtracted the hidden rows found on THIS page from the
+  // server's whole-table `count=exact`, so the page holding
+  // `katsyarinafedorova97` reported one fewer than every other page and the
+  // pager read "Page 1 of 12", then "Page 2 of 11", and back.
+  const FETCH = stripComments(readRepoFile("lib/supabase-profiles.ts"));
+
+  it("reports the server's count unadjusted", () => {
+    assert.match(
+      FETCH,
+      /return \{ data: filtered\.map\(toUserProfile\), totalCount \};/,
+      "the whole-table count must not be corrected by a page-local observation",
+    );
+    assert.ok(
+      !/totalCount - \(dbRows\.length - filtered\.length\)/.test(FETCH),
+      "the per-page subtraction is back",
+    );
+  });
+
+  it("still hides the rows themselves", () => {
+    // The adjustment went; the filter did not. A hidden profile is still
+    // dropped from the list — the total is the only thing that stopped
+    // pretending to know about it.
+    assert.match(FETCH, /const filtered = dbRows\.filter\(\(r\) => !isHiddenProfile\(r\)\);/);
+  });
+
+  it("derives the pager from that count and nothing else", () => {
+    assert.match(CODE, /const totalPages = Math\.max\(1, Math\.ceil\(totalCount \/ PAGE_SIZE\)\);/);
+  });
+});
+
+describe("the action switch reports its tripwire before taking the screen down", () => {
+  // The `chat` case is a deliberate throw: no chat button reaches this list,
+  // and falling through silently would hide a table edit that gave a row a
+  // button the screen cannot service. It fires inside an `onAction` during a
+  // press, so in production it took the screen down with nothing recorded.
+  it("captures before it throws", () => {
+    assert.match(
+      CODE,
+      /captureException\(new Error\("people list has no chat action"\), \{\s*scope: "people\.runRelationshipAction",\s*extra: \{ action \},\s*\}\);\s*throw new Error\("people list has no chat action"\);/,
+    );
+  });
+
+  it("names the switch parameter `action`, so the extra is a shorthand", () => {
+    // `analytics-pii.test.ts` rules on the NAME of every `captureException`
+    // extra: `extra` reaches Sentry verbatim and `scrubPII` does not read it,
+    // so a value assembled at the call site says nothing about what it holds.
+    // `{ action: id }` was both the wrong shape and the wrong word — `id`
+    // would have been an allow-list entry nobody could reason about, while
+    // `action` is one of eight `RelationshipActionId` literals.
+    assert.match(CODE, /function runRelationshipAction\(action: RelationshipActionId, profileId: string\)/);
+    assert.match(CODE, /switch \(ACTION_METHOD\[action\]\)/);
+  });
+
+  it("keeps the throw, which is the tripwire", () => {
+    assert.match(CODE, /throw new Error\("people list has no chat action"\);/);
+  });
+});
+
 describe("the pager is hidden while a search is running", () => {
   // `totalPages` comes from `totalCount`, which is every profile in the table
   // and not the rows a search answered. So a query matching three people

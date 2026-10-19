@@ -174,7 +174,25 @@ export async function fetchProfiles(
   const dbRows = rows as DbProfile[];
   const filtered = dbRows.filter((r) => !isHiddenProfile(r));
 
-  return { data: filtered.map(toUserProfile), totalCount: totalCount - (dbRows.length - filtered.length) };
+  // `totalCount` is the server's `count=exact` — every row in `profiles`,
+  // including the hidden ones this page just dropped. It is reported
+  // UNADJUSTED, and until 2026-10-19 this line subtracted the hidden rows
+  // found on THIS page, which corrected a whole-table number by a page-local
+  // observation: the page holding `katsyarinafedorova97` reported one fewer
+  // than every other page, so `app/people.tsx`' pager read "Page 1 of 12" and
+  // then "Page 2 of 11" and back, flipping whenever that row's page was
+  // loaded. A total that is at most `HIDDEN_USERNAMES.length` too high is
+  // invisible (at worst a final page with one row fewer); a total that changes
+  // as you page is a defect somebody can see.
+  //
+  // Subtracting the CONSTANT instead would be stable and would assume every
+  // hidden username exists, which nothing here knows. The honest fix is
+  // server-side — excluding the usernames in the query, so `count=exact` is
+  // exact and the page comes back full — and it is a PostgREST filter whose
+  // syntax has to be verified against the real endpoint before it ships,
+  // because getting it wrong returns 400 for every profile request and blanks
+  // the screen. It is in `.tasks/.suggestions.md` rather than guessed at here.
+  return { data: filtered.map(toUserProfile), totalCount };
 }
 
 /**

@@ -31,6 +31,7 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
+import { captureException } from "@/lib/sentry";
 import {
   profileSearchNeedle,
   profileSearchUnion,
@@ -233,8 +234,8 @@ export default function PeopleScreen() {
    * exhaustive over the method names rather than over the eight intents, so
    * adding a ninth intent that reuses an existing method needs no change here.
    */
-  function runRelationshipAction(id: RelationshipActionId, profileId: string) {
-    switch (ACTION_METHOD[id]) {
+  function runRelationshipAction(action: RelationshipActionId, profileId: string) {
+    switch (ACTION_METHOD[action]) {
       case "addFriend":
         void addFriend(profileId);
         return;
@@ -250,7 +251,18 @@ export default function PeopleScreen() {
       case "chat":
         // No chat action reaches the people list — `chat` is detail-only in
         // the table. Falling through silently would hide a table edit that
-        // gave a row a button this screen cannot service.
+        // gave a row a button this screen cannot service, which is why this
+        // throws rather than returns.
+        //
+        // Reported first, because the throw is a tripwire for a DEVELOPER and
+        // it fires inside an `onAction` during a press: in dev it surfaces
+        // loudly, and in production it takes the screen down with nothing
+        // recorded anywhere. `captureException` means the table edit that
+        // caused it is findable either way.
+        captureException(new Error("people list has no chat action"), {
+          scope: "people.runRelationshipAction",
+          extra: { action },
+        });
         throw new Error("people list has no chat action");
     }
   }

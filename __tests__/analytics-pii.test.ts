@@ -263,8 +263,16 @@ describe("PII guard — captureException extra carries labels, never content", (
    * failed. A function name from a closed list, not a value — and the case
    * below that this list rules on names rather than values is what keeps it
    * that way.
+   *
+   * `action` joined the same day and is a `RelationshipActionId`: one of eight
+   * literals in the app's own table, naming which relationship button a screen
+   * was asked to service. `app/people.tsx` reports it beside the deliberate
+   * throw for an action its list has no button for, and the switch parameter
+   * was RENAMED from `id` to make the extra a shorthand — `id` would have been
+   * an entry on this list nobody could reason about, because an id is exactly
+   * the kind of thing it exists to keep out.
    */
-  const EXTRA_ALLOWED_KEYS = new Set(["keyspace", "reason", "step"]);
+  const EXTRA_ALLOWED_KEYS = new Set(["keyspace", "reason", "step", "action"]);
 
   /**
    * Every `extra:` object passed to a `captureException`, read through the
