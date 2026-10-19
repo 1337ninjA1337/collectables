@@ -127,9 +127,17 @@ describe("SEC-1 — delete-image Edge Function holds the secret server-side", ()
 });
 
 describe("SEC-1 — supabase-profiles exposes the edge-function client helper", () => {
+  // The claim is unchanged and now reads two files: the fetch envelope moved
+  // to `lib/edge-function-call.ts` on 2026-10-19, because the two callers in
+  // `supabase-profiles` had written it twice and only one of them caught a
+  // rejected `fetch`. The security half — the function is reached through
+  // `/functions/v1/<name>` with the caller's own JWT, so the Cloudinary secret
+  // stays server-side — is asserted where each half now lives rather than
+  // dropped for having moved.
   const src = read("lib/supabase-profiles.ts");
+  const envelope = read("lib/edge-function-call.ts");
 
-  it("exports deleteImagesViaEdgeFunction posting to /functions/v1/delete-image", () => {
+  it("exports deleteImagesViaEdgeFunction and routes it to the delete-image function", () => {
     assert.match(
       src,
       /export async function deleteImagesViaEdgeFunction/,
@@ -137,13 +145,26 @@ describe("SEC-1 — supabase-profiles exposes the edge-function client helper", 
     );
     assert.match(
       src,
-      /functions\/v1\/delete-image/,
+      /callDeleteFunction\("delete-image", \{ publicIds \}\)/,
       "helper must target the delete-image Edge Function",
+    );
+  });
+
+  it("the shared envelope reaches /functions/v1 and forwards the caller's JWT", () => {
+    assert.match(
+      envelope,
+      /`\$\{baseUrl\}\/functions\/v1\/\$\{name\}`/,
+      "the envelope must address the Edge Function endpoint",
+    );
+    assert.match(
+      envelope,
+      /Authorization:\s*`Bearer \$\{token\}`/,
+      "the envelope must forward the caller's JWT so the function can verify it",
     );
     assert.match(
       src,
-      /Authorization:\s*`Bearer \$\{token\}`/,
-      "helper must forward the caller's JWT so the function can verify it",
+      /token: getAccessToken/,
+      "supabase-profiles must hand the envelope the real session token",
     );
   });
 });

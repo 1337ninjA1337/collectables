@@ -36,6 +36,11 @@ import {
   ownCollectionsSinceUrl,
   ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
+import {
+  callEdgeFunction,
+  edgeFunctionDeletedCount,
+  type EdgeFunctionResult,
+} from "@/lib/edge-function-call";
 import { mergeProfileMatches, sanitizeProfileSearchQuery } from "@/lib/profile-search";
 import { collectKeysetPages, withKeysetBefore, withPageLimit } from "@/lib/supabase-pagination";
 import { maxUpdatedAt } from "@/lib/sync-cursors";
@@ -879,27 +884,35 @@ export async function deleteAllUserData(userId: string): Promise<void> {
   await supabaseRest(`/profiles?id=eq.${userId}`, { method: "DELETE" });
 }
 
+/**
+ * POST to a Supabase Edge Function with this app's transport.
+ *
+ * The decision-making is in `lib/edge-function-call.ts`, which is a pure
+ * module precisely so the thing that was wrong here can be RUN: the two
+ * callers below were the same fetch envelope written twice and only one of
+ * them wrapped it in a `try`, so a network rejection returned an envelope from
+ * one and threw out of the other — whose signature promises an envelope, and
+ * whose entire call chain is `try … finally` with no `catch`. Deleting an
+ * account offline stopped the spinner and said nothing.
+ *
+ * Raw `fetch` rather than `fetchWithRetry` (which `supabaseRest` uses) is
+ * carried over deliberately and unchanged: retrying a POST that deletes an
+ * account is a decision about idempotency, not a refactor, and not one this
+ * change is entitled to make.
+ */
+function callDeleteFunction(name: string, body?: unknown): Promise<EdgeFunctionResult> {
+  return callEdgeFunction(
+    { baseUrl: supabaseUrl, apiKey: supabaseKey, token: getAccessToken, fetch },
+    name,
+    body,
+  );
+}
+
 export async function deleteAccountViaEdgeFunction(): Promise<{ error?: string }> {
   if (!isSupabaseConfigured) return { error: "Not configured" };
 
-  const token = await getAccessToken();
-  if (!token) return { error: "No session" };
-
-  const res = await fetch(`${supabaseUrl}/functions/v1/delete-account`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: supabaseKey,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({ error: "Unknown error" }));
-    return { error: data.error ?? "Deletion failed" };
-  }
-
-  return {};
+  const result = await callDeleteFunction("delete-account");
+  return result.ok ? {} : { error: result.error };
 }
 
 /**
@@ -915,26 +928,7 @@ export async function deleteImagesViaEdgeFunction(
   if (!isSupabaseConfigured) return { deleted: 0, error: "Not configured" };
   if (publicIds.length === 0) return { deleted: 0 };
 
-  const token = await getAccessToken();
-  if (!token) return { deleted: 0, error: "No session" };
-
-  try {
-    const res = await fetch(`${supabaseUrl}/functions/v1/delete-image`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        apikey: supabaseKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ publicIds }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({ error: "Unknown error" }));
-      return { deleted: 0, error: data.error ?? "Deletion failed" };
-    }
-    const data = (await res.json().catch(() => ({}))) as { deleted?: number };
-    return { deleted: typeof data.deleted === "number" ? data.deleted : 0 };
-  } catch (err) {
-    return { deleted: 0, error: (err as Error).message };
-  }
+  const result = await callDeleteFunction("delete-image", { publicIds });
+  if (!result.ok) return { deleted: 0, error: result.error };
+  return { deleted: edgeFunctionDeletedCount(result.body) };
 }
