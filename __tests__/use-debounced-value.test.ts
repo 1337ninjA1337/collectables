@@ -275,8 +275,27 @@ describe("useDebouncedValue — adoption", () => {
     });
 
     it(`${label} clears its remote matches when the settled query is empty`, () => {
+      // The claim: the empty-query branch clears to `[]` and RETURNS, so no
+      // request is sent and no stale list survives an emptied field.
+      //
+      // The gap before `return` was `\s*` until 2026-10-19, when
+      // `app/people.tsx` added `setSearchInFlight(false)` beside the clear —
+      // an emptied field is the third way a pending search stops being
+      // pending, next to a resolve and a reject, and the flag is what keeps
+      // the empty state from contradicting a search still in the air. A
+      // bookkeeping statement in that branch is not a second request; what
+      // the case is about is that nothing is FETCHED.
       const code = stripComments(readRepoFile(consumer.file));
-      assert.match(code, /if \(!debouncedQuery[\s\S]{0,60}\) \{[\s\S]{0,60}\(\[\]\);\s*return;\s*\}/);
+      assert.match(
+        code,
+        /if \(!debouncedQuery[\s\S]{0,60}\) \{[\s\S]{0,60}\(\[\]\);[\s\S]{0,80}return;\s*\}/,
+      );
+      const branch = /if \(!debouncedQuery[\s\S]{0,60}\) \{([\s\S]*?)return;/.exec(code);
+      assert.ok(branch, "the empty-query branch is not readable");
+      assert.ok(
+        !/searchProfiles\(/.test(branch[1]),
+        "the empty-query branch must not fetch anything",
+      );
     });
   }
 

@@ -1,5 +1,5 @@
 import { Link } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { HeroBanner } from "@/components/hero-banner";
 import { MaskedTextInput } from "@/components/masked-text-input";
@@ -82,19 +82,59 @@ export default function PeopleScreen() {
   const myProfile = getMyProfile();
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  // The id of the most recent page request. Two taps on Next fire two
+  // `fetchProfiles` calls and the SLOWER one used to win: whichever response
+  // landed last wrote `remoteProfiles`, so the list could settle on page 2
+  // while the pager read "Page 3 of 12" and nothing would correct it until the
+  // next tap. The search effect three blocks down has carried a `cancelled`
+  // flag for exactly this since it was written; the pager never did.
+  //
+  // A monotonic token rather than a per-call `cancelled` boolean, because
+  // `handleRefresh` calls `loadPage` too and a refresh must also lose to a
+  // page change started after it.
+  const pageRequestRef = useRef(0);
+
   const loadPage = useCallback(async (pageNum: number) => {
+    const request = pageRequestRef.current + 1;
+    pageRequestRef.current = request;
     setLoading(true);
     try {
       const result = await fetchProfiles(pageNum, PAGE_SIZE);
+      if (request !== pageRequestRef.current) return;
       setRemoteProfiles(result.data);
       setTotalCount(result.totalCount);
     } catch {
       // Network/auth failure: keep whatever page is already shown instead of
       // leaving the list stuck on the skeleton via an unhandled rejection.
     } finally {
-      setLoading(false);
+      // Only the newest request may stop the skeleton: an older one finishing
+      // afterwards would show the list as settled while a page is still in
+      // flight.
+      if (request === pageRequestRef.current) setLoading(false);
     }
   }, []);
+
+  /**
+   * What somebody typed, reduced to what can be matched — once.
+   *
+   * `profileSearchNeedle` was called twice in this screen and `query.trim()`
+   * twice more, which is four reductions of one input and three spellings of
+   * "is a search active". They agree on ordinary text and not on a query of
+   * only metacharacters: `"%"` trims to `"%"` and reduces to `""`, so the
+   * trimmed reading calls that a search with no matches and the needle calls
+   * it no search at all. The needle is the one `filteredPeople` compares
+   * with, so it is the one the empty state and the pager have to agree with.
+   *
+   * `query.trim()` survives in ONE place below — what `useDebouncedValue`
+   * holds, which is what `searchProfiles` is asked for and what
+   * `use-debounced-value.test.ts` pins. `searchSettling` compares against it
+   * for that reason: the question there is whether the debounce has caught up
+   * with the field, and the debounce holds the trimmed string.
+   */
+  const needle = useMemo(() => profileSearchNeedle(query), [query]);
+
+  /** A query is active, so the list is search results rather than a page. */
+  const searching = needle.length > 0;
 
   // Server-side search: the loaded page only holds PAGE_SIZE profiles, so
   // filtering it client-side made anyone beyond the current page unfindable.
@@ -106,21 +146,44 @@ export default function PeopleScreen() {
   // never read during that window.
   const debouncedQuery = useDebouncedValue(query.trim(), PROFILE_SEARCH_DEBOUNCE_MS);
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [searchInFlight, setSearchInFlight] = useState(false);
   useEffect(() => {
     if (!debouncedQuery) {
       setSearchResults([]);
+      setSearchInFlight(false);
       return;
     }
     let cancelled = false;
+    setSearchInFlight(true);
     searchProfiles(debouncedQuery, SEARCH_RESULT_LIMIT)
       .then((results) => {
         if (!cancelled) setSearchResults(results);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSearchInFlight(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [debouncedQuery]);
+
+  /**
+   * The search has been asked for and has not answered yet.
+   *
+   * Two windows, and the first is the one with no request in it at all: the
+   * debounce means `debouncedQuery` lags what is typed, so for
+   * `PROFILE_SEARCH_DEBOUNCE_MS` after a keystroke nothing has been sent.
+   * Then the round trip.
+   *
+   * It exists because the empty state was shown through both. Typing a profile
+   * ID that only the server knows about matched nothing on the loaded page, so
+   * "no people found" rendered for the debounce plus a round trip and then
+   * flipped to the answer — under a field whose whole purpose is finding
+   * somebody who is NOT on this page. `loading` could not cover it: that flag
+   * is about `fetchProfiles`, which is not running.
+   */
+  const searchSettling = searching && (debouncedQuery !== query.trim() || searchInFlight);
 
   useEffect(() => {
     void loadPage(page);
@@ -142,8 +205,7 @@ export default function PeopleScreen() {
   );
  //
   const filteredPeople = useMemo(() => {
-    const needle = profileSearchNeedle(query);
-    if (!needle) return others;
+    if (!searching) return others;
     // The loaded page and the (debounced) server-wide results as one list,
     // through `profileSearchUnion`: it filters BOTH halves with the predicate
     // the overlay and the server's `or=` list are derived from, dedupes by id
@@ -164,7 +226,7 @@ export default function PeopleScreen() {
       searchResults.filter((p) => p.id !== myProfile?.id),
       needle,
     );
-  }, [others, query, searchResults, myProfile]);
+  }, [others, needle, searching, searchResults, myProfile]);
 
   /**
    * One intent → one context method, via `ACTION_METHOD`. The switch is
@@ -246,19 +308,39 @@ export default function PeopleScreen() {
         />
       </View>
 
+      {/*
+        Rows win over the skeleton, and the skeleton wins over the empty state.
+        The order is the point: a keystroke that narrows a search must not
+        replace rows that still answer with a skeleton (that is the
+        responsiveness `profileSearchUnion` keeps stale-but-matching rows
+        for), and "no people found" must not be shown while the search that
+        would find them is still in the air.
+      */}
       {loading ? (
         <SkeletonProfileList count={4} />
-      ) : filteredPeople.length === 0 ? (
+      ) : filteredPeople.length > 0 ? (
+        filteredPeople.map(renderProfileCard)
+      ) : searchSettling ? (
+        <SkeletonProfileList count={4} />
+      ) : (
         <EmptyState
           icon="🔎"
           title={t("emptyPeopleTitle")}
           hint={t("emptyPeopleHint")}
         />
-      ) : (
-        filteredPeople.map(renderProfileCard)
       )}
 
-      {!loading && totalPages > 1 && (
+      {/*
+        No pager while a search is active. `totalPages` comes from
+        `totalCount`, which is every profile in the table and not the rows a
+        search answered — so a query matching three people rendered three
+        cards under "Page 1 of 12", and Next fetched page 2 of the UNFILTERED
+        table, replacing `others` and changing the result list underneath the
+        user for a reason the label does not describe. The search already
+        reaches the whole table through `searchProfiles`, so there is nothing
+        for a pager to do while one is running.
+      */}
+      {!loading && !searching && totalPages > 1 && (
         <View style={styles.pagination}>
           <Pressable
             style={{...styles.pageButton, ...(page <= 1 ? styles.pageButtonDisabled : {})}}
