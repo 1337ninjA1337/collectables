@@ -50,8 +50,8 @@ import {
 } from "@/lib/profile-search";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useI18n } from "@/lib/i18n-context";
-import { announceMessage } from "@/lib/announce";
-import { searchAnnouncement, type SearchResultsState } from "@/lib/search-announcement";
+import { type SearchResultsState } from "@/lib/search-announcement";
+import { announceSearchResults } from "@/lib/search-results-announcement";
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 
@@ -264,13 +264,12 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // already spoken", and both belong in the module that has the cases for
     // them. It also decides what to REMEMBER on an unsettled round, which a
     // call-site guard cannot.
-    const decision = searchAnnouncement(
+    spokenResults.current = announceSearchResults(
+      t,
       { query: q, total: totalResults },
       spokenResults.current,
       { settled: !peopleSearchSettling },
     );
-    spokenResults.current = decision.spoken;
-    if (decision.speak) announceMessage(t("searchResultsAnnouncement", { count: totalResults }));
   }, [debouncedQuery, peopleSearchSettling, q, totalResults, t]);
 
   const filters: { key: FilterType; label: string }[] = [

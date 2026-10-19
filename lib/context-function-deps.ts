@@ -208,6 +208,11 @@ export const SANCTIONED_EFFECT_DEPS: readonly SanctionedEffectDep[] = [
     field: "t",
     why: "a translated placeholder and an announcement, both of which a language change should re-state",
   },
+  {
+    file: "app/people.tsx",
+    field: "t",
+    why: "the result-count announcement, where a re-fire is silent BY CONSTRUCTION rather than by a guard somebody wrote: `searchAnnouncement` answers `speak: false` for a repeat of the number already spoken, so a context rebuild re-runs it with the same { query, total } and it says nothing. The effect does one thing and that thing is idempotent on an unchanged count",
+  },
 ];
 
 /** A pairing the registry does not cover, or an entry covering nothing. */

@@ -32,6 +32,8 @@ import {
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import { captureException } from "@/lib/sentry";
+import { type SearchResultsState } from "@/lib/search-announcement";
+import { announceSearchResults } from "@/lib/search-results-announcement";
 import {
   profileSearchNeedle,
   profileSearchUnion,
@@ -228,6 +230,36 @@ export default function PeopleScreen() {
       needle,
     );
   }, [others, needle, searching, searchResults, myProfile]);
+
+  /**
+   * The result count, out loud, when it changes.
+   *
+   * The sheet (`components/search-overlay.tsx`) has announced its count since
+   * the day its three headings became headings; this screen, which holds the
+   * same page-plus-server union, the same settling state and the same locale
+   * key, announced NOTHING — so a screen-reader user got a count in the sheet
+   * and silence here, on the surface whose whole job is finding people.
+   *
+   * Whether to speak is `lib/search-announcement.ts`' (a repeat of the number
+   * already spoken is silence; an empty field forgets; an unsettled total is
+   * not a count), and the announcing is
+   * `lib/search-results-announcement.ts`' — the platform-pair half, which is
+   * also why this is one line rather than the sheet's effect copied.
+   *
+   * No `debouncedQuery !== needle` guard, unlike the sheet: `searchSettling`
+   * already covers the lagging debounce for an active query, and when the
+   * field is cleared the forget should happen AT ONCE rather than a debounce
+   * window later, so the memory tracks the field.
+   */
+  const spokenResults = useRef<SearchResultsState | null>(null);
+  useEffect(() => {
+    spokenResults.current = announceSearchResults(
+      t,
+      { query: needle, total: filteredPeople.length },
+      spokenResults.current,
+      { settled: !searchSettling },
+    );
+  }, [needle, filteredPeople.length, searchSettling, t]);
 
   /**
    * One intent → one context method, via `ACTION_METHOD`. The switch is

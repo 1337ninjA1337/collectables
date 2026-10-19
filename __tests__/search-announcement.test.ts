@@ -179,15 +179,73 @@ describe("the overlay around it", () => {
   it("asks the shared rule rather than comparing counts inline", () => {
     assert.match(
       OVERLAY,
-      /searchAnnouncement\(\s*\{ query: q, total: totalResults \},\s*spokenResults\.current,\s*\{ settled: !peopleSearchSettling \},\s*\)/,
+      /spokenResults\.current = announceSearchResults\(\s*t,\s*\{ query: q, total: totalResults \},\s*spokenResults\.current,\s*\{ settled: !peopleSearchSettling \},\s*\)/,
     );
-    assert.match(OVERLAY, /announceMessage\(t\("searchResultsAnnouncement", \{ count: totalResults \}\)\)/);
   });
 
-  it("speaks through the shared channel, so two callers are heard in turn", () => {
-    // `announceForAccessibility` interrupts; `lib/announce.ts` is the queue
-    // that stops a toast cutting this off mid-word.
-    assert.match(OVERLAY, /from "@\/lib\/announce"/);
+  it("speaks through the mechanism module, not its own announceMessage", () => {
+    // `lib/search-results-announcement.ts` is the MECHANISM half — it imports
+    // `lib/announce.ts`, the platform pair that keeps a toast from cutting
+    // this off mid-word, which is why it is a module and not a line here:
+    // importing the pair would put the node suites out of reach of whatever
+    // file did it. `tab-announcement`/`tab-sentence` and
+    // `reorder-announcement`/`drag-reorder` are the same split.
+    assert.match(OVERLAY, /from "@\/lib\/search-results-announcement"/);
+    assert.ok(
+      !/announceMessage\(/.test(OVERLAY),
+      "the overlay announces directly again, which is the line app/people.tsx would copy",
+    );
+  });
+});
+
+describe("the mechanism half, and the second surface that needed it", () => {
+  const MECHANISM = read("lib/search-results-announcement.ts");
+  const PEOPLE = read("app/people.tsx");
+
+  it("is the announce side of the split, and the decision module is not", () => {
+    assert.match(MECHANISM, /from "@\/lib\/announce"/);
+    assert.match(MECHANISM, /announceMessage\(t\("searchResultsAnnouncement", \{ count: next\.total \}\)\)/);
+    assert.ok(
+      !/from "@\/lib\/announce"/.test(read("lib/search-announcement.ts")),
+      "the decision module must stay node-testable",
+    );
+  });
+
+  it("returns the memory rather than holding it", () => {
+    // Per-surface: two independent searches, two things last spoken. A
+    // module-level cache would let the sheet's last count silence the
+    // screen's identical one.
+    assert.match(MECHANISM, /\): SearchResultsState \| null \{/);
+    assert.match(MECHANISM, /return decision\.spoken;/);
+  });
+
+  it("takes the one key it can ask for, as both sibling modules do", () => {
+    assert.match(
+      MECHANISM,
+      /export type SearchResultsTranslate = \(\s*key: "searchResultsAnnouncement",/,
+    );
+  });
+
+  it("app/people.tsx announces its count too, which it never did", () => {
+    // The screen holds the same page-plus-server union, the same settling
+    // state and the same locale key as the sheet, and said nothing — so a
+    // screen-reader user got a count in the sheet and silence on the surface
+    // whose whole job is finding people.
+    assert.match(
+      PEOPLE,
+      /spokenResults\.current = announceSearchResults\(\s*t,\s*\{ query: needle, total: filteredPeople\.length \},\s*spokenResults\.current,\s*\{ settled: !searchSettling \},\s*\)/,
+    );
+    assert.match(PEOPLE, /useRef<SearchResultsState \| null>\(null\)/);
+  });
+
+  it("the screen needs no debounce guard of its own", () => {
+    // `searchSettling` already covers the lagging debounce for an active
+    // query, and when the field is cleared the forget should happen AT ONCE
+    // rather than a debounce window later — so the memory tracks the field.
+    assert.ok(
+      !/if \(debouncedQuery !== /.test(PEOPLE),
+      "the screen added a guard the sheet needs for a reason it does not share",
+    );
   });
 });
 
