@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { parseStoredCurrency } from "@/lib/locale-helpers";
 import { CURRENCY_KEY } from "@/lib/storage-keys";
 import { readRepoFile as read } from "./helpers/repo-file";
+import { clearAllUserDataBody } from "./helpers/storage-key-source";
 
 describe("CURRENCY_KEY", () => {
   it("uses the documented collectables-currency-v1 slot", () => {
@@ -13,9 +14,7 @@ describe("CURRENCY_KEY", () => {
   it("is removed by clearAllUserData so signing out wipes the preference", () => {
     const src = read("lib/storage-keys.ts");
     assert.match(src, /CURRENCY_KEY[^;]*"collectables-currency-v1"/);
-    const clearBlock = src.match(/clearAllUserData[\s\S]*?\n\}/);
-    assert.ok(clearBlock, "expected clearAllUserData function block");
-    assert.match(clearBlock![0], /CURRENCY_KEY/);
+    assert.match(clearAllUserDataBody(), /CURRENCY_KEY/);
   });
 });
 

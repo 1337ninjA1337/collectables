@@ -90,11 +90,41 @@ export function marketplaceTransferLogKey(userId: string): string {
 }
 
 /**
+ * The entities that carry a per-user sync cursor AND a tombstone set.
+ *
+ * One list, and it is here because this is where the two key builders and the
+ * account-deletion wipe are. It was the same four-member union declared twice
+ * — `SyncEntity` in `lib/sync-cursors.ts` ("entities that carry an
+ * `updated_at`/`moddatetime` trigger") and `TombstoneEntity` in
+ * `lib/tombstones.ts` ("entities that carry a soft-delete `deleted_at`
+ * column") — two sentences about two columns that have named the same four
+ * tables since BE-15a, with nothing saying so. Both are aliases of this now,
+ * so they cannot disagree about which tables sync.
+ *
+ * It is a runtime LIST and not only a type because `clearAllUserData` has to
+ * iterate it. Before 2026-10-19 it wiped the cursor and tombstone keys for
+ * `collections` and `items` by hand while the unions named four, so
+ * `collectables-sync-cursor-v1-profiles-<id>` and the `friend_requests` pair
+ * would have survived an account deletion the day anything wrote them.
+ * Nothing does today — every call site passes `"collections"` or `"items"` —
+ * which is what made it a latent gap rather than live residue, and exactly
+ * the kind that lands the moment somebody adds a delta pull for profiles.
+ */
+export const SYNCED_ENTITIES = ["collections", "items", "profiles", "friend_requests"] as const;
+
+/** One of {@link SYNCED_ENTITIES}. */
+export type SyncedEntity = (typeof SYNCED_ENTITIES)[number];
+
+/**
  * Per-entity, per-user delta-pull cursor (BE-14). Stores the highest
  * `updated_at` timestamp seen so far for a given entity so the next cloud pull
  * can ask for `updated_at=gt.<cursor>` instead of refetching the whole table.
+ *
+ * Takes a {@link SyncedEntity} rather than a `string`: the builder is what the
+ * wipe enumerates, so a key it can produce for an entity the wipe has never
+ * heard of is the defect this signature now refuses.
  */
-export function syncCursorKey(entity: string, userId: string): string {
+export function syncCursorKey(entity: SyncedEntity, userId: string): string {
   return `collectables-sync-cursor-v1-${entity}-${userId}`;
 }
 
@@ -104,7 +134,7 @@ export function syncCursorKey(entity: string, userId: string): string {
  * dropping them locally even when a later full/seed load would otherwise
  * resurrect them — generalising the social-graph `deletedProfileIds` set.
  */
-export function tombstoneKey(entity: string, userId: string): string {
+export function tombstoneKey(entity: SyncedEntity, userId: string): string {
   return `collectables-tombstones-v1-${entity}-${userId}`;
 }
 
@@ -206,10 +236,12 @@ export async function clearAllUserData(userId: string): Promise<void> {
     socialCacheKey(userId),
     premiumKey(userId),
     marketplaceTransferLogKey(userId),
-    syncCursorKey("collections", userId),
-    syncCursorKey("items", userId),
-    tombstoneKey("collections", userId),
-    tombstoneKey("items", userId),
+    // Every synced entity, not the two somebody wrote out: the unions have
+    // named four since BE-15a and this list named two, so a cursor or a
+    // tombstone set for `profiles` or `friend_requests` would have outlived
+    // the account it belonged to.
+    ...SYNCED_ENTITIES.map((entity) => syncCursorKey(entity, userId)),
+    ...SYNCED_ENTITIES.map((entity) => tombstoneKey(entity, userId)),
     SOCIAL_GRAPH_KEY,
     LANGUAGE_KEY,
     MARKETPLACE_KEY,

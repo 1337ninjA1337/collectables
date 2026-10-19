@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { SYNC_OVERLAP_MS, maxUpdatedAt, overlapCursor } from "@/lib/sync-cursors";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { clearAllUserDataBody } from "./helpers/storage-key-source";
 
 // --- maxUpdatedAt (pure delta-cursor reducer) ---
 describe("maxUpdatedAt", () => {
@@ -155,10 +156,21 @@ describe("sync-cursors storage + context wiring", () => {
     assert.match(keys, /syncCursorKey/);
   });
 
-  it("clears both cursor keys on per-user data reset", () => {
+  it("clears a cursor key for every synced entity on per-user data reset", () => {
+    // It pinned `syncCursorKey("collections", userId)` and the `"items"` line
+    // until 2026-10-19, which was the wipe's hand-written pair — and
+    // `SyncEntity` has named FOUR entities since BE-15a, so a cursor for
+    // `profiles` or `friend_requests` would have outlived the account it
+    // belonged to the day anything wrote one. The wipe maps `SYNCED_ENTITIES`
+    // now, and `clear-all-user-data.test.ts` seeds a key per entity and RUNS
+    // it; this is the structural half, asserting the derivation rather than
+    // two of the four names.
+    assert.match(
+      clearAllUserDataBody(),
+      /\.\.\.SYNCED_ENTITIES\.map\(\(entity\) => syncCursorKey\(entity, userId\)\)/,
+    );
     const keys = read("lib/storage-keys.ts");
-    assert.match(keys, /syncCursorKey\("collections", userId\)/);
-    assert.match(keys, /syncCursorKey\("items", userId\)/);
+    assert.match(keys, /export const SYNCED_ENTITIES = \[/);
   });
 
   it("the warm refresh path delta-pulls collections + items via cursors", () => {

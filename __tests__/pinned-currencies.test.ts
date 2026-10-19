@@ -8,6 +8,7 @@ import {
 } from "@/lib/locale-helpers";
 import { PINNED_CURRENCIES_KEY } from "@/lib/storage-keys";
 import { readRepoFile as read } from "./helpers/repo-file";
+import { clearAllUserDataBody } from "./helpers/storage-key-source";
 
 describe("PINNED_CURRENCIES_KEY", () => {
   it("uses the collectables-pinned-currencies-v1 slot", () => {
@@ -15,10 +16,8 @@ describe("PINNED_CURRENCIES_KEY", () => {
   });
 
   it("is removed by clearAllUserData so signing out wipes the MRU list", () => {
-    const src = read("lib/storage-keys.ts");
-    const clearBlock = src.match(/clearAllUserData[\s\S]*?\n\}/);
-    assert.ok(clearBlock, "expected clearAllUserData function block");
-    assert.match(clearBlock![0], /PINNED_CURRENCIES_KEY/);
+    const clearBlock = clearAllUserDataBody();
+    assert.match(clearBlock, /PINNED_CURRENCIES_KEY/);
   });
 });
 

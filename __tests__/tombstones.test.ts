@@ -8,6 +8,7 @@ import {
 } from "@/lib/tombstones";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { clearAllUserDataBody } from "./helpers/storage-key-source";
 
 // --- partitionByTombstone (pure split alive vs tombstoned) ---
 describe("partitionByTombstone", () => {
@@ -123,10 +124,17 @@ describe("tombstones storage + key wiring", () => {
     assert.match(keys, /tombstoneKey/);
   });
 
-  it("clears both tombstone keys on per-user data reset", () => {
-    const keys = read("lib/storage-keys.ts");
-    assert.match(keys, /tombstoneKey\("collections", userId\)/);
-    assert.match(keys, /tombstoneKey\("items", userId\)/);
+  it("clears a tombstone key for every synced entity on per-user data reset", () => {
+    // Same change as the cursor half, for the same reason: this pinned the
+    // wipe's hand-written `"collections"`/`"items"` pair while
+    // `TombstoneEntity` had named four since BE-15a. Both unions are aliases
+    // of `SYNCED_ENTITIES` now and the wipe maps it.
+    assert.match(
+      clearAllUserDataBody(),
+      /\.\.\.SYNCED_ENTITIES\.map\(\(entity\) => tombstoneKey\(entity, userId\)\)/,
+    );
+    assert.match(read("lib/storage-keys.ts"), /export const SYNCED_ENTITIES = \[/);
+    assert.match(read("lib/tombstones.ts"), /export type TombstoneEntity = SyncedEntity;/);
   });
 
   it("the AsyncStorage wrappers no-op a persist when the set is unchanged", () => {

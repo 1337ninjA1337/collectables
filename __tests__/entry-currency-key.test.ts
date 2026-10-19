@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 
 import { CURRENCY_KEY, ENTRY_CURRENCY_KEY } from "@/lib/storage-keys";
 
-import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceCode } from "./helpers/source-files";
+import { clearAllUserDataBody } from "./helpers/storage-key-source";
 
 /**
  * One storage slot was two facts, and the collision was not theoretical.
@@ -55,11 +55,9 @@ describe("the two keys", () => {
     // means the next account on this device opens its first cost form on a
     // stranger's unit — which is the reason the display half was already in
     // this list.
-    const src = read("lib/storage-keys.ts");
-    const clearBlock = src.match(/clearAllUserData[\s\S]*?\n\}/);
-    assert.ok(clearBlock, "expected clearAllUserData function block");
-    assert.match(clearBlock![0], /\bCURRENCY_KEY\b/);
-    assert.match(clearBlock![0], /\bENTRY_CURRENCY_KEY\b/);
+    const clearBlock = clearAllUserDataBody();
+    assert.match(clearBlock, /\bCURRENCY_KEY\b/);
+    assert.match(clearBlock, /\bENTRY_CURRENCY_KEY\b/);
   });
 });
 

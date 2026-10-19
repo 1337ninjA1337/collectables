@@ -11,6 +11,7 @@ import {
 } from "@/lib/currency-rates";
 import { CURRENCY_RATES_KEY } from "@/lib/storage-keys";
 import { readRepoFile as read } from "./helpers/repo-file";
+import { clearAllUserDataBody } from "./helpers/storage-key-source";
 
 describe("parseRatesResponse", () => {
   it("returns a frozen payload with USD anchor when given a valid response", () => {
@@ -216,10 +217,8 @@ describe("currency-rates module — endpoint + storage", () => {
   });
 
   it("clearAllUserData wipes CURRENCY_RATES_KEY so signing out drops stale cache", () => {
-    const src = read("lib/storage-keys.ts");
-    const clearBlock = src.match(/clearAllUserData[\s\S]*?\n\}/);
-    assert.ok(clearBlock, "expected clearAllUserData function block");
-    assert.match(clearBlock![0], /CURRENCY_RATES_KEY/);
+    const clearBlock = clearAllUserDataBody();
+    assert.match(clearBlock, /CURRENCY_RATES_KEY/);
   });
 });
 

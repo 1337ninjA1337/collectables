@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { reportStorageFailure } from "@/lib/report-storage-failure";
-import { tombstoneKey } from "@/lib/storage-keys";
+import { tombstoneKey, type SyncedEntity } from "@/lib/storage-keys";
 
 /**
  * BE-15a — soft-delete tombstones (generalising the social graph's
@@ -21,8 +21,14 @@ import { tombstoneKey } from "@/lib/storage-keys";
  * `tombstoneKey`.
  */
 
-/** Entities that carry a soft-delete `deleted_at` column (see BE-15a). */
-export type TombstoneEntity = "collections" | "items" | "profiles" | "friend_requests";
+/** Entities that carry a soft-delete `deleted_at` column (see BE-15a).
+ *
+ * An alias of `SyncedEntity` since 2026-10-19: this union and its twin one
+ * module over were two sentences about two columns that have named the same
+ * four tables since BE-15a, and `clearAllUserData` needed the list at
+ * RUNTIME to wipe a deleted account's keys for all of them.
+ */
+export type TombstoneEntity = SyncedEntity;
 
 /**
  * Split a freshly pulled batch of cloud rows into the still-alive rows and the

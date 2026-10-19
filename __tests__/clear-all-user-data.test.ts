@@ -38,14 +38,19 @@ const KEPT: Readonly<Record<string, string>> = {
 };
 
 /**
- * The entities `syncCursorKey` / `tombstoneKey` are instantiated for.
+ * The module under test, imported lazily.
  *
- * The two-argument builders take an entity as well as a user, and the wipe
- * enumerates these two itself. A third entity would have to be added in both
- * places, which is the one thing this suite cannot discover — named here
- * rather than left implicit in a loop.
+ * Every read of it goes through here rather than a top-level
+ * `import … from "@/lib/storage-keys"`, because a static import evaluates the
+ * module — and AsyncStorage with it — before {@link installStorageSpy} has
+ * registered the mock, which `mockModule` can only do for a module that has
+ * not been evaluated yet. A static import failed with
+ * `ReferenceError: window is not defined` from the REAL AsyncStorage, which
+ * is the spy quietly not being installed rather than a broken case.
  */
-const SCOPED_ENTITIES = ["collections", "items"] as const;
+function storageKeys() {
+  return import("@/lib/storage-keys");
+}
 
 /**
  * Every `collectables-*` key the module exports, user-scoped ones resolved.
@@ -57,7 +62,15 @@ const SCOPED_ENTITIES = ["collections", "items"] as const;
  * nothing writes and would fail this case with a name no reader could place.
  */
 async function allKeysFor(userId: string): Promise<string[]> {
-  const keys = (await import("@/lib/storage-keys")) as unknown as Record<string, unknown>;
+  const module = await storageKeys();
+  // The one statement of which tables sync, read rather than copied: this
+  // suite declared `["collections", "items"]` of its own for a few hours on
+  // 2026-10-19, which is the exact defect it was built to catch one level up
+  // — the wipe hard-coded those two while `SyncEntity` and `TombstoneEntity`
+  // had named four since BE-15a, and a case that copies the list it is
+  // checking cannot see that.
+  const entities: readonly string[] = module.SYNCED_ENTITIES;
+  const keys = module as unknown as Record<string, unknown>;
   const found = new Set<string>();
   const keep = (produced: unknown) => {
     if (typeof produced === "string" && produced.startsWith("collectables-")) found.add(produced);
@@ -72,7 +85,7 @@ async function allKeysFor(userId: string): Promise<string[]> {
     const builder = value as (...args: string[]) => unknown;
     if (builder.length === 1) keep(builder(userId));
     else if (builder.length === 2) {
-      for (const entity of SCOPED_ENTITIES) keep(builder(entity, userId));
+      for (const entity of entities) keep(builder(entity, userId));
     }
   }
   return [...found];
@@ -84,7 +97,7 @@ describe("clearAllUserData removes what it says it removes", () => {
   it("wipes every key it was given", async () => {
     // The premise: a spy whose `multiRemove` did nothing would make every
     // assertion below vacuously agreeable.
-    const { clearAllUserData, collectionsKey, itemsKey } = await import("@/lib/storage-keys");
+    const { clearAllUserData, collectionsKey, itemsKey } = await storageKeys();
     spy.store.set(collectionsKey("u1"), "[]");
     spy.store.set(itemsKey("u1"), "[]");
     await clearAllUserData("u1");
@@ -94,7 +107,7 @@ describe("clearAllUserData removes what it says it removes", () => {
   it("leaves another account's rows alone", async () => {
     // The per-user half of the key names is the whole reason they are
     // per-user: two accounts on one device, one deletion.
-    const { clearAllUserData, collectionsKey } = await import("@/lib/storage-keys");
+    const { clearAllUserData, collectionsKey } = await storageKeys();
     spy.store.set(collectionsKey("u1"), "mine");
     spy.store.set(collectionsKey("u2"), "theirs");
     await clearAllUserData("u1");
@@ -104,7 +117,7 @@ describe("clearAllUserData removes what it says it removes", () => {
   it("removes every key the module can produce, except the ones named above", async () => {
     // The case the hand-written list never had. A key added to
     // `lib/storage-keys.ts` and forgotten here fails with its own name.
-    const { clearAllUserData } = await import("@/lib/storage-keys");
+    const { clearAllUserData } = await storageKeys();
     for (const key of await allKeysFor("u1")) spy.store.set(key, "x");
     const before = spy.store.size;
     assert.ok(before >= 20, `only ${String(before)} keys were derived — the module read has broken`);
@@ -127,11 +140,26 @@ describe("clearAllUserData removes what it says it removes", () => {
     }
   });
 
+  it("wipes a cursor and a tombstone set for EVERY synced entity", async () => {
+    // The latent gap. The wipe named `collections` and `items`; the two
+    // entity unions have named four since BE-15a. Nothing writes a cursor for
+    // `profiles` or `friend_requests` today, which is what made this a gap
+    // that lands later rather than residue sitting in storage now.
+    const { clearAllUserData, syncCursorKey, tombstoneKey, SYNCED_ENTITIES } = await storageKeys();
+    assert.ok(SYNCED_ENTITIES.length >= 4, "the entity list shrank — check both unions");
+    for (const entity of SYNCED_ENTITIES) {
+      spy.store.set(syncCursorKey(entity, "u1"), "2026-01-01");
+      spy.store.set(tombstoneKey(entity, "u1"), "[]");
+    }
+    await clearAllUserData("u1");
+    assert.equal(spy.store.size, 0);
+  });
+
   it("wipes the sort-mode blob, which is keyed by the deleted account's collections", async () => {
     // The key that was missing. Not user-scoped, so nothing about its NAME
     // said it belonged to anybody — and its contents are a map from the
     // deleted account's collection ids to a sort mode.
-    const { clearAllUserData, ITEM_SORT_KEY } = await import("@/lib/storage-keys");
+    const { clearAllUserData, ITEM_SORT_KEY } = await storageKeys();
     spy.store.set(ITEM_SORT_KEY, JSON.stringify({ "col-1": "newest" }));
     await clearAllUserData("u1");
     assert.equal(spy.store.has(ITEM_SORT_KEY), false);
@@ -142,7 +170,7 @@ describe("clearAllUserData removes what it says it removes", () => {
     // device still holds its rows" off this one failure, and the sentence is
     // only true because a failed `multiRemove` removes NONE of the keys
     // rather than some.
-    const { clearAllUserData, collectionsKey, ITEM_SORT_KEY } = await import("@/lib/storage-keys");
+    const { clearAllUserData, collectionsKey, ITEM_SORT_KEY } = await storageKeys();
     spy.store.set(collectionsKey("u1"), "[]");
     spy.store.set(ITEM_SORT_KEY, "{}");
     spy.removeError = new Error("storage full");

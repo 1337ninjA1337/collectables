@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { reportStorageFailure } from "@/lib/report-storage-failure";
-import { syncCursorKey } from "@/lib/storage-keys";
+import { syncCursorKey, type SyncedEntity } from "@/lib/storage-keys";
 
 /**
  * BE-14 — delta pulls.
@@ -15,8 +15,14 @@ import { syncCursorKey } from "@/lib/storage-keys";
  * helpers are thin AsyncStorage wrappers keyed via `syncCursorKey`.
  */
 
-/** Entities that carry an `updated_at`/`moddatetime` trigger (see BE-9). */
-export type SyncEntity = "collections" | "items" | "profiles" | "friend_requests";
+/** Entities that carry an `updated_at`/`moddatetime` trigger (see BE-9).
+ *
+ * An alias of `SyncedEntity` since 2026-10-19: this union and its twin one
+ * module over were two sentences about two columns that have named the same
+ * four tables since BE-15a, and `clearAllUserData` needed the list at
+ * RUNTIME to wipe a deleted account's keys for all of them.
+ */
+export type SyncEntity = SyncedEntity;
 
 /**
  * Returns the most-recent `updated_at` across `rows`, never going backwards
