@@ -46,7 +46,7 @@ describe("runDeleteAccount — the happy path", () => {
   it("runs the five steps in order", async () => {
     const log: string[] = [];
     const outcome = await runDeleteAccount(happyPath(log));
-    assert.deepEqual(outcome, { warnings: [] });
+    assert.deepEqual(outcome, { warnings: [], localDataRemains: false });
     assert.deepEqual(log, [
       "listImageUrls",
       "deleteImages",
@@ -184,6 +184,38 @@ describe("runDeleteAccount — a failure AFTER the delete is not a deletion fail
     );
   });
 
+  it("says the device still holds the deleted account's rows", async () => {
+    // The one warning with a consequence for somebody other than a log
+    // reader: `clearAllUserData` is a single all-or-nothing `multiRemove`, so
+    // a failure leaves the collections, items, chat cache and language in
+    // storage while the app navigates away looking signed out — and the next
+    // person to open it on this device sees a stranger's collections.
+    const log: string[] = [];
+    const outcome = await runDeleteAccount(
+      withStep(log, "clearLocalData", () => Promise.reject(new Error("storage full"))),
+    );
+    assert.equal(outcome.localDataRemains, true);
+    assert.equal(outcome.error, undefined, "it is not an error — retrying would hit a deleted account");
+  });
+
+  it("is false when the clear succeeded, whatever else failed", async () => {
+    const log: string[] = [];
+    const outcome = await runDeleteAccount(
+      withStep(log, "signOut", () => Promise.reject(new Error("socket closed"))),
+    );
+    assert.equal(outcome.localDataRemains, false);
+  });
+
+  it("is false when the account was never deleted", async () => {
+    // Nothing was cleared because nothing should have been: the data on this
+    // device belongs to an account that still exists.
+    const log: string[] = [];
+    const outcome = await runDeleteAccount(
+      withStep(log, "deleteAccount", async () => ({ error: "No session" })),
+    );
+    assert.equal(outcome.localDataRemains, false);
+  });
+
   it("still signs out when clearing local data threw", async () => {
     // The steps after a failed cleanup step still run: an open realtime
     // socket on a deleted account is worse than a stale storage key.
@@ -259,7 +291,7 @@ describe("runDeleteAccount — no step rejects out of it", () => {
 describe("the two call sites that used to have no catch", () => {
   it("lib/auth-context.tsx runs the flow rather than awaiting five things in a row", () => {
     const code = stripComments(readRepoFile("lib/auth-context.tsx"));
-    assert.match(code, /const \{ error, warnings \} = await runDeleteAccount\(\{/);
+    assert.match(code, /const \{ error, warnings, localDataRemains \} = await runDeleteAccount\(\{/);
     // Destructured shorthand, which `analytics-pii.test.ts` requires of every
     // `extra`: the allow-list rules on the NAME, so a value assembled at the
     // call site would say nothing about what reaches Sentry.
@@ -275,8 +307,18 @@ describe("the two call sites that used to have no catch", () => {
     const code = stripComments(readRepoFile("app/settings.tsx"));
     assert.match(
       code,
-      /const \{ error \} = await deleteAccount\(\);[\s\S]*?\} catch \{[\s\S]*?reportDeleteFailed\(\);[\s\S]*?\} finally \{/,
+      /await deleteAccount\(\);[\s\S]*?\} catch \{[\s\S]*?reportDeleteFailed\(\);[\s\S]*?\} finally \{/,
       "performDelete must report a throw, not swallow it into a stopped spinner",
+    );
+  });
+
+  it("app/settings.tsx tells the user when the device still holds the data", () => {
+    const code = stripComments(readRepoFile("app/settings.tsx"));
+    assert.match(code, /const \{ error, localDataRemains \} = await deleteAccount\(\);/);
+    assert.match(
+      code,
+      /if \(localDataRemains\) notify\(t\("deleteAccountLocalDataRemains"\)\);\s*router\.replace\("\/"\);/,
+      "the warning must be shown AND the navigation must still happen — the account is gone either way",
     );
   });
 

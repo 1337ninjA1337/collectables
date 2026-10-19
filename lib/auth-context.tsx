@@ -44,7 +44,12 @@ type AuthContextValue = {
   verifyEmailOtp: (email: string, token: string) => Promise<{ error?: string }>;
   signInWithProvider: (provider: "google" | "apple") => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
-  deleteAccount: () => Promise<{ error?: string }>;
+  /**
+   * `localDataRemains` is the one outcome that is neither success nor failure:
+   * the account was deleted and this device still holds its rows, so the
+   * screen has to say so — see `lib/delete-account-flow.ts`.
+   */
+  deleteAccount: () => Promise<{ error?: string; localDataRemains?: boolean }>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -248,7 +253,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           // no alert, no navigation and no record. The image sweep is
           // best-effort, the Edge Function call is the answer, and everything
           // after it runs on an account that is already gone.
-          const { error, warnings } = await runDeleteAccount({
+          const { error, warnings, localDataRemains } = await runDeleteAccount({
             listImageUrls: () => fetchAllUserImageUrls(userId),
             deleteImages: (urls) => deleteCloudinaryImages([...urls]),
             deleteAccount: deleteAccountViaEdgeFunction,
@@ -272,7 +277,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
               extra: { step, reason },
             });
           }
-          return error === undefined ? {} : { error };
+          return error === undefined ? { localDataRemains } : { error };
         } finally {
           setPending(false);
         }

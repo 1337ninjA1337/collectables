@@ -441,6 +441,8 @@ export const en = {
   deleteAccountConfirm: "Delete my account",
   deleteAccountDeleting: "Deleting...",
   deleteAccountFailed: "Could not delete account. Please try again later.",
+  deleteAccountLocalDataRemains:
+    "Your account was deleted, but some data could not be removed from this device. Reinstalling the app or clearing its storage will remove it.",
   chatsTitle: "Chats",
   navChatsUnreadA11y: (params?: TranslationParams) =>
     `Chats, unread: ${params?.count ?? 0}`,

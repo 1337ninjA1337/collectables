@@ -233,6 +233,8 @@ export const be: TranslationMap = {
   deleteAccountConfirm: "Выдаліць мой акаўнт",
   deleteAccountDeleting: "Выдаленне...",
   deleteAccountFailed: "Не ўдалося выдаліць акаўнт. Паспрабуйце пазней.",
+  deleteAccountLocalDataRemains:
+    "Акаўнт выдалены, але частку даных не ўдалося выдаліць з гэтай прылады. Перавстанавіце дадатак або ачысціце яго даныя, каб выдаліць іх.",
   chatsTitle: "Чаты",
   navChatsUnreadA11y: (params?: TranslationParams) =>
     `Чаты, непрачытаных: ${params?.count ?? 0}`,

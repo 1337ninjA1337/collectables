@@ -84,6 +84,24 @@ export interface DeleteAccountWarning {
 export interface DeleteAccountOutcome {
   readonly error?: string;
   readonly warnings: readonly DeleteAccountWarning[];
+  /**
+   * The account is gone and this device still holds its rows.
+   *
+   * Separated from the other warnings because it is the only one with a
+   * consequence for somebody other than a log reader. `clearAllUserData`
+   * removes the per-user keys AND the device-wide ones — `collectables-social-graph-v1`,
+   * the language, the marketplace cache, both currency preferences — through a
+   * single `AsyncStorage.multiRemove`, which is all-or-nothing: when it fails,
+   * nothing is removed. The app then navigates away looking signed out while
+   * the deleted account's collections, items and chat cache sit in storage, so
+   * the next person to open it on this device sees them.
+   *
+   * It is not an `error`: the deletion succeeded, and telling somebody to retry
+   * it would send them at an account that no longer exists. It is the one
+   * warning the user has to be told about, which is why it is a field and not
+   * a `warnings.some(...)` every caller would have to think to write.
+   */
+  readonly localDataRemains: boolean;
 }
 
 /** The step names a warning can carry, so a reader can grep for them. */
@@ -159,12 +177,15 @@ export async function runDeleteAccount(
     // the one that does not clear the user's data on a maybe.
     error = reasonOf(err);
   }
-  if (error !== undefined) return { error, warnings };
+  if (error !== undefined) return { error, warnings, localDataRemains: false };
 
   // Past this line the account is gone. Nothing below can make that untrue,
   // so nothing below can produce an `error`.
   await attempt(warnings, "clearLocalData", () => steps.clearLocalData());
   await attempt(warnings, "signOut", () => steps.signOut());
 
-  return { warnings };
+  return {
+    warnings,
+    localDataRemains: warnings.some((warning) => warning.step === "clearLocalData"),
+  };
 }

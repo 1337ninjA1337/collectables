@@ -659,7 +659,16 @@ describe("translation floors", () => {
     // collections and nothing else, while its a11y label said "Search your
     // collections by name". One field with two labels that disagreed, and the
     // visible one promised two sections the sheet cannot return.
-    assert.match(report, /en: 555\/555 keys \(100\.0%\)/);
+    // 556 on 2026-10-19: `deleteAccountLocalDataRemains`. Deleting an account
+    // clears this device's rows through a single all-or-nothing
+    // `AsyncStorage.multiRemove`, so when that step fails NOTHING is removed —
+    // the collections, items, chat cache, social graph and language of a
+    // deleted account stay in storage while the app navigates away looking
+    // signed out, and the next person to open it on this device sees a
+    // stranger's collections. It is not `deleteAccountFailed` (the deletion
+    // succeeded, and retrying would hit an account that no longer exists), so
+    // it is a sentence of its own: what happened, and what removes the rest.
+    assert.match(report, /en: 556\/556 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

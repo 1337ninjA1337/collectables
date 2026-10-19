@@ -435,6 +435,8 @@ export const ru: TranslationMap = {
   deleteAccountConfirm: "Удалить мой аккаунт",
   deleteAccountDeleting: "Удаление...",
   deleteAccountFailed: "Не удалось удалить аккаунт. Попробуйте позже.",
+  deleteAccountLocalDataRemains:
+    "Аккаунт удалён, но часть данных не удалось удалить с этого устройства. Переустановите приложение или очистите его данные, чтобы удалить их.",
   chatsTitle: "Чаты",
   navChatsUnreadA11y: (params?: TranslationParams) =>
     `Чаты, непрочитанных: ${params?.count ?? 0}`,

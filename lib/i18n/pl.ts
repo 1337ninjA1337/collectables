@@ -225,6 +225,8 @@ export const pl: TranslationMap = {
   deleteAccountConfirm: "Usuń moje konto",
   deleteAccountDeleting: "Usuwanie...",
   deleteAccountFailed: "Nie udało się usunąć konta. Spróbuj ponownie później.",
+  deleteAccountLocalDataRemains:
+    "Konto zostało usunięte, ale części danych nie udało się usunąć z tego urządzenia. Ponowna instalacja aplikacji lub wyczyszczenie jej danych je usunie.",
   chatsTitle: "Czaty",
   navChatsUnreadA11y: (params?: TranslationParams) =>
     `Czaty, nieprzeczytane: ${params?.count ?? 0}`,

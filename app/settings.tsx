@@ -200,21 +200,33 @@ export default function SettingsScreen() {
     ]);
   }
 
-  function reportDeleteFailed() {
+  /** One alert, two platforms — `Alert.alert` is a no-op on web. */
+  function notify(message: string) {
     if (Platform.OS === "web") {
-      globalThis.alert?.(t("deleteAccountFailed"));
+      globalThis.alert?.(message);
     } else {
-      Alert.alert(t("deleteAccountFailed"));
+      Alert.alert(message);
     }
+  }
+
+  function reportDeleteFailed() {
+    notify(t("deleteAccountFailed"));
   }
 
   async function performDelete() {
     setDeleting(true);
     try {
-      const { error } = await deleteAccount();
+      const { error, localDataRemains } = await deleteAccount();
       if (error) {
         reportDeleteFailed();
       } else {
+        // The account is gone and the local wipe failed, so this device still
+        // holds its collections, items, chat cache and language — and the
+        // screen is about to navigate away looking signed out. Not an error
+        // (retrying would hit a deleted account) and not silence either: the
+        // next person to open the app on this device would see a stranger's
+        // collections.
+        if (localDataRemains) notify(t("deleteAccountLocalDataRemains"));
         router.replace("/");
       }
     } catch {
