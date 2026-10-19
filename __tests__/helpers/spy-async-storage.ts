@@ -26,7 +26,8 @@ import { installNativeModuleStubs, mockModule } from "./render";
  * render and a spy that RECORDS writes in order, which is a different
  * fixture), and it does not stub `multiSet` or `getAllKeys` — an
  * unused branch is an untested one, and the module that needs one of those can
- * add it with the case that reads it. `removeItem` arrived that way.
+ * add it with the case that reads it. `removeItem` arrived that way, and
+ * `multiRemove` after it.
  *
  * ## One per process
  *
@@ -51,12 +52,13 @@ export interface StorageSpy {
   /** Non-null makes every `setItem` reject with it. */
   writeError: Error | null;
   /**
-   * Non-null makes every `removeItem` reject with it.
+   * Non-null makes every `removeItem` AND `multiRemove` reject with it.
    *
    * Its own field rather than sharing {@link writeError}: a store that refuses
    * writes and a store that refuses deletes are different failures, and the
-   * one case that needs this — `clearEntryCurrency`, the first `removeItem` in
-   * `STORAGE_FAILURE_SITES` — is specifically about the delete arm.
+   * one case that needed this — `clearEntryCurrency`, the first `removeItem`
+   * in `STORAGE_FAILURE_SITES` — is specifically about the delete arm.
+   * `multiRemove` shares it because it is the same arm.
    */
   removeError: Error | null;
   /** Clears the store, both failures, the reports AND the session budget. */
@@ -122,6 +124,19 @@ export function installStorageSpy(): StorageSpy {
       removeItem: async (key: string) => {
         if (spy.removeError) throw spy.removeError;
         store.delete(key);
+      },
+      // Added with `clear-all-user-data.test.ts` for the same reason as
+      // `removeItem`: `clearAllUserData` is the production account-deletion
+      // wipe and its key list was hand-written and unread by anything that
+      // could RUN it. It shares {@link StorageSpy.removeError} with
+      // `removeItem` — both are the delete arm, and a store that refuses one
+      // refuses the other.
+      multiRemove: async (keys: readonly string[]) => {
+        if (spy.removeError) throw spy.removeError;
+        // All-or-nothing, as the real one is: it is why a failed wipe leaves
+        // EVERY key behind rather than some, which is the claim
+        // `localDataRemains` rests on.
+        for (const key of keys) store.delete(key);
       },
     },
   });

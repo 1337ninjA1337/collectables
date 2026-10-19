@@ -177,6 +177,22 @@ export async function clearAllCollectablesStorage(): Promise<void> {
   await AsyncStorage.multiRemove(keys);
 }
 
+/**
+ * Every key this device holds for one account, removed.
+ *
+ * The production account-deletion wipe — `lib/delete-account-flow.ts` runs it
+ * after the Edge Function has deleted the auth user, and a failure here is
+ * what `localDataRemains` reports: one `multiRemove`, all-or-nothing, so a
+ * failure leaves EVERY key behind rather than some.
+ *
+ * The list is hand-written and `clear-all-user-data.test.ts` holds it to the
+ * keys this module can actually produce, with an exemption list carrying a
+ * reason per key that is deliberately kept. Before that case existed the
+ * production wipe was a hand list and the dev-only wipe
+ * ({@link clearAllCollectablesStorage}) was a `collectables-*` sweep, so a new
+ * storage key joined the second automatically and the first only if somebody
+ * remembered — which is how `ITEM_SORT_KEY` came to be missing from it.
+ */
 export async function clearAllUserData(userId: string): Promise<void> {
   const keys = [
     collectionsKey(userId),
@@ -205,6 +221,13 @@ export async function clearAllUserData(userId: string): Promise<void> {
     ENTRY_CURRENCY_KEY,
     PINNED_CURRENCIES_KEY,
     CURRENCY_RATES_KEY,
+    // Added 2026-10-19. Not user-scoped — its own comment argues that a sort
+    // mode is a view preference rather than anything a signed-out user should
+    // not see, which is true about VISIBILITY and says nothing about
+    // deletion: the blob is keyed by the deleted account's collection ids, so
+    // leaving it behind is residue of an account that no longer exists in a
+    // map that would otherwise only ever grow.
+    ITEM_SORT_KEY,
   ];
   await AsyncStorage.multiRemove(keys);
 }
