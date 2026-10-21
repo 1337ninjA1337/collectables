@@ -232,8 +232,21 @@ export function subscribeToTyping(
 
   return {
     setTyping: (isTyping: boolean) => {
+      // Only the TRANSITIONS are news, and `pendingTyping` already knows which
+      // one this is. `handleTextChange` calls `setTyping(true)` on every
+      // keystroke — it debounces the stop, not the start — so this reached
+      // `track()` once per CHARACTER: a presence push per keystroke, each one
+      // re-broadcasting the channel's presence, each landing on the other side
+      // as a `sync` that re-renders their conversation. A forty-character
+      // message was forty pushes and forty renders to say one thing.
+      //
+      // The assignment stays ahead of the early return: `pendingTyping` is
+      // what the `subscribe` callback tracks when the channel (re)connects, so
+      // it has to hold the latest intent even when nothing is pushed now.
+      const unchanged = isTyping === pendingTyping;
       pendingTyping = isTyping;
       if (!channel || !subscribed) return;
+      if (unchanged) return;
       void channel.track({ typing: isTyping });
     },
     unsubscribe: () => {

@@ -204,16 +204,42 @@ export default function ChatDetailScreen() {
     }, TYPING_DEBOUNCE_MS);
   }
 
+  /**
+   * One press, one message.
+   *
+   * `sendMessage` awaits a cloud insert before anything clears the box, and
+   * `disabled={!text.trim()}` is false for that whole round trip — so a second
+   * tap, or `onSubmitEditing` landing on top of the press that triggered it,
+   * sent the same text again under a fresh uuid. Two rows, two bubbles, and
+   * nothing after the fact can tell them from a message somebody meant to send
+   * twice.
+   *
+   * A ref rather than state, for the reason `app/collection/[id].tsx`'
+   * `hasAttemptedShareSaveRef` is one: the second press is in the same tick as
+   * the first, and a `setState` has not re-rendered yet when it arrives.
+   */
+  const sendingRef = useRef(false);
+
   async function handleSend() {
     if (!text.trim()) return;
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     if (typingTimerRef.current) {
       clearTimeout(typingTimerRef.current);
       typingTimerRef.current = null;
     }
     typingSubRef.current?.setTyping(false);
-    const msg = await sendMessage(otherUserId, text);
-    if (msg) {
-      setText("");
+    try {
+      const msg = await sendMessage(otherUserId, text);
+      if (msg) {
+        setText("");
+      }
+    } finally {
+      // In a `finally` because a rejected send must not wedge the composer:
+      // `sendMessage` resolves for an offline send (it queues), so a rejection
+      // here is a bug somewhere else, and a button that never works again is
+      // the worst way to report one.
+      sendingRef.current = false;
     }
   }
 
