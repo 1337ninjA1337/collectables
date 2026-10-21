@@ -190,11 +190,18 @@ describe("the tree it guards", () => {
     .filter((file) => file.endsWith("-context.tsx"))
     .flatMap((file) => functionFieldsOf(file, readRepoFile(file)));
 
-  it("reads 84 function-valued context fields, 58 of them factory-built", () => {
+  it("reads 85 function-valued context fields, 58 of them factory-built", () => {
     // The subject, taken on 2026-10-01. A provider lifting a function to its
     // own useCallback moves the second number down and is an improvement; both
     // moving at once is the rule losing its reach.
-    assert.equal(fields.length, 84, "the subject moved — re-read before trusting the negative");
+    //
+    // 84 until 2026-10-21, when `SocialProvider` began exporting
+    // `isProfileDeleted` — the admin tombstone as a question, for the two
+    // people surfaces that read the profiles table directly and had been
+    // rendering rows an admin deleted. It is a `useCallback`, so the first
+    // number moved and the second did not, which is the direction that is an
+    // improvement rather than a loss of reach.
+    assert.equal(fields.length, 85, "the subject moved — re-read before trusting the negative");
     assert.equal(fields.filter((f) => f.supply === "factory-built").length, 58);
   });
 

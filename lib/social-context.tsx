@@ -109,6 +109,19 @@ type SocialContextValue = {
   following: string[];
   getMyProfile: () => UserProfile | undefined;
   getProfileById: (id: string) => UserProfile | undefined;
+  /**
+   * Whether an admin has deleted this profile, for the readers that do not go
+   * through {@link profiles}.
+   *
+   * The tombstone set stays internal — "nothing outside it scans either one",
+   * below — and this is the question those readers actually have.
+   * `app/people.tsx` and `components/search-overlay.tsx` list rows straight
+   * out of `fetchProfiles`/`searchProfiles`, so until 2026-10-21 a deleted
+   * profile was gone from `profiles` and still in the people browser, in the
+   * search sheet, and one tap from a full profile screen. A tombstone honoured
+   * by one list out of four is not a tombstone.
+   */
+  isProfileDeleted: (id: string) => boolean;
   ensureProfilesLoaded: (ids: readonly string[]) => Promise<void>;
   getRelationship: (profileId: string) => ProfileRelationship;
   updateMyProfile: (input: Partial<Pick<UserProfile, "avatar" | "displayName" | "bio" | "publicId" | "username">>) => Promise<void>;
@@ -435,12 +448,27 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // Both of these are persisted as arrays (the blobs are JSON) and asked
   // membership questions everywhere they are read — the tombstone list against
   // every profile the app knows, `following` against every social collection.
-  // Internal to the provider: nothing outside it scans either one.
+  // The SETS stay internal: `following` is scanned nowhere else, and the
+  // tombstone leaves only as the `isProfileDeleted` question below, which is
+  // what its readers outside this file actually have.
   const deletedProfileIdSet = useMemo(() => new Set(deletedProfileIds), [deletedProfileIds]);
   const followingIds = useMemo(() => new Set(following), [following]);
 
+  /**
+   * The one reader of the tombstone set, and the only thing that leaves here.
+   *
+   * It was three inline `deletedProfileIdSet.has(...)` calls — this provider's
+   * profile list, the social collections, and nothing else — which read as
+   * complete because the set is private. It was not: every row the two people
+   * surfaces render comes from `fetchProfiles`/`searchProfiles` and never
+   * passed any of the three.
+   */
+  const isProfileDeleted = useCallback(
+    (profileId: string) => deletedProfileIdSet.has(profileId),
+    [deletedProfileIdSet],
+  );
+
   const profiles = useMemo<UserProfile[]>(() => {
-    const isDeleted = (profileId: string) => deletedProfileIdSet.has(profileId);
     const seen = new Set<string>();
 
     const result: UserProfile[] = [];
@@ -452,7 +480,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     }
 
     for (const rp of remoteProfiles) {
-      if (!seen.has(rp.id) && !isDeleted(rp.id)) {
+      if (!seen.has(rp.id) && !isProfileDeleted(rp.id)) {
         result.push(normalizeProfile(rp));
         seen.add(rp.id);
       }
@@ -460,14 +488,14 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
     for (const sp of seedProfiles) {
       const normalized = normalizeProfile(sp);
-      if (!seen.has(normalized.id) && !isDeleted(normalized.id)) {
+      if (!seen.has(normalized.id) && !isProfileDeleted(normalized.id)) {
         result.push(normalized);
         seen.add(normalized.id);
       }
     }
 
     return result;
-  }, [deletedProfileIdSet, myProfileOverride, remoteProfiles, t, user]);
+  }, [isProfileDeleted, myProfileOverride, remoteProfiles, t, user]);
 
   const isAdmin = useMemo(() => {
     if (!user) {
@@ -704,6 +732,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       const inFlight = inFlightProfileIdsRef.current;
       const now = Date.now();
       const missing = ids.filter((id) => {
+        // A tombstoned id is not missing, it is gone: fetching it would put
+        // the row back in `viewerProfiles` for `getProfileById` to find, which
+        // is the resurrection `deleteProfile` evicts that entry to prevent.
+        if (isProfileDeleted(id)) return false;
         if (!id || profileById.has(id) || inFlight.has(id)) return false;
         const cached = viewerProfiles[id];
         if (!cached) return true;
@@ -731,7 +763,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         missing.forEach((id) => inFlight.delete(id));
       }
     },
-    [profileById, viewerProfiles],
+    [isProfileDeleted, profileById, viewerProfiles],
   );
 
   /**
@@ -753,10 +785,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     () =>
       seedSocialCollections.filter(
         (collection) =>
-          !deletedProfileIdSet.has(collection.ownerUserId) &&
+          !isProfileDeleted(collection.ownerUserId) &&
           (followingIds.has(collection.ownerUserId) || friendIds.has(collection.ownerUserId)),
       ),
-    [deletedProfileIdSet, friendIds, followingIds],
+    [friendIds, followingIds, isProfileDeleted],
   );
 
   const visibleSocialItems = useMemo(() => {
@@ -774,7 +806,16 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       incomingRequestUserIds,
       following,
       getMyProfile: () => (user ? profileById.get(user.id) : undefined),
-      getProfileById: (id) => profileById.get(id) ?? viewerProfiles[id]?.profile,
+      // The tombstone gate is on the ANSWER, not only on `profiles`: that map
+      // is built from the filtered list, so a deleted id misses it and fell
+      // through to `viewerProfiles` — the cache `ensureProfilesLoaded` fills
+      // from `fetchProfileById`, which knows nothing about admin deletions. So
+      // `app/profile/[id].tsx` rendered a deleted profile in full the moment
+      // anything asked for it by id, and `deleteProfile`'s eviction of that
+      // cache entry lasted until the next tap.
+      getProfileById: (id) =>
+        isProfileDeleted(id) ? undefined : profileById.get(id) ?? viewerProfiles[id]?.profile,
+      isProfileDeleted,
       ensureProfilesLoaded,
       getRelationship: (profileId) => {
         if (user?.id === profileId) {
@@ -925,7 +966,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     // `updateMyProfile`: without it the factory keeps the translator it was
     // built with, and a profile created after a language switch gets its
     // default bio in the previous language.
-    [ensureProfilesLoaded, friendIds, following, followingIds, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, requestDirections, syncSocial, t, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
+    [ensureProfilesLoaded, friendIds, following, followingIds, friends, incomingRequestUserIds, isAdmin, isProfileDeleted, pendingSocial, profileById, profiles, ready, requestDirections, syncSocial, t, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;

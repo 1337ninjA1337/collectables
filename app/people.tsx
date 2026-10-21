@@ -68,6 +68,7 @@ export default function PeopleScreen() {
   const {
     getMyProfile,
     getRelationship,
+    isProfileDeleted,
     addFriend,
     followProfile,
     removeFriend,
@@ -179,10 +180,23 @@ export default function PeopleScreen() {
   // hold and not a leading debounce.
   const showRefreshing = useMinimumVisible(refreshing);
 
-  const others = useMemo(
-    () => remoteProfiles.filter((p) => p.id !== myProfile?.id),
-    [remoteProfiles, myProfile],
+  /**
+   * Who may appear in this list at all, asked once for both halves of it.
+   *
+   * Two rules. "Not me" is the screen's own — it is for finding other people,
+   * and the row would offer relationship actions against yourself. "Not
+   * deleted" is the admin tombstone, and it was MISSING: `fetchProfiles` and
+   * `searchProfiles` read the table directly, so a profile an admin had
+   * deleted was gone from `SocialProvider.profiles` and still listed here,
+   * still findable by search, and one tap from a full profile screen. The
+   * provider answers the question rather than exporting the set.
+   */
+  const isListable = useCallback(
+    (profile: UserProfile) => profile.id !== myProfile?.id && !isProfileDeleted(profile.id),
+    [isProfileDeleted, myProfile],
   );
+
+  const others = useMemo(() => remoteProfiles.filter(isListable), [remoteProfiles, isListable]);
  //
   const filteredPeople = useMemo(() => {
     if (!searching) return others;
@@ -203,10 +217,10 @@ export default function PeopleScreen() {
     // which is genuinely this screen's rule.
     return profileSearchUnion(
       others,
-      searchResults.filter((p) => p.id !== myProfile?.id),
+      searchResults.filter(isListable),
       needle,
     );
-  }, [others, needle, searching, searchResults, myProfile]);
+  }, [others, needle, searching, searchResults, isListable]);
 
   /**
    * The result count, out loud, when it changes.

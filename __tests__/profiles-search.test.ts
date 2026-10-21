@@ -120,7 +120,7 @@ describe("people/search UI uses the server-side search", () => {
     const src = readRepoFile("components/search-overlay.tsx");
     assert.match(src, /const SECTION_LIMIT = 20;/);
     assert.match(src, /searchProfiles\(settledQuery, SECTION_LIMIT\)/);
-    assert.match(src, /profileSearchUnion\([^)]*\)\.slice\(0, SECTION_LIMIT\)/);
+    assert.match(src, /profileSearchUnion\([\s\S]*?\)\.slice\(0, SECTION_LIMIT\)/);
   });
 
   it("all three sections of the sheet cut at the same number", () => {
@@ -551,10 +551,13 @@ describe("both readers merge through the shared function", () => {
 
   it("the overlay orders before it slices", () => {
     // A twenty-row cut off the front of an unordered union can drop the
-    // exact match outright.
+    // exact match outright. Both halves pass the admin tombstone on the way
+    // in since 2026-10-21 — a deleted profile was in this section until then,
+    // because the snapshot and the matches both read the table rather than
+    // `SocialProvider.profiles`.
     assert.match(
       readRepoFile("components/search-overlay.tsx"),
-      /profileSearchUnion\(profiles, remoteMatches, needle\)\.slice\(0, SECTION_LIMIT\)/,
+      /profileSearchUnion\(\s*profiles\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\),\s*remoteMatches\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\),\s*needle,\s*\)\.slice\(0, SECTION_LIMIT\)/,
     );
   });
 });

@@ -49,12 +49,32 @@ mockModule("@/lib/analytics", { trackEvent: () => undefined });
 
 mockModule("@/lib/auth-context", { useAuth: () => ({ user }) });
 
+/** Every id `fetchProfileById` was actually asked for, in order. */
+const fetchedProfileIds: string[] = [];
+
+/** A row the table would answer with, for the ids a case says it holds. */
+const remoteProfileRow = (id: string) => ({
+  id,
+  email: `${id}@example.com`,
+  displayName: id.toUpperCase(),
+  username: id,
+  publicId: `${id}-public`,
+  bio: "",
+  avatar: "",
+});
+
+/** Which ids the table answers for; everything else reads as absent. */
+let remoteProfileIds: string[] = [];
+
 mockModule("@/lib/supabase-profiles", {
   fetchFriendRequests: async () => {
     if (remoteRequests === null) throw new Error("offline");
     return remoteRequests;
   },
-  fetchProfileById: async () => null,
+  fetchProfileById: async (id: string) => {
+    fetchedProfileIds.push(id);
+    return remoteProfileIds.includes(id) ? remoteProfileRow(id) : null;
+  },
   sendFriendRequest: async () => true,
   cloudAcceptFriendRequest: async () => true,
   removeFriendRequest: async () => true,
@@ -105,6 +125,8 @@ beforeEach(async () => {
   await resetStorageNotice();
   user = { id: "user-a" };
   remoteRequests = [];
+  remoteProfileIds = [];
+  fetchedProfileIds.length = 0;
 });
 
 describe("SocialProvider — one account", () => {
@@ -206,6 +228,68 @@ describe("SocialProvider — the device-global graph key", () => {
 
     assert.ok(!seen()?.profiles.some((profile) => profile.id === "u3"));
     assert.deepEqual(seen()?.incomingRequestUserIds, [], "the stale local copy is not an inbox");
+  });
+});
+
+describe("SocialProvider — the tombstone every reader has to pass", () => {
+  /**
+   * The set is private and three readers used it inline, which read as
+   * complete because nothing outside could ask. It was not: `app/people.tsx`
+   * and `components/search-overlay.tsx` list rows straight out of
+   * `fetchProfiles`/`searchProfiles`, so a deleted profile was gone from
+   * `profiles` and still in the people browser, still findable by search, and
+   * one tap from a full profile screen — because `getProfileById` fell through
+   * to the viewer cache, which `fetchProfileById` fills and which knows
+   * nothing about an admin deletion.
+   */
+  it("answers the question the direct readers of the table actually have", async () => {
+    store.set(GRAPH, JSON.stringify({ deletedProfileIds: ["u3"] }));
+    await mount();
+
+    assert.equal(seen()?.isProfileDeleted("u3"), true);
+    assert.equal(seen()?.isProfileDeleted("u2"), false, "the gate is a tombstone, not a blanket");
+  });
+
+  it("does not answer by id with a row the viewer cache happens to hold", async () => {
+    // The resurrection: `deleteProfile` evicts the cache entry, and the next
+    // `ensureProfilesLoaded` for that id put it straight back.
+    store.set(GRAPH, JSON.stringify({ deletedProfileIds: ["u3"] }));
+    const tree = await mount();
+    remoteProfileIds = ["u3"];
+
+    await seen()?.ensureProfilesLoaded(["u3"]);
+    await drain(tree);
+
+    assert.deepEqual(fetchedProfileIds, [], "a tombstoned id is not missing, it is gone");
+    assert.equal(seen()?.getProfileById("u3"), undefined);
+  });
+
+  it("still loads and answers for a profile nobody deleted", async () => {
+    // The control. A gate that answered `undefined` for everything would pass
+    // every case above and blank the profile screen.
+    store.set(GRAPH, JSON.stringify({ deletedProfileIds: ["u3"] }));
+    const tree = await mount();
+    remoteProfileIds = ["u9"];
+
+    await seen()?.ensureProfilesLoaded(["u9"]);
+    await drain(tree);
+
+    assert.deepEqual(fetchedProfileIds, ["u9"]);
+    assert.equal(seen()?.getProfileById("u9")?.username, "u9");
+  });
+
+  it("keeps a tombstoned owner's social collections invisible", async () => {
+    // The third inline reader, unchanged in behaviour and now going through
+    // the same question as the other two.
+    store.set(GRAPH, JSON.stringify({ deletedProfileIds: ["u2"] }));
+    store.set(PERSONAL_A, A_PERSONAL);
+    await mount();
+
+    assert.deepEqual(
+      seen()?.getVisibleCollections().filter((collection) => collection.ownerUserId === "u2"),
+      [],
+      "following a profile an admin deleted still opened their collections",
+    );
   });
 });
 

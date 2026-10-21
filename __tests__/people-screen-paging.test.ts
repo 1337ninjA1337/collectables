@@ -191,7 +191,10 @@ describe("the pager is hidden while a search is running", () => {
 
   it("filters the result list by the shared needle rather than re-reducing", () => {
     assert.match(CODE, /if \(!searching\) return others;/);
-    assert.match(CODE, /\}, \[others, needle, searching, searchResults, myProfile\]\);/);
+    // `myProfile` left the list on 2026-10-21 and `isListable` took its place:
+    // "not me" and "not a profile an admin deleted" are one question about a
+    // row, asked once for the loaded page and the server-wide half both.
+    assert.match(CODE, /\}, \[others, needle, searching, searchResults, isListable\]\);/);
   });
 });
 

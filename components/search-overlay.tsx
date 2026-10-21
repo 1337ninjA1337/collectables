@@ -49,6 +49,7 @@ import {
 } from "@/lib/profile-search";
 import { useSettledSearch } from "@/lib/use-settled-search";
 import { useI18n } from "@/lib/i18n-context";
+import { useSocial } from "@/lib/social-context";
 import { type SearchResultsState } from "@/lib/search-announcement";
 import { announceSearchResults } from "@/lib/search-results-announcement";
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
@@ -86,6 +87,7 @@ type FilterType = "all" | "collections" | "items" | "people";
 export function SearchOverlay({ visible, onClose }: Props) {
   const { t } = useI18n();
   const { collections, items } = useCollections();
+  const { isProfileDeleted } = useSocial();
   const [query, setQuery] = useState("");
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
@@ -196,8 +198,19 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // front of an unordered union can drop the exact match outright, which is
     // a stronger version of the bug the ordering fixes. The cut is the same
     // number the request above asked for, deliberately — see SECTION_LIMIT.
-    return profileSearchUnion(profiles, remoteMatches, needle).slice(0, SECTION_LIMIT);
-  }, [profiles, q, peopleSearchActive, remoteMatches]);
+    // Both halves pass the admin tombstone, which neither did until
+    // 2026-10-21: the snapshot comes from `fetchProfiles` and the matches from
+    // `searchProfiles`, and both read the table rather than
+    // `SocialProvider.profiles` — so a deleted profile was gone from every
+    // list built in the provider and still in this section, under a search box
+    // whose whole job is finding people. The provider answers the question;
+    // the set stays its own.
+    return profileSearchUnion(
+      profiles.filter((p) => !isProfileDeleted(p.id)),
+      remoteMatches.filter((p) => !isProfileDeleted(p.id)),
+      needle,
+    ).slice(0, SECTION_LIMIT);
+  }, [profiles, q, peopleSearchActive, remoteMatches, isProfileDeleted]);
 
   // Get collection name for an item
   function getCollectionName(collectionId: string): string {

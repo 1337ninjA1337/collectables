@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { stripComments } from "@/lib/strip-comments";
+
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -33,9 +35,13 @@ describe("social-context.tsx viewer-profile cache", () => {
   });
 
   it("getProfileById falls back to the viewerProfiles cache (.profile unwrap)", () => {
+    // Behind the tombstone gate since 2026-10-21: the fallback is what made an
+    // admin deletion survivable by one tap, because `profileById` is built
+    // from the filtered list and `viewerProfiles` is filled by
+    // `fetchProfileById`, which knows nothing about it.
     assert.match(
       SOURCE,
-      /getProfileById:\s*\(id\)\s*=>\s*profileById\.get\(id\)\s*\?\?\s*viewerProfiles\[id\]\?\.profile/,
+      /getProfileById:\s*\(id\)\s*=>\s*isProfileDeleted\(id\)\s*\?\s*undefined\s*:\s*profileById\.get\(id\)\s*\?\?\s*viewerProfiles\[id\]\?\.profile/,
     );
   });
 
@@ -105,4 +111,64 @@ describe("consumers route profile lookups through ensureProfilesLoaded", () => {
       );
     });
   }
+});
+
+describe("the admin tombstone reaches every reader of the profiles table", () => {
+  /**
+   * `deleteProfile` writes an id into a device-global set, and until
+   * 2026-10-21 exactly three things read it — all of them inside the provider.
+   * Every row the two people surfaces render comes from `fetchProfiles` or
+   * `searchProfiles` instead, so the only list that honoured a deletion was
+   * the one nothing on those screens uses.
+   *
+   * `social-provider-mounted.test.ts` runs the provider's half. These are the
+   * two call sites, which cannot be mounted here and can be read.
+   */
+  const PEOPLE = readRepoFile("app", "people.tsx");
+  const OVERLAY = readRepoFile("components", "search-overlay.tsx");
+
+  it("exports the question rather than the set", () => {
+    // The set stays internal — the provider says so about both of its sets —
+    // and what leaves is what its readers outside the file actually have.
+    assert.match(SOURCE, /isProfileDeleted: \(id: string\) => boolean;/);
+    assert.match(
+      SOURCE,
+      /const isProfileDeleted = useCallback\(\s*\(profileId: string\) => deletedProfileIdSet\.has\(profileId\),/,
+    );
+    assert.ok(
+      !/deletedProfileIds,?\s*$/m.test(SOURCE.split("const value = useMemo")[1] ?? ""),
+      "the array itself is in the context value, which puts the scan back at the call sites",
+    );
+  });
+
+  it("is the only reader of the set left inside the provider", () => {
+    // Three inline `.has(...)` calls became one, so the next reader asks the
+    // same question as the other three rather than a fourth copy of it.
+    // Comment-stripped: the hook's own header writes the offending line out.
+    assert.equal(stripComments(SOURCE).split("deletedProfileIdSet.has(").length - 1, 1);
+  });
+
+  it("the people screen drops a deleted profile from both halves of its list", () => {
+    assert.match(
+      PEOPLE,
+      /const isListable = useCallback\(\s*\(profile: UserProfile\) => profile\.id !== myProfile\?\.id && !isProfileDeleted\(profile\.id\),/,
+    );
+    assert.match(PEOPLE, /remoteProfiles\.filter\(isListable\)/, "the loaded page");
+    assert.match(PEOPLE, /searchResults\.filter\(isListable\)/, "and the server-wide search");
+  });
+
+  it("the search sheet drops one from its snapshot and its matches", () => {
+    assert.match(OVERLAY, /profiles\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\)/);
+    assert.match(OVERLAY, /remoteMatches\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\)/);
+  });
+
+  it("asks the provider rather than re-deriving the rule per surface", () => {
+    for (const [label, src] of [["app/people.tsx", PEOPLE], ["components/search-overlay.tsx", OVERLAY]] as const) {
+      assert.match(src, /isProfileDeleted/, `${label} does not consult the tombstone`);
+      assert.ok(
+        !/deletedProfileIds/.test(src),
+        `${label} reads the tombstone ARRAY, which is the provider's own state`,
+      );
+    }
+  });
 });
