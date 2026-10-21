@@ -278,6 +278,52 @@ describe("SocialProvider — the tombstone every reader has to pass", () => {
     assert.equal(seen()?.getProfileById("u9")?.username, "u9");
   });
 
+  it("counts a tombstoned profile in no relationship, however the cloud answers", async () => {
+    // `deleteProfile` drops the pairs it can see from `friendRequests`, and the
+    // next `fetchFriendRequests` brings them back: the cloud knows nothing
+    // about a device-local deletion. So the deleted profile was a friend
+    // again — counted on the home screen, counted in the friends tab's "(2)",
+    // offered as a share target — with no card in the list under it, because
+    // `getProfileById` stopped answering for it and nothing else had.
+    store.set(GRAPH, JSON.stringify({ deletedProfileIds: ["u3"] }));
+    remoteRequests = [
+      { from_user_id: "u3", to_user_id: "user-a" },
+      { from_user_id: "user-a", to_user_id: "u3" },
+      { from_user_id: "u2", to_user_id: "user-a" },
+    ];
+    const tree = await mount();
+    await drain(tree);
+
+    assert.deepEqual(seen()?.friends, [], "a mutual pair with a deleted profile is not a friendship");
+    assert.equal(seen()?.friendIds.has("u3"), false);
+    assert.deepEqual(
+      seen()?.incomingRequestUserIds,
+      ["u2"],
+      "the deleted profile's request is not an inbox entry, and the live one still is",
+    );
+    assert.equal(seen()?.getRelationship("u3"), "none");
+  });
+
+  it("leaves a tombstoned id out of the follow list the UI counts", async () => {
+    // The stored list keeps it — the tombstone is device-global and the follow
+    // list is per account, so un-deleting should restore the follow rather
+    // than require it again. What must not survive is the id reaching
+    // `app/index.tsx`' `following.length`, which renders beside the list it is
+    // supposed to count.
+    store.set(GRAPH, JSON.stringify({ deletedProfileIds: ["u2"] }));
+    store.set(PERSONAL_A, JSON.stringify({ following: ["u2", "u3"], myProfile: null }));
+    const tree = await mount();
+    await drain(tree);
+
+    assert.deepEqual(seen()?.following, ["u3"]);
+    const personal = writesTo(PERSONAL_A);
+    assert.deepEqual(
+      JSON.parse(personal[personal.length - 1].value).following,
+      ["u2", "u3"],
+      "the stored follow list must keep the id, so un-deleting restores the follow",
+    );
+  });
+
   it("keeps a tombstoned owner's social collections invisible", async () => {
     // The third inline reader, unchanged in behaviour and now going through
     // the same question as the other two.

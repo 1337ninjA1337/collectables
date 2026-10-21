@@ -14,6 +14,7 @@ import { SwipeTabs } from "@/components/swipe-tabs";
 import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
 import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
+import { captureException } from "@/lib/sentry";
 import { useSocial } from "@/lib/social-context";
 import { ProfileRelationship, UserProfile } from "@/lib/types";
 import { FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -84,7 +85,18 @@ export default function FriendsScreen() {
   useEffect(() => {
     let active = true;
     const ids = [...friends, ...incomingRequestUserIds];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      // An emptied list is the third way a pending load stops being pending,
+      // next to a resolve and a reject — and the only one that used to leave
+      // the flag set. Removing your last friend while its profile fetch was
+      // in flight cancelled the `.finally` (the cleanup had already set
+      // `active` false) and re-ran this effect into the early return, so
+      // `loadingFriends` stayed true and the tab rendered a skeleton with no
+      // request behind it and no empty state to get out of it. The screen that
+      // tells you to go and find people was the one with no way out.
+      setLoadingFriends(false);
+      return;
+    }
     setLoadingFriends(true);
     ensureProfilesLoaded(ids)
       .catch(() => {})
@@ -94,7 +106,12 @@ export default function FriendsScreen() {
 
   useEffect(() => {
     let active = true;
-    if (following.length === 0) return;
+    if (following.length === 0) {
+      // Same flag, same window, same reason as the friends tab above: an
+      // unfollow landing inside the profile fetch left the skeleton standing.
+      setLoadingFollowing(false);
+      return;
+    }
     setLoadingFollowing(true);
     ensureProfilesLoaded(following)
       .catch(() => {})
@@ -137,6 +154,17 @@ export default function FriendsScreen() {
         // people the user already has an edge to. Throwing rather than
         // falling through is how a table edit that gave a tab a follow button
         // surfaces, instead of a button that does nothing.
+        //
+        // Reported first, for the reason `app/people.tsx`' identical tripwire
+        // was given a `captureException` on 2026-10-19 and this one was not:
+        // the throw is for a DEVELOPER and it fires inside an `onAction`
+        // during a press, so in dev it surfaces loudly and in production it
+        // takes the screen down with nothing recorded anywhere. The report is
+        // what makes the table edit that caused it findable either way.
+        captureException(new Error("friends screen has no follow action"), {
+          scope: "friends.runRelationshipAction",
+          extra: { action },
+        });
         throw new Error("friends screen has no follow action");
     }
   }

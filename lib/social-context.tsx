@@ -452,7 +452,6 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // tombstone leaves only as the `isProfileDeleted` question below, which is
   // what its readers outside this file actually have.
   const deletedProfileIdSet = useMemo(() => new Set(deletedProfileIds), [deletedProfileIds]);
-  const followingIds = useMemo(() => new Set(following), [following]);
 
   /**
    * The one reader of the tombstone set, and the only thing that leaves here.
@@ -467,6 +466,24 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     (profileId: string) => deletedProfileIdSet.has(profileId),
     [deletedProfileIdSet],
   );
+
+  /**
+   * The follow list as anything outside this provider may see it.
+   *
+   * The stored list keeps a tombstoned id — the tombstone is device-global and
+   * the follow list is per account, so an id can be deleted by one account's
+   * admin and still be followed by another's, and un-deleting should restore
+   * the follow rather than require it again. What must not survive is the id
+   * reaching a COUNT: `app/index.tsx` renders `following.length` beside
+   * `friends.length`, and a number one higher than the list under it is the
+   * disagreement this whole day has been about.
+   */
+  const visibleFollowing = useMemo(
+    () => following.filter((id) => !isProfileDeleted(id)),
+    [following, isProfileDeleted],
+  );
+
+  const followingIds = useMemo(() => new Set(visibleFollowing), [visibleFollowing]);
 
   const profiles = useMemo<UserProfile[]>(() => {
     const seen = new Set<string>();
@@ -635,11 +652,25 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       return { outgoing, incoming, mutual };
     }
 
-    for (const request of friendRequests) {
+    // A tombstoned profile is in no relationship with anybody, and the filter
+    // has to be HERE rather than at the write: `deleteProfile` drops the pairs
+    // it can see from `friendRequests`, and the next `fetchFriendRequests` —
+    // on the realtime refetch, or on the next mount — brings them straight
+    // back from the cloud, which knows nothing about a device-local deletion.
+    // So the deleted profile was a friend again: counted on the home screen,
+    // counted in the friends tab's "(2)" and offered as a share target, with
+    // no card in the list under it, because `getProfileById` stopped
+    // answering for it on 2026-10-21 and nothing else had.
+    const pairs = friendRequests.filter(
+      (request) =>
+        !isProfileDeleted(request.fromUserId) && !isProfileDeleted(request.toUserId),
+    );
+
+    for (const request of pairs) {
       if (request.fromUserId === user.id) outgoing.add(request.toUserId);
       if (request.toUserId === user.id) incoming.add(request.fromUserId);
     }
-    for (const request of friendRequests) {
+    for (const request of pairs) {
       if (request.fromUserId === user.id && incoming.has(request.toUserId)) {
         mutual.add(request.toUserId);
       }
@@ -648,7 +679,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       }
     }
     return { outgoing, incoming, mutual };
-  }, [friendRequests, user]);
+  }, [friendRequests, isProfileDeleted, user]);
 
   /**
    * An alias, not a derivation — which is why it is a `const` among memos. The
@@ -783,12 +814,15 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
    */
   const visibleSocialCollections = useMemo(
     () =>
+      // No tombstone term of its own: neither set can hold a deleted id any
+      // more — `followingIds` comes from the filtered follow list and
+      // `friendIds` from `requestDirections`, which drops a pair naming one.
+      // A third statement of one rule is how two of them end up disagreeing.
       seedSocialCollections.filter(
         (collection) =>
-          !isProfileDeleted(collection.ownerUserId) &&
-          (followingIds.has(collection.ownerUserId) || friendIds.has(collection.ownerUserId)),
+          followingIds.has(collection.ownerUserId) || friendIds.has(collection.ownerUserId),
       ),
-    [friendIds, followingIds, isProfileDeleted],
+    [friendIds, followingIds],
   );
 
   const visibleSocialItems = useMemo(() => {
@@ -804,7 +838,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       friends,
       friendIds,
       incomingRequestUserIds,
-      following,
+      following: visibleFollowing,
       getMyProfile: () => (user ? profileById.get(user.id) : undefined),
       // The tombstone gate is on the ANSWER, not only on `profiles`: that map
       // is built from the filtered list, so a deleted id misses it and fell
@@ -966,7 +1000,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     // `updateMyProfile`: without it the factory keeps the translator it was
     // built with, and a profile created after a language switch gets its
     // default bio in the previous language.
-    [ensureProfilesLoaded, friendIds, following, followingIds, friends, incomingRequestUserIds, isAdmin, isProfileDeleted, pendingSocial, profileById, profiles, ready, requestDirections, syncSocial, t, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
+    [ensureProfilesLoaded, friendIds, visibleFollowing, followingIds, friends, incomingRequestUserIds, isAdmin, isProfileDeleted, pendingSocial, profileById, profiles, ready, requestDirections, syncSocial, t, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;
