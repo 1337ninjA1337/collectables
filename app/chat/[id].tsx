@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AppState,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -41,6 +40,7 @@ import {
   TEXT_DARK,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
+import { useAppAway } from "@/lib/use-app-away";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { buildChatId } from "@/lib/chat-helpers";
@@ -151,31 +151,24 @@ export default function ChatDetailScreen() {
     };
   }, [chatId, user, allowed]);
 
-  // Clear typing presence when the user backgrounds the app or blurs the tab,
-  // so the other side stops seeing "is typing..." after ~1s instead of ~30s.
-  useEffect(() => {
-    function clearTyping() {
-      if (typingTimerRef.current) {
-        clearTimeout(typingTimerRef.current);
-        typingTimerRef.current = null;
-      }
-      typingSubRef.current?.setTyping(false);
+  // Clear typing presence when the user goes away, so the other side stops
+  // seeing "is typing..." the moment they leave rather than when a timer says
+  // so.
+  //
+  // `useAppAway` rather than the third hand-rolled copy of the platform split
+  // this file carried: on native it reports every state that is not `active`
+  // (a notification shade and an incoming call are both "not looking"), and on
+  // web it listens for the window losing FOCUS as well as the tab being
+  // hidden — alt-tabbing to another app is the commonest way a desktop user
+  // leaves, and `document.hidden` reports it as `false`, so the listener this
+  // replaces did not see it at all.
+  useAppAway(() => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
     }
-
-    if (Platform.OS === "web") {
-      if (typeof document === "undefined") return;
-      function onVisibilityChange() {
-        if (document.hidden) clearTyping();
-      }
-      document.addEventListener("visibilitychange", onVisibilityChange);
-      return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-    }
-
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "background" || state === "inactive") clearTyping();
-    });
-    return () => sub.remove();
-  }, []);
+    typingSubRef.current?.setTyping(false);
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => {

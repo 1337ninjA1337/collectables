@@ -87,3 +87,30 @@ describe("a keystroke is not news twice", () => {
     assert.match(CODE, /sub\.setTyping\(false\);\s*sub\.unsubscribe\(\);/, "and on teardown");
   });
 });
+
+describe("one platform split, in the hook that owns it", () => {
+  // The screen hand-rolled the web/native departure listener — the third copy
+  // in the tree after `lib/use-app-away.ts` and `lib/use-visibility-refresh.ts`
+  // — and its web half listened for `visibilitychange` only. Alt-tabbing to
+  // another app is the commonest way a desktop user leaves and
+  // `document.hidden` reports it as `false`, so the copy that lived here did
+  // not see it: the other side kept "is typing…" until a timer said otherwise.
+  it("clears typing presence through useAppAway", () => {
+    assert.match(CODE, /import \{ useAppAway \} from "@\/lib\/use-app-away";/);
+    assert.match(
+      CODE,
+      /useAppAway\(\(\) => \{\s*if \(typingTimerRef\.current\) \{\s*clearTimeout\(typingTimerRef\.current\);\s*typingTimerRef\.current = null;\s*\}\s*typingSubRef\.current\?\.setTyping\(false\);\s*\}\);/,
+    );
+  });
+
+  it("holds no departure listener of its own any more", () => {
+    assert.ok(!/visibilitychange/.test(CODE), "the web half of the split is back in the screen");
+    assert.ok(!/AppState/.test(CODE), "the native half of the split is back in the screen");
+  });
+
+  it("keeps Platform for the one thing that is genuinely per-platform here", () => {
+    // The keyboard inset. `AppState` left with the listener; `Platform` stays
+    // because iOS needs `padding` and Android does not.
+    assert.match(CODE, /behavior=\{Platform\.OS === "ios" \? "padding" : undefined\}/);
+  });
+});
