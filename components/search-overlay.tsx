@@ -198,18 +198,16 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // front of an unordered union can drop the exact match outright, which is
     // a stronger version of the bug the ordering fixes. The cut is the same
     // number the request above asked for, deliberately — see SECTION_LIMIT.
-    // Both halves pass the admin tombstone, which neither did until
+    // `isVisible` carries the admin tombstone, which neither half passed until
     // 2026-10-21: the snapshot comes from `fetchProfiles` and the matches from
     // `searchProfiles`, and both read the table rather than
     // `SocialProvider.profiles` — so a deleted profile was gone from every
     // list built in the provider and still in this section, under a search box
-    // whose whole job is finding people. The provider answers the question;
-    // the set stays its own.
-    return profileSearchUnion(
-      profiles.filter((p) => !isProfileDeleted(p.id)),
-      remoteMatches.filter((p) => !isProfileDeleted(p.id)),
-      needle,
-    ).slice(0, SECTION_LIMIT);
+    // whose whole job is finding people. The provider answers the question,
+    // the union applies it to both halves, and the set stays the provider's.
+    return profileSearchUnion(profiles, remoteMatches, needle, {
+      isVisible: (p) => !isProfileDeleted(p.id),
+    }).slice(0, SECTION_LIMIT);
   }, [profiles, q, peopleSearchActive, remoteMatches, isProfileDeleted]);
 
   // Get collection name for an item

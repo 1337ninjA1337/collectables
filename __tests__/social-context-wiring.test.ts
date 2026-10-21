@@ -149,17 +149,45 @@ describe("the admin tombstone reaches every reader of the profiles table", () =>
   });
 
   it("the people screen drops a deleted profile from both halves of its list", () => {
+    // One predicate, two rules, and the union is what applies it to the loaded
+    // page and the server-wide half both: the screen filtered "not me" twice
+    // by hand until 2026-10-21, which is the arrangement that let the tombstone
+    // be forgotten in the first place.
     assert.match(
       PEOPLE,
       /const isListable = useCallback\(\s*\(profile: UserProfile\) => profile\.id !== myProfile\?\.id && !isProfileDeleted\(profile\.id\),/,
     );
-    assert.match(PEOPLE, /remoteProfiles\.filter\(isListable\)/, "the loaded page");
-    assert.match(PEOPLE, /searchResults\.filter\(isListable\)/, "and the server-wide search");
+    assert.match(PEOPLE, /remoteProfiles\.filter\(isListable\)/, "the loaded page it browses");
+    assert.match(
+      PEOPLE,
+      /profileSearchUnion\(others, searchResults, needle, \{ isVisible: isListable \}\)/,
+      "and both halves of the list it searches",
+    );
   });
 
-  it("the search sheet drops one from its snapshot and its matches", () => {
-    assert.match(OVERLAY, /profiles\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\)/);
-    assert.match(OVERLAY, /remoteMatches\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\)/);
+  it("the search sheet hands the same rule to the union", () => {
+    assert.match(
+      OVERLAY,
+      /profileSearchUnion\(profiles, remoteMatches, needle, \{\s*isVisible: \(p\) => !isProfileDeleted\(p\.id\),\s*\}\)/,
+    );
+    assert.ok(
+      !/\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\)/.test(OVERLAY),
+      "a per-half filter is back at the call site, which is where it got forgotten",
+    );
+  });
+
+  it("makes the rule the union's to apply rather than each caller's to remember", () => {
+    // Required, not defaulted — the reason `searchAnnouncement`'s `{ settled }`
+    // is: a caller that forgot it would still work and would be wrong only
+    // about the rows somebody decided nobody may see.
+    assert.match(
+      readRepoFile("lib", "profile-search.ts"),
+      /needle: string,\s*\{ isVisible \}: \{ isVisible: \(profile: T\) => boolean \},/,
+    );
+    assert.match(
+      readRepoFile("lib", "profile-search.ts"),
+      /list\.filter\(\(p\) => isVisible\(p\) && profileMatchesSearch\(p, needle\)\)/,
+    );
   });
 
   it("the profile screen decides showability before it fetches what belongs to the profile", () => {

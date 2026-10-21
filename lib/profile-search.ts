@@ -277,12 +277,24 @@ export function mergeProfileMatches<T extends IdentifiedProfile>(
  * it. A third reader gets that for free rather than having to remember it,
  * which is the whole difference between this function and the two lines it
  * replaces.
+ *
+ * `isVisible` is the second question about a row and goes through the same
+ * halves for the same reason. "Does this row answer what was typed" is this
+ * module's; "may this viewer see it at all" is the caller's — not me, and not
+ * a profile an admin deleted — and on 2026-10-21 BOTH callers were applying
+ * it half a call away, one `.filter()` per list, which is the arrangement that
+ * produced four defects in a week in this exact seam. It is required rather
+ * than defaulted, for the reason `searchAnnouncement`'s `{ settled }` is: a
+ * caller that forgot it would still work, and would be wrong only about the
+ * rows somebody has decided nobody may see.
  */
 export function profileSearchUnion<T extends IdentifiedProfile>(
   local: readonly T[],
   remote: readonly T[],
   needle: string,
+  { isVisible }: { isVisible: (profile: T) => boolean },
 ): T[] {
-  const answers = (list: readonly T[]) => list.filter((p) => profileMatchesSearch(p, needle));
-  return mergeProfileMatches(answers(local), answers(remote), needle);
+  const shown = (list: readonly T[]) =>
+    list.filter((p) => isVisible(p) && profileMatchesSearch(p, needle));
+  return mergeProfileMatches(shown(local), shown(remote), needle);
 }

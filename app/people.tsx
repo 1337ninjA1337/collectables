@@ -215,11 +215,7 @@ export default function PeopleScreen() {
     // so narrowing "ann" to "annz" rendered rows that answer nothing on
     // screen until the next round trip landed). Only "not me" is left here,
     // which is genuinely this screen's rule.
-    return profileSearchUnion(
-      others,
-      searchResults.filter(isListable),
-      needle,
-    );
+    return profileSearchUnion(others, searchResults, needle, { isVisible: isListable });
   }, [others, needle, searching, searchResults, isListable]);
 
   /**

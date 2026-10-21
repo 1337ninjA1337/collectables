@@ -551,13 +551,14 @@ describe("both readers merge through the shared function", () => {
 
   it("the overlay orders before it slices", () => {
     // A twenty-row cut off the front of an unordered union can drop the
-    // exact match outright. Both halves pass the admin tombstone on the way
-    // in since 2026-10-21 — a deleted profile was in this section until then,
-    // because the snapshot and the matches both read the table rather than
-    // `SocialProvider.profiles`.
+    // exact match outright. The admin tombstone rides in as `isVisible` since
+    // 2026-10-21 — a deleted profile was in this section until then, because
+    // the snapshot and the matches both read the table rather than
+    // `SocialProvider.profiles`, and the union is what applies one rule to
+    // both halves.
     assert.match(
       readRepoFile("components/search-overlay.tsx"),
-      /profileSearchUnion\(\s*profiles\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\),\s*remoteMatches\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\),\s*needle,\s*\)\.slice\(0, SECTION_LIMIT\)/,
+      /profileSearchUnion\(profiles, remoteMatches, needle, \{\s*isVisible: \(p\) => !isProfileDeleted\(p\.id\),\s*\}\)\.slice\(0, SECTION_LIMIT\)/,
     );
   });
 });
@@ -836,7 +837,9 @@ describe("the server's rows answer an older query than the one on screen", () =>
 
   /** What a screen renders: exactly the call both of them make. */
   function rendered(typed: string, remote: readonly ReturnType<typeof row>[]): string[] {
-    return profileSearchUnion([], remote, profileSearchNeedle(typed)).map((p) => p.id);
+    return profileSearchUnion([], remote, profileSearchNeedle(typed), {
+      isVisible: () => true,
+    }).map((p) => p.id);
   }
 
   it("drops the stale row that no longer answers what is typed", () => {
@@ -991,6 +994,20 @@ describe("profileSearchUnion", () => {
     publicId: `${username}-id`,
   });
 
+  /**
+   * The union with every row visible, which is what the cases about MATCHING
+   * are asking about.
+   *
+   * `isVisible` became required on 2026-10-21, for the reason
+   * `searchAnnouncement`'s `{ settled }` did: a caller that forgot it would
+   * still work and would be wrong only about rows somebody decided nobody may
+   * see. The same trade-off the `decide()` wrapper names one suite over — a
+   * case written by copying its neighbours never sees the parameter — so the
+   * cases that are ABOUT visibility call the function directly, below.
+   */
+  const union = <T extends { id: string }>(local: readonly T[], remote: readonly T[], needle: string) =>
+    profileSearchUnion(local as never, remote as never, needle, { isVisible: () => true });
+
   it("filters both halves, which is the whole difference from the merge", () => {
     // `mergeProfileMatches` keeps every input row by design ("ordering is not
     // filtering", with its reason). This is the function the screens want,
@@ -998,7 +1015,7 @@ describe("profileSearchUnion", () => {
     const local = [row("1", "anna"), row("2", "boris")];
     const remote = [row("3", "annabel"), row("4", "clara")];
     assert.deepEqual(
-      profileSearchUnion(local, remote, "anna").map((p) => p.id),
+      union(local, remote, "anna").map((p) => p.id),
       ["1", "3"],
     );
     assert.equal(
@@ -1013,7 +1030,7 @@ describe("profileSearchUnion", () => {
     const local = [row("1", "banna-fan")];
     const remote = [row("2", "anna")];
     assert.deepEqual(
-      profileSearchUnion(local, remote, "anna").map((p) => p.id),
+      union(local, remote, "anna").map((p) => p.id),
       ["2", "1"],
     );
   });
@@ -1021,7 +1038,7 @@ describe("profileSearchUnion", () => {
   it("lets the local copy of a duplicate win", () => {
     const local = [row("1", "anna")];
     const remote = [{ ...row("1", "anna-stale"), publicId: "anna-id" }];
-    const merged = profileSearchUnion(local, remote, "anna");
+    const merged = union(local, remote, "anna");
     assert.equal(merged.length, 1);
     assert.equal(merged[0].username, "anna");
   });
@@ -1030,6 +1047,43 @@ describe("profileSearchUnion", () => {
     // Consistent rather than meaningful: the callers skip the whole filter in
     // that state. An empty needle that silently emptied the list would be the
     // worse of the two answers.
-    assert.equal(profileSearchUnion([row("1", "anna")], [row("2", "boris")], "").length, 2);
+    assert.equal(union([row("1", "anna")], [row("2", "boris")], "").length, 2);
+  });
+
+  it("applies the visibility rule to BOTH halves, which is why it is in here", () => {
+    // The two call sites each wrote this as one `.filter()` per list, and this
+    // seam has produced four defects in a week from exactly that arrangement:
+    // the predicate, the union, the ordering and the filter, every one of them
+    // "one half got it and the other did not".
+    const local = [row("1", "anna"), row("2", "annika")];
+    const remote = [row("3", "annabel"), row("4", "annette")];
+    assert.deepEqual(
+      profileSearchUnion(local, remote, "ann", {
+        isVisible: (p) => p.id !== "2" && p.id !== "3",
+      }).map((p) => p.id),
+      ["1", "4"],
+    );
+  });
+
+  it("drops a row that answers but may not be seen, and keeps the two questions apart", () => {
+    const local = [row("1", "anna")];
+    assert.deepEqual(profileSearchUnion(local, [], "anna", { isVisible: () => false }), []);
+    assert.deepEqual(
+      profileSearchUnion(local, [], "boris", { isVisible: () => true }),
+      [],
+      "visible is not a reason to show a row that answers nothing",
+    );
+  });
+
+  it("asks about visibility even on an empty needle, where the match is a pass", () => {
+    // The state the callers skip the filter in — but the union is also what
+    // `app/people.tsx` hands a cleared field mid-debounce, and a row nobody
+    // may see must not come back because nothing was typed.
+    assert.deepEqual(
+      profileSearchUnion([row("1", "anna")], [row("2", "boris")], "", {
+        isVisible: (p) => p.id === "2",
+      }).map((p) => p.id),
+      ["2"],
+    );
   });
 });
