@@ -340,7 +340,25 @@ export default function PeopleScreen() {
       {loading ? (
         <SkeletonProfileList count={4} />
       ) : filteredPeople.length > 0 ? (
-        filteredPeople.map(renderProfileCard)
+        <>
+          {/*
+            A header, not a label, and it is the other half of the
+            announcement this screen got on 2026-10-19. `announceSearchResults`
+            tells a screen-reader user the count changed; until this landed the
+            rows underneath were a bare sequence of cards with no landmark, so
+            the rotor had nothing to jump TO and the number was the end of the
+            sentence rather than the start of one. The sheet's three sections
+            have had exactly this since the day they became headings.
+
+            The count is what is RENDERED, which is the same promise the sheet's
+            section headings make: the rows a search answered, or the rows of
+            this page, with the pager below saying which page that is.
+          */}
+          <Text style={{ ...styles.resultsHeading, color: theme.meta }} accessibilityRole="header">
+            {t("searchResultsPeople")} ({filteredPeople.length})
+          </Text>
+          {filteredPeople.map(renderProfileCard)}
+        </>
       ) : searchSettling ? (
         <SkeletonProfileList count={4} />
       ) : (
@@ -400,6 +418,15 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     padding: 18,
     gap: SPACING_LIST,
+  },
+  resultsHeading: {
+    fontWeight: "800",
+    fontSize: 13,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    fontFamily: FONT_BODY_EXTRABOLD,
+    marginTop: 4,
+    marginBottom: 2,
   },
   searchLabel: {
     color: MUTED_10,

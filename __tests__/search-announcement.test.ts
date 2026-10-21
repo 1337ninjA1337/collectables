@@ -297,3 +297,50 @@ describe("an unsettled count is not a count", () => {
     assert.equal(searchAnnouncement(state("juno", 1), null, { settled: true }).speak, true);
   });
 });
+
+
+describe("the landmark the count sends a reader to", () => {
+  const OVERLAY = read("components/search-overlay.tsx");
+  const PEOPLE = read("app/people.tsx");
+
+  it("the sheet heads each section, which is what made the announcement worth having", () => {
+    // The rotor is how a screen-reader user skips twenty items to reach the
+    // two people; the spoken count is what tells them it is worth skipping.
+    assert.equal(OVERLAY.split('accessibilityRole="header"').length - 1, 3);
+  });
+
+  it("the people screen heads the list it announces the size of", () => {
+    // Until 2026-10-21 it spoke a count over a bare sequence of cards: the
+    // announcement opened a sentence ("the number changed") and there was
+    // nothing to jump to, which is the half of the sheet's pairing the screen
+    // got without the other.
+    assert.match(
+      PEOPLE,
+      /<Text style=\{\{ \.\.\.styles\.resultsHeading, color: theme\.meta \}\} accessibilityRole="header">\s*\{t\("searchResultsPeople"\)\} \(\{filteredPeople\.length\}\)/,
+    );
+  });
+
+  it("counts the rows it is a heading for, which is the number spoken", () => {
+    // `filteredPeople.length` in both places, so the heading cannot drift from
+    // the announcement: a heading counting `totalCount` would say 300 over 25
+    // cards, and one counting `remoteProfiles` would ignore the search.
+    assert.match(PEOPLE, /\{ query: needle, total: filteredPeople\.length \}/);
+  });
+
+  it("renders the heading over rows only — never over a skeleton or an empty state", () => {
+    // A landmark above an empty area is somewhere to jump to and nothing to
+    // read when you get there. It lives inside the `length > 0` branch, which
+    // is where the sheet puts its three.
+    assert.match(
+      PEOPLE,
+      /filteredPeople\.length > 0 \? \(\s*<>[\s\S]*?accessibilityRole="header"[\s\S]*?filteredPeople\.map\(renderProfileCard\)\}\s*<\/>\s*\) : searchSettling/,
+    );
+  });
+
+  it("reuses the sheet's section key rather than a seventh translation of 'People'", () => {
+    // Six locales each; the sheet's people section already says this word, and
+    // the two surfaces heading one kind of list with two spellings is the
+    // drift this seam spent the week removing one level down.
+    assert.match(OVERLAY, /\{t\("searchResultsPeople"\)\} \(\{matchedProfiles\.length\}\)/);
+  });
+});

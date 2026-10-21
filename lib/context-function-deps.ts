@@ -206,7 +206,7 @@ export const SANCTIONED_EFFECT_DEPS: readonly SanctionedEffectDep[] = [
   {
     file: "components/search-overlay.tsx",
     field: "t",
-    why: "a translated placeholder and an announcement, both of which a language change should re-state",
+    why: "the result-count announcement — the screen's entry below, in the sheet. The reason read 'a translated placeholder and an announcement, both of which a language change should re-state' until 2026-10-21, and by then neither half was true: only one effect here names `t`, and `searchAnnouncement` answers `speak: false` for a repeat of the number already spoken, so a language change re-fires it and it says NOTHING. What sanctions it is the condition the guard itself names as sufficient: a re-fire is a no-op by construction. Whether a language change should re-state a count whose words have changed and whose number has not is a product question, and it is in `.tasks/.suggestions.md` rather than asserted here by a sentence about behaviour the tree does not have",
   },
   {
     file: "app/people.tsx",
