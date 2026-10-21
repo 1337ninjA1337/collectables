@@ -64,6 +64,7 @@ export default function ProfileScreen() {
     getMyProfile,
     getRelationship,
     ensureProfilesLoaded,
+    isProfileDeleted,
     addFriend,
     removeFriend,
     followProfile,
@@ -100,6 +101,12 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!params.id || params.id === "[id]") return;
+      // Decide whether this profile may be shown BEFORE fetching what belongs
+      // to it. `getProfileById` answers `undefined` for a profile an admin
+      // deleted, so the render below is already the "not found" branch — and
+      // without this the screen still paid for its collections, its wishlist
+      // and an item count per collection, every one of them thrown away.
+      if (isProfileDeleted(params.id)) return;
 
       let active = true;
       const needsProfileFetch = !cachedProfile;
@@ -132,7 +139,7 @@ export default function ProfileScreen() {
       return () => {
         active = false;
       };
-    }, [cachedProfile, params.id, isSelf, isFriend, ensureProfilesLoaded]),
+    }, [cachedProfile, params.id, isSelf, isFriend, ensureProfilesLoaded, isProfileDeleted]),
   );
 
   // `fetchSettled`, not `Promise.all`: one collection whose fetch rejects used

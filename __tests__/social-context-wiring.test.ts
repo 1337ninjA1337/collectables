@@ -162,6 +162,19 @@ describe("the admin tombstone reaches every reader of the profiles table", () =>
     assert.match(OVERLAY, /remoteMatches\.filter\(\(p\) => !isProfileDeleted\(p\.id\)\)/);
   });
 
+  it("the profile screen decides showability before it fetches what belongs to the profile", () => {
+    // `getProfileById` already answers `undefined` for a tombstoned id, so the
+    // screen rendered "not found" and had still paid for the collections, the
+    // wishlist and an item count per collection.
+    const SCREEN = readRepoFile("app/profile/[id].tsx");
+    assert.match(SCREEN, /if \(isProfileDeleted\(params\.id\)\) return;/);
+    assert.match(
+      SCREEN,
+      /isProfileDeleted\(params\.id\)\) return;[\s\S]*?let active = true;/,
+      "the gate has to come before the async work, not beside it",
+    );
+  });
+
   it("asks the provider rather than re-deriving the rule per surface", () => {
     for (const [label, src] of [["app/people.tsx", PEOPLE], ["components/search-overlay.tsx", OVERLAY]] as const) {
       assert.match(src, /isProfileDeleted/, `${label} does not consult the tombstone`);

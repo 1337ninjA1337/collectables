@@ -195,6 +195,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "Every useChunkedList(items) call passes a reference React holds stable (a useMemo result, a provider-held array, useState) — the window resets on the array's identity, so a list rebuilt per render pins itself to page one and Load more silently does nothing",
   },
   {
+    npmScript: "lint:profile-visibility",
+    scriptPath: "scripts/check-profile-visibility.ts",
+    args: [],
+    description:
+      "Every file importing fetchProfiles/searchProfiles names isProfileDeleted — those readers answer with the table's rows, the admin tombstone lives in SocialProvider's state and so cannot be applied inside the fetch, and all three readers had forgotten it: a profile an admin deleted was in the people browser, in the search sheet and one tap from a full profile screen",
+  },
+  {
     npmScript: "lint:reduced-motion",
     scriptPath: "scripts/check-reduced-motion.ts",
     args: [],

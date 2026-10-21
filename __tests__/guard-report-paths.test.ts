@@ -80,6 +80,14 @@ const PLANTED: Readonly<
     // call, which is the version that reads as obviously fine.
     source: "export default function Screen() {\n  const { items } = useCollections();\n  const owned = items.filter((i) => i.role === \"owner\");\n  const w = useChunkedList(owned, 20);\n  return null;\n}\n",
   },
+  "check-profile-visibility": {
+    entries: ["app", "components", "lib"],
+    file: "app/planted-offender.tsx",
+    // The plant is the shape the rule is for and the shape that reads as
+    // obviously fine: the rows come back typed, complete and ready to render,
+    // and nothing at the call site says a visibility decision was skipped.
+    source: 'import { fetchProfiles } from "@/lib/supabase-profiles";\n\nexport default function Screen() {\n  const rows = use(fetchProfiles(1, 25));\n  return rows.length;\n}\n',
+  },
   "check-reduced-motion": {
     entries: ["app", "components", "lib"],
     file: "app/planted-offender.tsx",

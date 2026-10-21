@@ -114,6 +114,13 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // Same five-root walk as check-orphan-i18n-keys and the same floor of 200;
   // `app` at 19 files is nowhere near it.
   "check-profile-id-pii": () => ["app"],
+  // The same app + components + lib walk as check-inline-hex and the same
+  // floor, so the same slice. The guard's second premise — that it matched an
+  // import of the row readers at all — is deliberately NOT what this fixture
+  // reaches: the floor assertion runs first, so a slice holding neither people
+  // surface still refuses on below_floor rather than on the lost-subject
+  // message, which is the distinction this suite exists to keep.
+  "check-profile-visibility": () => sliceOfEveryRoot("check-profile-visibility"),
   "check-console-swap": () => sliceOfEveryRoot("check-console-swap"),
   // Same app + components + lib walk as check-inline-hex and the same floor of
   // 174, so the same slice. The guard's second premise — that it matched an

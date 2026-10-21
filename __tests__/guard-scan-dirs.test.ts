@@ -88,6 +88,14 @@ const GUARD_SCANS: Readonly<
         "node tooling — nothing there mounts a provider, and a closure rebuilt per render needs a render to be rebuilt on",
     },
   },
+  "check-profile-visibility": {
+    dirs: ["app", "components", "lib"],
+    excludes: {
+      data: "seed fixtures are rows, not readers of the profiles table",
+      scripts:
+        "node tooling — nothing there renders a profile, so a row it read could not reach a screen past a visibility decision",
+    },
+  },
   "check-chunked-list-items": {
     dirs: ["app", "components", "lib"],
     excludes: {
@@ -248,6 +256,7 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
       "check-latest-ref",
       "check-chunked-list-items",
       "check-context-function-deps",
+      "check-profile-visibility",
     ]) {
       assert.deepEqual(
         declaredDirs(guard),
