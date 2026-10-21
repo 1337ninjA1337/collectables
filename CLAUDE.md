@@ -26,7 +26,7 @@ npm run ios        # iOS simulator
 npm run web        # browser
 
 # Lint
-npm run lint       # eslint . over the whole tree (config in eslint.config.js; the full report — 40 findings, 29 of them errors, every one of them read)
+npm run lint       # eslint . over the whole tree (config in eslint.config.js; the full report — 39 findings, 28 of them errors, every one of them read)
 ```
 
 Tests run on the built-in `node:test` runner via `tsx`:

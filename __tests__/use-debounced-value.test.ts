@@ -11,12 +11,18 @@ import {
 } from "@/lib/debounce-helpers";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /**
  * `lib/use-debounced-value.ts` is the shared trailing-edge debounce that
  * replaced two hand-rolled `setTimeout(..., 300)` blocks (`app/people.tsx`
  * and `components/search-overlay.tsx`), and is the guard the in-collection
  * search will need when live-as-you-type filtering lands.
+ *
+ * Both of those screens reach it through `lib/use-settled-search.ts` now,
+ * which is what they were each wrapping it in by hand — so the adoption suite
+ * below has one consumer, and the two surfaces are
+ * `use-settled-search.test.ts`'.
  *
  * The pure half (`lib/debounce-helpers.ts`) is exercised directly, and what is
  * left here is structural: which module owns the timer, and that the two
@@ -209,14 +215,6 @@ describe("useDebouncedValue — structure", () => {
     assert.match(readHookSrc(), /STABLE reference/);
   });
 
-  it("is only ever handed primitives by its current consumers", () => {
-    for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
-      const call = stripComments(readRepoFile(file)).match(/useDebouncedValue\(([^,]+),/);
-      assert.ok(call, `useDebouncedValue call not found in ${file}`);
-      assert.doesNotMatch(call[1], /[{[]/, "a fresh object/array literal would never settle");
-    }
-  });
-
   it("stays a pure behaviour hook (no navigation, i18n, design tokens or styles)", () => {
     const code = stripComments(readHookSrc());
     for (const forbidden of [/@\/lib\/design-tokens/, /@\/lib\/i18n-context/, /expo-router/, /StyleSheet/, /react-native/]) {
@@ -226,82 +224,47 @@ describe("useDebouncedValue — structure", () => {
 });
 
 describe("useDebouncedValue — adoption", () => {
-  // The limit is a NAME and a value since 2026-10-19: both were bare literals
-  // at the call site, and the sheet's was the same number written four times
-  // (its request plus a cut per section). The claim this suite makes is
-  // unchanged — this consumer asks the server for that many rows — and it now
-  // takes two assertions, because the number and the call are in two places
-  // on purpose.
-  const CONSUMERS = [
-    { file: "app/people.tsx", limit: 50, limitName: "SEARCH_RESULT_LIMIT" },
-    { file: "components/search-overlay.tsx", limit: 20, limitName: "SECTION_LIMIT" },
-  ];
+  /**
+   * One consumer now, and it is a hook rather than a screen.
+   *
+   * `app/people.tsx` and `components/search-overlay.tsx` called this directly
+   * and wrapped it in the same twenty lines of request, cancellation and
+   * settling state — twice. `lib/use-settled-search.ts` holds that once and
+   * is the only caller of the debounce left in the app tree;
+   * `use-settled-search.test.ts` holds the claims about the two surfaces,
+   * including the row limit each asks the server for.
+   */
+  const CONSUMER = "lib/use-settled-search.ts";
+  /** The hook itself, which names its own call and is not a consumer of it. */
+  const DECLARING = "lib/use-debounced-value.ts";
 
-  for (const consumer of CONSUMERS) {
-    const label = consumer.file;
+  it("is reached by exactly one module, which is the search hook", () => {
+    const callers = sourceFiles()
+      .filter((file) => file !== DECLARING)
+      .filter((file) => /useDebouncedValue\(/.test(stripComments(readRepoFile(file))));
+    assert.deepEqual(callers, [CONSUMER]);
+  });
 
-    it(`${label} debounces its searchProfiles round trip through the shared hook`, () => {
-      const code = stripComments(readRepoFile(consumer.file));
-      assert.match(code, /import \{ useDebouncedValue \} from "@\/lib\/use-debounced-value";/);
-      assert.match(code, /useDebouncedValue\([\s\S]{0,40}PROFILE_SEARCH_DEBOUNCE_MS\)/);
-      assert.match(
-        code,
-        new RegExp(`searchProfiles\\(debouncedQuery, ${consumer.limitName}\\)`),
-      );
-      assert.match(
-        code,
-        new RegExp(`const ${consumer.limitName} = ${String(consumer.limit)};`),
-        `${consumer.limitName} is not ${String(consumer.limit)} any more`,
-      );
-    });
+  it(`${CONSUMER} debounces at the shared remote-search delay`, () => {
+    const code = stripComments(readRepoFile(CONSUMER));
+    assert.match(code, /import \{ useDebouncedValue \} from "@\/lib\/use-debounced-value";/);
+    assert.match(code, /import \{ PROFILE_SEARCH_DEBOUNCE_MS \} from "@\/lib\/debounce-helpers";/);
+    assert.match(code, /delayMs = PROFILE_SEARCH_DEBOUNCE_MS/);
+    assert.doesNotMatch(code, /,\s*300\)/, "the 300ms literal must live in debounce-helpers only");
+  });
 
-    it(`${label} no longer hand-rolls a debounce timer`, () => {
-      const code = stripComments(readRepoFile(consumer.file));
-      assert.doesNotMatch(code, /setTimeout/, "the debounce timer belongs to the hook now");
-      assert.doesNotMatch(code, /clearTimeout/);
-    });
+  it(`${CONSUMER} is handed a primitive, which is the only safe kind of value`, () => {
+    // A fresh object or array literal re-arms the timer every render and never
+    // settles — the trap the hook's header documents.
+    const call = stripComments(readRepoFile(CONSUMER)).match(/useDebouncedValue\(([^,]+),/);
+    assert.ok(call, "useDebouncedValue call not found");
+    assert.doesNotMatch(call[1], /[{[]/, "a fresh object/array literal would never settle");
+  });
 
-    it(`${label} imports the shared delay rather than a literal 300`, () => {
-      const code = stripComments(readRepoFile(consumer.file));
-      assert.match(code, /import \{ PROFILE_SEARCH_DEBOUNCE_MS \} from "@\/lib\/debounce-helpers";/);
-      assert.doesNotMatch(code, /,\s*300\)/, "the 300ms literal must live in debounce-helpers only");
-    });
-
-    it(`${label} still cancels an in-flight response so a late resolve cannot overwrite a newer one`, () => {
-      const code = stripComments(readRepoFile(consumer.file));
-      assert.match(code, /let cancelled = false;/);
-      assert.match(code, /if \(!cancelled\) set\w+\(results\);/);
-      assert.match(code, /return \(\) => \{\s*cancelled = true;\s*\};/);
-    });
-
-    it(`${label} clears its remote matches when the settled query is empty`, () => {
-      // The claim: the empty-query branch clears to `[]` and RETURNS, so no
-      // request is sent and no stale list survives an emptied field.
-      //
-      // The gap before `return` was `\s*` until 2026-10-19, when
-      // `app/people.tsx` added `setSearchInFlight(false)` beside the clear —
-      // an emptied field is the third way a pending search stops being
-      // pending, next to a resolve and a reject, and the flag is what keeps
-      // the empty state from contradicting a search still in the air. A
-      // bookkeeping statement in that branch is not a second request; what
-      // the case is about is that nothing is FETCHED.
-      const code = stripComments(readRepoFile(consumer.file));
-      assert.match(
-        code,
-        /if \(!debouncedQuery[\s\S]{0,60}\) \{[\s\S]{0,60}\(\[\]\);[\s\S]{0,80}return;\s*\}/,
-      );
-      const branch = /if \(!debouncedQuery[\s\S]{0,60}\) \{([\s\S]*?)return;/.exec(code);
-      assert.ok(branch, "the empty-query branch is not readable");
-      assert.ok(
-        !/searchProfiles\(/.test(branch[1]),
-        "the empty-query branch must not fetch anything",
-      );
-    });
-  }
-
-  it("is the only debounce implementation left in the app — no stray keystroke timers", () => {
-    // A third hand-rolled copy is exactly the drift this hook exists to stop.
-    for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
+  it("is the only debounce implementation in the tree — no stray keystroke timers", () => {
+    // A hand-rolled copy is exactly the drift this hook exists to stop, and
+    // the two screens that had one are the places it would come back.
+    for (const file of ["app/people.tsx", "components/search-overlay.tsx", CONSUMER]) {
       assert.doesNotMatch(stripComments(readRepoFile(file)), /setTimeout\([\s\S]{0,80}\},\s*\d+\)/);
     }
   });

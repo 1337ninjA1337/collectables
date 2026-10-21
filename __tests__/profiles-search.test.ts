@@ -99,16 +99,17 @@ describe("people/search UI uses the server-side search", () => {
   it("app/people.tsx queries searchProfiles when the box is non-empty", () => {
     const src = readRepoFile("app/people.tsx");
     assert.match(src, /import \{ fetchProfiles, searchProfiles \} from "@\/lib\/supabase-profiles"/);
-    // The needle is the settled value from `useDebouncedValue`; the trimming
-    // it used to do inline now happens at the hook's input.
-    assert.match(src, /searchProfiles\(debouncedQuery, SEARCH_RESULT_LIMIT\)/);
-    assert.match(src, /useDebouncedValue\(query\.trim\(\), PROFILE_SEARCH_DEBOUNCE_MS\)/);
+    // The request is the hook's, and what the screen decides is the two
+    // strings that go in: the trimmed field is what gets searched for, and
+    // the needle decides whether anything is.
+    assert.match(src, /search: \(settledQuery\) => searchProfiles\(settledQuery, SEARCH_RESULT_LIMIT\),/);
+    assert.match(src, /input: query\.trim\(\),\s*active: searching,/);
   });
 
   it("components/search-overlay.tsx queries searchProfiles for the people section", () => {
     const src = readRepoFile("components/search-overlay.tsx");
-    assert.match(src, /searchProfiles\(debouncedQuery, SECTION_LIMIT\)/);
-    assert.match(src, /useDebouncedValue\(q, PROFILE_SEARCH_DEBOUNCE_MS\)/);
+    assert.match(src, /search: \(settledQuery\) => searchProfiles\(settledQuery, SECTION_LIMIT\),/);
+    assert.match(src, /input: q,\s*active: peopleSearchActive,/);
   });
 
   it("the sheet asks for exactly as many profiles as it will show", () => {
@@ -118,7 +119,7 @@ describe("people/search UI uses the server-side search", () => {
     // smaller than it leaves the section short with nothing saying why.
     const src = readRepoFile("components/search-overlay.tsx");
     assert.match(src, /const SECTION_LIMIT = 20;/);
-    assert.match(src, /searchProfiles\(debouncedQuery, SECTION_LIMIT\)/);
+    assert.match(src, /searchProfiles\(settledQuery, SECTION_LIMIT\)/);
     assert.match(src, /profileSearchUnion\([^)]*\)\.slice\(0, SECTION_LIMIT\)/);
   });
 
@@ -151,7 +152,7 @@ describe("people/search UI uses the server-side search", () => {
     const src = readRepoFile("app/people.tsx");
     assert.match(src, /const SEARCH_RESULT_LIMIT = 50;/);
     assert.ok(
-      !/searchProfiles\(debouncedQuery, \d+\)/.test(src),
+      !/searchProfiles\(settledQuery, \d+\)/.test(src),
       "the people screen asks for a bare literal again",
     );
     assert.ok(

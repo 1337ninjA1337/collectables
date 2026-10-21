@@ -43,12 +43,11 @@ import {
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { catalogueSearchNeedle, collectionMatchesSearch, itemMatchesSearch } from "@/lib/catalogue-search";
-import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import {
   profileSearchNeedle,
   profileSearchUnion,
 } from "@/lib/profile-search";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useSettledSearch } from "@/lib/use-settled-search";
 import { useI18n } from "@/lib/i18n-context";
 import { type SearchResultsState } from "@/lib/search-announcement";
 import { announceSearchResults } from "@/lib/search-results-announcement";
@@ -145,61 +144,46 @@ export function SearchOverlay({ visible, onClose }: Props) {
       .slice(0, SECTION_LIMIT);
   }, [items, q, filter, ownerFilter]);
 
-  // Server-side people search: the 100-row snapshot fetched on open misses
-  // any profile beyond it, so the query also hits the whole table (debounced).
-  //
-  // As on the people screen, the settle lags a cleared field by the debounce
-  // window — harmless because `matchedProfiles` below returns `[]` while the
-  // raw `q` is empty, so the stale matches are never rendered.
-  const debouncedQuery = useDebouncedValue(q, PROFILE_SEARCH_DEBOUNCE_MS);
-  const [remoteMatches, setRemoteMatches] = useState<UserProfile[]>([]);
-  const [peopleSearchInFlight, setPeopleSearchInFlight] = useState(false);
-  useEffect(() => {
-    if (!debouncedQuery || filter === "collections" || filter === "items") {
-      setRemoteMatches([]);
-      setPeopleSearchInFlight(false);
-      return;
-    }
-    let cancelled = false;
-    setPeopleSearchInFlight(true);
-    searchProfiles(debouncedQuery, SECTION_LIMIT)
-      .then((results) => {
-        if (!cancelled) setRemoteMatches(results);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setPeopleSearchInFlight(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedQuery, filter]);
-
   /**
-   * The people half has been asked for and has not answered yet.
+   * The people half of the sheet: a server-wide search, and whether it has
+   * answered yet.
    *
-   * The same two windows `app/people.tsx` names: the debounce, during which
-   * nothing has been sent at all, and the round trip. The condition mirrors
-   * the effect above exactly — a `collections` or `items` filter sends no
-   * people request, so nothing is settling under it.
+   * The 100-row snapshot fetched on open misses any profile beyond it, so the
+   * query also hits the whole table (debounced). `useSettledSearch` holds the
+   * debounce, the request, the cancellation and `settling` — the same twenty
+   * lines `app/people.tsx` wrote separately until the hook landed.
+   *
+   * `peopleSearchActive` is the hook's `active` and the sections' own guard,
+   * which is the point of naming it: a `collections` or `items` filter sends
+   * no people request, so nothing may be SETTLING under it either — a flag
+   * that said otherwise would hide the empty state for a search that had
+   * already finished.
    *
    * It exists because this sheet had the people screen's defect of 2026-10-19
    * twice over. Typing a profile ID that only the server knows matched nothing
-   * in the 100-row snapshot, so "nothing found" rendered for a debounce window
-   * plus a round trip and then flipped to the answer — in a sheet whose people
+   * in the snapshot, so "nothing found" rendered for a debounce window plus a
+   * round trip and then flipped to the answer — in a sheet whose people
    * section exists precisely to find somebody who is NOT in that snapshot. And
    * the announcement, which is gated on the debounce having caught up, SPOKE
    * the zero: a screen-reader user was told "0 results" and then, a round trip
    * later, "1 result". A wrong number out loud is the worse half.
    */
-  const peopleSearchSettling =
-    q.length > 0 &&
-    filter !== "collections" &&
-    filter !== "items" &&
-    (debouncedQuery !== q || peopleSearchInFlight);
+  const peopleSearchActive = q.length > 0 && filter !== "collections" && filter !== "items";
+  const {
+    results: remoteMatches,
+    query: debouncedQuery,
+    settling: peopleSearchSettling,
+  } = useSettledSearch({
+    input: q,
+    active: peopleSearchActive,
+    search: (settledQuery) => searchProfiles(settledQuery, SECTION_LIMIT),
+  });
 
   const matchedProfiles = useMemo(() => {
-    if (!q || filter === "collections" || filter === "items") return [];
+    // The same flag the request is gated on, rather than its third spelling:
+    // a section that rendered rows the search is not being run for is the
+    // disagreement `peopleSearchActive` exists to make impossible.
+    if (!peopleSearchActive) return [];
     // Shared with `app/people.tsx` and with the server's `or=` list: the page
     // the client holds and the rest of the table have to answer one question.
     const needle = profileSearchNeedle(q);
@@ -213,7 +197,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
     // a stronger version of the bug the ordering fixes. The cut is the same
     // number the request above asked for, deliberately — see SECTION_LIMIT.
     return profileSearchUnion(profiles, remoteMatches, needle).slice(0, SECTION_LIMIT);
-  }, [profiles, q, filter, remoteMatches]);
+  }, [profiles, q, peopleSearchActive, remoteMatches]);
 
   // Get collection name for an item
   function getCollectionName(collectionId: string): string {

@@ -37,7 +37,7 @@ describe("the set-state-in-effect triage", () => {
     assert.equal(new Set(keys).size, keys.length, "no site may be registered twice");
   });
 
-  it("decided all 31: 27 keep, 2 open, 2 fixed", () => {
+  it("decided all 30: 26 keep, 2 open, 2 fixed", () => {
     // The numbers are in the module header and in `.tasks/.tasks.md`, so they
     // are asserted rather than restated. A verdict that moves without the
     // sentences moving is the drift this catches — and two have moved:
@@ -45,7 +45,12 @@ describe("the set-state-in-effect triage", () => {
     // `lint:chunked-items` started holding its callers to the contract the
     // effect depends on, and `app/profile/[id].tsx`'s drafts went from open to
     // fixed on 2026-10-11 when the question they were open on got an answer.
-    assert.deepEqual(verdictCounts(), { keep: 27, open: 2, fixed: 2 });
+    // 27 keep until 2026-10-21: `app/people.tsx`' `setSearchResults([])` and
+    // `components/search-overlay.tsx`' `setRemoteMatches([])` were the same
+    // `reset-on-input` shape in two files, and `lib/use-settled-search.ts`
+    // holds it once — so two entries became one, which is the registry
+    // tracking a consolidation rather than a verdict changing its mind.
+    assert.deepEqual(verdictCounts(), { keep: 26, open: 2, fixed: 2 });
   });
 
   it("gives every site a reason of its own", () => {

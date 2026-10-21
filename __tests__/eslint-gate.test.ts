@@ -380,13 +380,18 @@ describe("the two read rules stay read", () => {
   it("both registries account for a tree the gate currently passes", () => {
     // The registries' own arithmetic, held here as well as by the gate: a
     // `fixed` verdict contributes nothing, because the finding it describes
-    // is gone. 29 live set-state findings from 31 entries — the second became
+    // is gone. 28 live set-state findings from 30 entries — the second became
     // `fixed` on 2026-10-11, when `app/profile/[id].tsx`'s draft sync stopped
     // overwriting what the user was typing — and 11 live exhaustive-deps
     // findings from 11 entries of which two are fixed and one stands for three.
+    //
+    // 29 from 31 until 2026-10-21: `lib/use-settled-search.ts` absorbed the
+    // search mechanism `app/people.tsx` and `components/search-overlay.tsx`
+    // each held, so two entries describing one `reset-on-input` shape became
+    // the one line that shape is written in now.
     const sum = (counts: ReadonlyMap<string, number>) =>
       [...counts.values()].reduce((total, n) => total + n, 0);
-    assert.equal(sum(setStateByFile()), 29);
+    assert.equal(sum(setStateByFile()), 28);
     assert.equal(sum(exhaustiveDepsByFile()), 11);
   });
 });

@@ -104,9 +104,9 @@ export interface LintReportSnapshot {
  * count fell by one for a code change rather than for a reading.
  */
 export const LINT_REPORT_SNAPSHOT: LintReportSnapshot = {
-  takenOn: "2026-10-11",
-  findings: 40,
-  errors: 29,
+  takenOn: "2026-10-21",
+  findings: 39,
+  errors: 28,
   byRule: {},
 };
 

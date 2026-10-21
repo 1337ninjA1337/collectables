@@ -126,7 +126,7 @@ describe("expectedByRule", () => {
 
   it("derives the two live rules at the counts the report states", () => {
     assert.deepEqual(expectedByRule(TOTALS), {
-      "react-hooks/set-state-in-effect": 29,
+      "react-hooks/set-state-in-effect": 28,
       "react-hooks/exhaustive-deps": 11,
     });
   });

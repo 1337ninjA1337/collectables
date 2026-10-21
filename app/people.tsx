@@ -30,7 +30,6 @@ import {
   TEXT_DARK,
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
-import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import { captureException } from "@/lib/sentry";
 import { type SearchResultsState } from "@/lib/search-announcement";
 import { announceSearchResults } from "@/lib/search-results-announcement";
@@ -44,7 +43,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useSettledSearch } from "@/lib/use-settled-search";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 
 const PAGE_SIZE = 25;
@@ -128,65 +127,43 @@ export default function PeopleScreen() {
    * it no search at all. The needle is the one `filteredPeople` compares
    * with, so it is the one the empty state and the pager have to agree with.
    *
-   * `query.trim()` survives in ONE place below — what `useDebouncedValue`
-   * holds, which is what `searchProfiles` is asked for and what
-   * `use-debounced-value.test.ts` pins. `searchSettling` compares against it
-   * for that reason: the question there is whether the debounce has caught up
-   * with the field, and the debounce holds the trimmed string.
+   * `query.trim()` survives in ONE place below — `useSettledSearch`'s input,
+   * which is what the debounce holds and what `searchProfiles` is asked for.
+   * The hook compares its settled value against that same string, which is
+   * why the trimmed reading is the one that goes in: the question it answers
+   * is whether the debounce has caught up with the FIELD.
    */
   const needle = useMemo(() => profileSearchNeedle(query), [query]);
 
   /** A query is active, so the list is search results rather than a page. */
   const searching = needle.length > 0;
 
-  // Server-side search: the loaded page only holds PAGE_SIZE profiles, so
-  // filtering it client-side made anyone beyond the current page unfindable.
-  // Debounced ilike query against the whole profiles table.
-  //
-  // Clearing the field does NOT clear `searchResults` until the debounce
-  // settles, which is invisible: `filteredPeople` below returns `others`
-  // untouched while the raw `query` is empty, so the stale remote matches are
-  // never read during that window.
-  const debouncedQuery = useDebouncedValue(query.trim(), PROFILE_SEARCH_DEBOUNCE_MS);
-  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
-  const [searchInFlight, setSearchInFlight] = useState(false);
-  useEffect(() => {
-    if (!debouncedQuery) {
-      setSearchResults([]);
-      setSearchInFlight(false);
-      return;
-    }
-    let cancelled = false;
-    setSearchInFlight(true);
-    searchProfiles(debouncedQuery, SEARCH_RESULT_LIMIT)
-      .then((results) => {
-        if (!cancelled) setSearchResults(results);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setSearchInFlight(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedQuery]);
-
   /**
-   * The search has been asked for and has not answered yet.
+   * The server-wide half of the result list, and whether it has answered.
    *
-   * Two windows, and the first is the one with no request in it at all: the
-   * debounce means `debouncedQuery` lags what is typed, so for
-   * `PROFILE_SEARCH_DEBOUNCE_MS` after a keystroke nothing has been sent.
-   * Then the round trip.
+   * The loaded page only holds `PAGE_SIZE` profiles, so filtering it
+   * client-side made anyone beyond the current page unfindable; the query also
+   * goes to the whole `profiles` table, debounced.
    *
-   * It exists because the empty state was shown through both. Typing a profile
-   * ID that only the server knows about matched nothing on the loaded page, so
-   * "no people found" rendered for the debounce plus a round trip and then
-   * flipped to the answer — under a field whose whole purpose is finding
-   * somebody who is NOT on this page. `loading` could not cover it: that flag
-   * is about `fetchProfiles`, which is not running.
+   * `useSettledSearch` holds all of it — the debounce, the request, the
+   * cancellation that keeps a late response from overwriting a newer one, and
+   * `settling`, whose two windows are why the empty state does not contradict
+   * a search still in the air. The sheet wrote the same twenty lines; the day
+   * a third reader appears it writes them a third time, which is what the
+   * hook is for.
+   *
+   * `query.trim()` is the debounce input because that is what is SEARCHED
+   * for, and `searching` — the needle's reading — is what makes it active,
+   * because that is what the result list is filtered by. They disagree on a
+   * query of only metacharacters (`"%"` trims to `"%"` and reduces to `""`),
+   * and the needle is the one that decides: a search with no matchable text
+   * is not a search.
    */
-  const searchSettling = searching && (debouncedQuery !== query.trim() || searchInFlight);
+  const { results: searchResults, settling: searchSettling } = useSettledSearch({
+    input: query.trim(),
+    active: searching,
+    search: (settledQuery) => searchProfiles(settledQuery, SEARCH_RESULT_LIMIT),
+  });
 
   useEffect(() => {
     void loadPage(page);

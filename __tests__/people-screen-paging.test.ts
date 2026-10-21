@@ -58,24 +58,26 @@ describe("the empty state waits for the search it is contradicting", () => {
   // purpose is finding somebody who is NOT on this page. `loading` could not
   // cover it: that flag is about `fetchProfiles`, which is not running.
   it("knows when a search has been asked for and has not answered", () => {
-    assert.match(CODE, /const \[searchInFlight, setSearchInFlight\] = useState\(false\);/);
+    // The state itself moved into `lib/use-settled-search.ts` on 2026-10-21,
+    // with the request and the cancellation it was written beside — the sheet
+    // held the same twenty lines. What is this screen's is which strings go
+    // in: the trimmed field is what gets searched for, and the needle's
+    // reading of "a search is active" is what the result list is filtered by.
+    // `use-settled-search.test.ts` holds the mechanism, and
+    // `use-settled-search-render.test.ts` runs both windows.
     assert.match(
       CODE,
-      /const searchSettling = searching && \(debouncedQuery !== query\.trim\(\) \|\| searchInFlight\);/,
+      /const \{ results: searchResults, settling: searchSettling \} = useSettledSearch\(\{\s*input: query\.trim\(\),\s*active: searching,/,
       "both windows: the debounce that has not caught up, and the request in flight",
     );
   });
 
-  it("covers the window where nothing has been requested yet", () => {
-    // The debounce means `debouncedQuery` lags the field, so for
-    // PROFILE_SEARCH_DEBOUNCE_MS after a keystroke there is no request at all
-    // — the half an "is a request in flight" flag cannot see.
-    assert.match(CODE, /debouncedQuery !== query\.trim\(\)/);
-  });
-
-  it("clears the flag on success, on failure and on an emptied field", () => {
-    assert.match(CODE, /\.finally\(\(\) => \{\s*if \(!cancelled\) setSearchInFlight\(false\);\s*\}\)/);
-    assert.match(CODE, /if \(!debouncedQuery\) \{\s*setSearchResults\(\[\]\);\s*setSearchInFlight\(false\);/);
+  it("holds no debounce, request or in-flight flag of its own", () => {
+    // Any one of them coming back is the start of the two surfaces
+    // disagreeing again, which this seam has done five times in a week.
+    assert.doesNotMatch(CODE, /searchInFlight/);
+    assert.doesNotMatch(CODE, /let cancelled = false;/);
+    assert.doesNotMatch(CODE, /useDebouncedValue/);
   });
 
   it("renders rows over the skeleton and the skeleton over the empty state", () => {
@@ -175,15 +177,15 @@ describe("the pager is hidden while a search is running", () => {
   });
 
   it("keeps query.trim() for the one thing that is about the field", () => {
-    // What `useDebouncedValue` holds is what `searchProfiles` is asked for,
-    // and `use-debounced-value.test.ts` pins it. `searchSettling` compares
-    // against the same string because the question there is whether the
-    // debounce has caught up with the FIELD.
-    assert.match(CODE, /useDebouncedValue\(query\.trim\(\), PROFILE_SEARCH_DEBOUNCE_MS\)/);
+    // What the debounce holds is what `searchProfiles` is asked for, and the
+    // hook compares its settled value against that same string — so the
+    // trimmed reading goes IN and is not written again. One occurrence since
+    // the mechanism moved: the hook's `input`.
+    assert.match(CODE, /input: query\.trim\(\),/);
     assert.equal(
       CODE.split("query.trim()").length - 1,
-      2,
-      "query.trim() is the debounce input and the comparison against it, and nothing else",
+      1,
+      "query.trim() is the hook's input and nothing else",
     );
   });
 
@@ -204,18 +206,29 @@ describe("the search sheet had the same two defects, and the spoken one was wors
   const OVERLAY = stripComments(readRepoFile("components/search-overlay.tsx"));
 
   it("knows when the people half is still in the air", () => {
-    assert.match(OVERLAY, /const \[peopleSearchInFlight, setPeopleSearchInFlight\] = useState\(false\);/);
-    assert.match(OVERLAY, /\(debouncedQuery !== q \|\| peopleSearchInFlight\)/);
-  });
-
-  it("mirrors the request's own filter condition exactly", () => {
-    // A `collections` or `items` filter sends no people request, so nothing
-    // is settling under it — and a flag that said otherwise would hide the
-    // empty state for a search that had already finished.
-    assert.match(OVERLAY, /if \(!debouncedQuery \|\| filter === "collections" \|\| filter === "items"\)/);
     assert.match(
       OVERLAY,
-      /q\.length > 0 &&\s*filter !== "collections" &&\s*filter !== "items" &&/,
+      /settling: peopleSearchSettling,\s*\} = useSettledSearch\(\{\s*input: q,\s*active: peopleSearchActive,/,
+    );
+    assert.doesNotMatch(OVERLAY, /peopleSearchInFlight/, "the flag the hook's answer state replaced");
+  });
+
+  it("mirrors the request's own filter condition exactly, by sharing it", () => {
+    // A `collections` or `items` filter sends no people request, so nothing
+    // may be settling under it — and a flag that said otherwise would hide
+    // the empty state for a search that had already finished. The condition
+    // was written three times (the request, the state, the section) and
+    // agreeing was a thing a reader had to check; it is one name now, and the
+    // hook takes it as the gate for the request AND the state.
+    assert.match(
+      OVERLAY,
+      /const peopleSearchActive = q\.length > 0 && filter !== "collections" && filter !== "items";/,
+    );
+    assert.match(OVERLAY, /if \(!peopleSearchActive\) return \[\];/);
+    assert.equal(
+      OVERLAY.split('filter !== "collections"').length - 1,
+      1,
+      "the filter condition is spelled out more than once again",
     );
   });
 
@@ -235,8 +248,13 @@ describe("the search sheet had the same two defects, and the spoken one was wors
     assert.match(OVERLAY, /\{ settled: !peopleSearchSettling \}/);
   });
 
-  it("clears the flag on success, on failure and on a filter that sends nothing", () => {
-    assert.match(OVERLAY, /\.finally\(\(\) => \{\s*if \(!cancelled\) setPeopleSearchInFlight\(false\);\s*\}\)/);
-    assert.match(OVERLAY, /setRemoteMatches\(\[\]\);\s*setPeopleSearchInFlight\(false\);/);
+  it("leaves success, failure and a filter that sends nothing to the hook", () => {
+    // All three used to be bookkeeping here — a `.finally`, a clear, and the
+    // flag beside each. `use-settled-search.test.ts` pins them where they
+    // live now, and the render suite runs the failure case this file could
+    // only match the text of.
+    assert.match(OVERLAY, /import \{ useSettledSearch \} from "@\/lib\/use-settled-search";/);
+    assert.doesNotMatch(OVERLAY, /setRemoteMatches/);
+    assert.doesNotMatch(OVERLAY, /\.finally\(/);
   });
 });

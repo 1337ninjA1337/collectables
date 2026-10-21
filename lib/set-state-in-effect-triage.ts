@@ -1,5 +1,5 @@
 /**
- * All 31 `react-hooks/set-state-in-effect` findings, read and decided.
+ * All 30 `react-hooks/set-state-in-effect` findings, read and decided.
  *
  * The rule's complaint is that a `setState` in an effect BODY renders twice
  * for one change, and in the wrong place loops. It is the second-largest error
@@ -206,13 +206,6 @@ export const SET_STATE_IN_EFFECT_SITES: readonly SetStateInEffectSite[] = [
   },
   {
     file: "app/people.tsx",
-    call: "setSearchResults([]);",
-    shape: "reset-on-input",
-    verdict: "keep",
-    why: "Clears remote matches when the debounced query empties, then returns; the results are not in the dependency list.",
-  },
-  {
-    file: "app/people.tsx",
     call: "void loadPage(page);",
     shape: "indirect",
     verdict: "keep",
@@ -246,13 +239,6 @@ export const SET_STATE_IN_EFFECT_SITES: readonly SetStateInEffectSite[] = [
     shape: "open-reset",
     verdict: "keep",
     why: "Clears the previous search when the overlay opens, keyed on `visible` alone.",
-  },
-  {
-    file: "components/search-overlay.tsx",
-    call: "setRemoteMatches([]);",
-    shape: "reset-on-input",
-    verdict: "keep",
-    why: "The people-screen shape again: clear the remote matches when the debounced query empties or the filter excludes people, then return.",
   },
   {
     file: "lib/auth-context.tsx",
@@ -364,6 +350,13 @@ export const SET_STATE_IN_EFFECT_SITES: readonly SetStateInEffectSite[] = [
     why: "The spinner is genuinely active, so there is no linger to hold; the effect returns straight after and `lingering` is not among its dependencies.",
   },
   {
+    file: "lib/use-settled-search.ts",
+    call: "setAnswer(null);",
+    shape: "reset-on-input",
+    verdict: "keep",
+    why: "The two entries this replaced — `app/people.tsx`' `setSearchResults([])` and `components/search-overlay.tsx`' `setRemoteMatches([])` — were one shape written twice, and they are one line in the hook that absorbed both on 2026-10-21. Clears the answer when there is nothing to search for, then returns; the answer is not in the dependency list, and React drops the render when it is already null.",
+  },
+  {
     file: "lib/use-reactions.ts",
     call: "setLoading(false);",
     occurrence: 1,
@@ -373,8 +366,14 @@ export const SET_STATE_IN_EFFECT_SITES: readonly SetStateInEffectSite[] = [
   },
 ];
 
-/** How many the linter reported, and therefore how many have to be in here. */
-export const SET_STATE_IN_EFFECT_TOTAL = 31;
+/**
+ * How many the linter reported, and therefore how many have to be in here.
+ *
+ * 31 until 2026-10-21, when `lib/use-settled-search.ts` absorbed the search
+ * mechanism both people surfaces held: two `reset-on-input` entries that were
+ * one shape written twice became one entry in the module that now owns it.
+ */
+export const SET_STATE_IN_EFFECT_TOTAL = 30;
 
 /** One entry's claim that no longer holds. */
 export interface TriageProblem {
