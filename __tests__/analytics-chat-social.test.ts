@@ -42,7 +42,7 @@ describe("app/chat/[id].tsx — chat_opened wiring", () => {
     const window = src.slice(Math.max(0, trackIdx - 400), trackIdx + 200);
     assert.match(
       window,
-      /useDwellTimeEffect\(\s*\[chatId,\s*otherUserId\]\s*,\s*DWELL_TIME_DEFAULT_MS\s*,/,
+      /useDwellTimeEffect\(\s*\[chatId,\s*otherUserId,\s*appVisible\]\s*,\s*DWELL_TIME_DEFAULT_MS\s*,/,
       "chat_opened must fire through useDwellTimeEffect keyed on the conversation identity",
     );
     assert.doesNotMatch(
@@ -188,5 +188,46 @@ describe("Analytics #10 — taxonomy parity", () => {
       taxonomy.indexOf("language_switched:"),
     );
     assert.match(block, /["']source["']/);
+  });
+});
+
+describe("chat_opened counts attention, not arrival", () => {
+  const src = read("app/chat/[id].tsx");
+
+  it("does not fire while the app is away", () => {
+    // The 500ms gate exists so a back/forth navigation flicker does not count
+    // a conversation nobody looked at — and the same event fired for a chat
+    // opened into a hidden tab or a backgrounded app, which nobody looked at
+    // either. The read receipt two effects up makes the same reading, so the
+    // funnel was counting intent in one line and attention in the other.
+    assert.match(src, /if \(!chatId \|\| !appVisible\) return;/);
+  });
+
+  it("re-arms the gate when the user comes back", () => {
+    // `appVisible` is in the deps rather than only in the body: a chat opened
+    // in a background tab and READ ten minutes later is a chat somebody
+    // looked at, and a body-only gate would have let the one scheduled fire
+    // pass as a no-op and never counted it.
+    assert.match(src, /useDwellTimeEffect\(\[chatId, otherUserId, appVisible\], DWELL_TIME_DEFAULT_MS/);
+  });
+
+  it("counts one conversation once, however many times the user leaves and returns", () => {
+    // Which is what re-arming costs if nothing remembers: alt-tab away and
+    // back and the event fires again for a chat the user never left.
+    assert.match(src, /const countedChatRef = useRef<string \| null>\(null\);/);
+    assert.match(
+      src,
+      /if \(countedChatRef\.current === chatId\) return;\s*countedChatRef\.current = chatId;/,
+    );
+  });
+
+  it("keys that memory on the conversation, so switching chats still counts", () => {
+    // A boolean would count the first conversation of a session and nothing
+    // after it — the screen is reused across chats by the router.
+    assert.match(src, /countedChatRef\.current = chatId;/);
+    assert.ok(
+      !/const countedChatRef = useRef\(false\)/.test(src),
+      "a boolean cannot tell one conversation from the next",
+    );
   });
 });

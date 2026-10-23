@@ -121,11 +121,29 @@ export default function ChatDetailScreen() {
     if (chatId && appVisible) markRead(chatId);
   }, [chatId, messages.length, appVisible, markRead]);
 
-  // Fire chat_opened debounced — the dwell-time gate prevents a back/forth
-  // navigation flicker from double-counting the conversation. Leaving (or
-  // switching conversations) before the gate elapses cancels the pending fire.
-  useDwellTimeEffect([chatId, otherUserId], DWELL_TIME_DEFAULT_MS, () => {
-    if (!chatId) return;
+  /**
+   * `chat_opened` counts ATTENTION, which is what its dwell gate was already
+   * for.
+   *
+   * The 500ms gate exists so a back/forth navigation flicker does not count a
+   * conversation nobody looked at — and the same event fired for a chat opened
+   * into a hidden tab or a backgrounded app, which nobody looked at either.
+   * That is the same reading the read receipt above now makes, and the funnel
+   * was counting intent in one line and attention in the other.
+   *
+   * `appVisible` is in the DEPS, so a return re-arms the gate and the event
+   * fires after 500ms of the user actually being there. `countedChatRef` is
+   * what keeps that from counting the same conversation twice: without it, a
+   * user who alt-tabs away and back fires `chat_opened` again for a chat they
+   * never left. One fire per conversation per mount, which is what the event
+   * has always claimed to be.
+   */
+  const countedChatRef = useRef<string | null>(null);
+
+  useDwellTimeEffect([chatId, otherUserId, appVisible], DWELL_TIME_DEFAULT_MS, () => {
+    if (!chatId || !appVisible) return;
+    if (countedChatRef.current === chatId) return;
+    countedChatRef.current = chatId;
     trackEvent("chat_opened", {
       conversationId: chatId,
       withFriend: isFriendRelationship(getRelationship(otherUserId)),
