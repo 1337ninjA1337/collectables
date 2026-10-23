@@ -676,7 +676,15 @@ describe("translation floors", () => {
     // Not `exportPdfFailed` either: the document was built, the browser
     // declined to show it, and the remedy is to allow the pop-up — which is
     // the one thing the generic sentence could not say.
-    assert.match(report, /en: 557\/557 keys \(100\.0%\)/);
+    // 559 on 2026-10-23: `profilesUnavailableTitle` and
+    // `profilesUnavailableHint`, the third thing `app/friends.tsx` can render.
+    // Both tabs map ids through `getProfileById` and drop what does not
+    // answer, so a mount that could not reach the profiles table rendered "you
+    // have no friends yet" and a CTA to go and find people — to a user who has
+    // friends, on the screen whose whole job is telling them about them. A
+    // pair rather than one key because the hint is where the remedy is, and
+    // the title alone would be an error message with no advice in it.
+    assert.match(report, /en: 559\/559 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

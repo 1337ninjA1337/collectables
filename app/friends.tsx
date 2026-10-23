@@ -80,6 +80,17 @@ export default function FriendsScreen() {
   const [tab, setTab] = useState<Tab>("friends");
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  /**
+   * Bumped by the "try again" on the could-not-load state, which is what makes
+   * that state an exit rather than a nicer dead end.
+   *
+   * A counter rather than a boolean, because the user can press it twice: a
+   * flag would be set on the first press and the second would re-run nothing.
+   * Both effects below depend on it, so one press re-fetches whichever tab is
+   * in front of the user — and the other one too, which is correct and free
+   * (`ensureProfilesLoaded` is the provider's dedupe).
+   */
+  const [profileReloads, setProfileReloads] = useState(0);
   const { unreadTotal } = useChat();
 
   useEffect(() => {
@@ -102,7 +113,7 @@ export default function FriendsScreen() {
       .catch(() => {})
       .finally(() => { if (active) setLoadingFriends(false); });
     return () => { active = false; };
-  }, [friends, incomingRequestUserIds, ensureProfilesLoaded]);
+  }, [friends, incomingRequestUserIds, ensureProfilesLoaded, profileReloads]);
 
   useEffect(() => {
     let active = true;
@@ -117,7 +128,7 @@ export default function FriendsScreen() {
       .catch(() => {})
       .finally(() => { if (active) setLoadingFollowing(false); });
     return () => { active = false; };
-  }, [following, ensureProfilesLoaded]);
+  }, [following, ensureProfilesLoaded, profileReloads]);
 
   const friendProfiles = friends
     .map((id) => getProfileById(id))
@@ -128,6 +139,33 @@ export default function FriendsScreen() {
   const followingProfiles = following
     .map((id) => getProfileById(id))
     .filter((p): p is UserProfile => p !== undefined);
+
+  /**
+   * "We know there are some and we have none of them" — which is NOT "there
+   * are none".
+   *
+   * Each list above maps ids through `getProfileById` and drops what does not
+   * answer, so a mount that could not reach the profiles table left every list
+   * empty while `friends` and `following` still held their ids. The tabs then
+   * rendered "you have no friends yet" and a CTA to go and find people — a
+   * conclusion drawn from missing evidence, to a user who has friends, on the
+   * screen whose whole job is telling them about them. `ensureProfilesLoaded`
+   * rejecting is swallowed by the `.catch(() => {})` above, and it has to be:
+   * the flag has to clear or the skeleton stands forever. What was missing was
+   * a third thing to render once it did.
+   *
+   * Read from the id list rather than from a caught error, because an empty
+   * list for a non-empty set of ids is the condition the user is looking at,
+   * however it came about — a rejected fetch, a partial response, a row an
+   * admin tombstoned between two loads.
+   */
+  const friendsUnresolved = !loadingFriends && friends.length > 0 && friendProfiles.length === 0;
+  const followingUnresolved =
+    !loadingFollowing && following.length > 0 && followingProfiles.length === 0;
+
+  function retryProfiles() {
+    setProfileReloads((n) => n + 1);
+  }
 
   /**
    * One intent → one context method, via `ACTION_METHOD`. Same switch the
@@ -283,6 +321,20 @@ export default function FriendsScreen() {
                         <Text style={styles.sectionLabel} accessibilityRole="header">{t("subTabMyFriends")}</Text>
                         {friendProfiles.map((p) => renderProfileCard(p, "friend"))}
                       </>
+                    ) : friendsUnresolved ? (
+                      // Ahead of the request check, not behind it: a pending
+                      // request renders above this, and the friends half being
+                      // unreadable is still worth saying under it. Silence
+                      // there was the same missing-evidence reading in a
+                      // quieter form.
+                      <EmptyState
+                        icon="📡"
+                        tone="neutral"
+                        title={t("profilesUnavailableTitle")}
+                        hint={t("profilesUnavailableHint")}
+                        actionLabel={t("tryAgain")}
+                        onAction={retryProfiles}
+                      />
                     ) : requestProfiles.length === 0 ? (
                       <EmptyState
                         icon="👋"
@@ -301,6 +353,15 @@ export default function FriendsScreen() {
             <View style={styles.tabPanel}>
               {loadingFollowing && followingProfiles.length === 0 ? (
                 <SkeletonProfileList count={3} />
+              ) : followingUnresolved ? (
+                <EmptyState
+                  icon="📡"
+                  tone="neutral"
+                  title={t("profilesUnavailableTitle")}
+                  hint={t("profilesUnavailableHint")}
+                  actionLabel={t("tryAgain")}
+                  onAction={retryProfiles}
+                />
               ) : followingProfiles.length === 0 ? (
                 <EmptyState
                   icon="🔍"

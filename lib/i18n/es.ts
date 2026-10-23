@@ -545,6 +545,8 @@ export const es: TranslationMap = {
   exportPdfDone: "PDF listo",
   exportPdfFailed: "No se pudo generar el PDF",
   exportPdfPopupBlocked: "Permite las ventanas emergentes para abrir el PDF",
+  profilesUnavailableTitle: "No se pudieron cargar estos perfiles",
+  profilesUnavailableHint: "Están guardados en este dispositivo, pero no se pudieron obtener sus datos. Revisa tu conexión e inténtalo de nuevo.",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}`,
   sharedCollectionSaved: "Añadida a tus colecciones de amigos",

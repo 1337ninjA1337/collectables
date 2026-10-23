@@ -326,6 +326,8 @@ export const ru: TranslationMap = {
   exportPdfDone: "PDF готов",
   exportPdfFailed: "Не удалось создать PDF",
   exportPdfPopupBlocked: "Разрешите всплывающие окна, чтобы открыть PDF",
+  profilesUnavailableTitle: "Не удалось загрузить профили",
+  profilesUnavailableHint: "Они сохранены на этом устройстве, но их данные не загрузились. Проверьте соединение и попробуйте снова.",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}`,
   recentlyAdded: "Недавно добавленные",

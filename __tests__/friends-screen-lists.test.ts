@@ -158,3 +158,79 @@ describe("the three lists it renders agree with the counts beside them", () => {
     );
   });
 });
+
+describe("an unreadable list is not an empty one", () => {
+  // Each list maps ids through `getProfileById` and drops what does not
+  // answer, so a mount that could not reach the profiles table left every list
+  // empty while `friends` and `following` still held their ids. The tabs then
+  // rendered "you have no friends yet" and a CTA to go and find people — a
+  // conclusion drawn from missing evidence, to a user who has friends, on the
+  // screen whose whole job is telling them about them.
+  it("reads the condition off the id list, not off a caught error", () => {
+    // `ensureProfilesLoaded` rejecting is swallowed by `.catch(() => {})` and
+    // has to be — the flag must clear or the skeleton stands forever. An empty
+    // list for a non-empty set of ids is the state the user is looking at,
+    // however it came about: a rejected fetch, a partial response, a row an
+    // admin tombstoned between two loads.
+    assert.match(
+      CODE,
+      /const friendsUnresolved = !loadingFriends && friends\.length > 0 && friendProfiles\.length === 0;/,
+    );
+    assert.match(
+      CODE,
+      /const followingUnresolved =\s*!loadingFollowing && following\.length > 0 && followingProfiles\.length === 0;/,
+    );
+  });
+
+  it("waits for the load to finish before concluding anything", () => {
+    // Both readings begin with the flag: a list that is empty because the
+    // fetch is still in flight is the skeleton's case, and reporting it as
+    // unreadable would flash an error on every cold open.
+    for (const guard of ["!loadingFriends &&", "!loadingFollowing &&"]) {
+      assert.ok(CODE.includes(guard), `${guard} is how the skeleton keeps its turn`);
+    }
+  });
+
+  it("offers a way out rather than a nicer dead end", () => {
+    assert.match(CODE, /actionLabel=\{t\("tryAgain"\)\}\s*onAction=\{retryProfiles\}/);
+    assert.match(CODE, /function retryProfiles\(\) \{\s*setProfileReloads\(\(n\) => n \+ 1\);\s*\}/);
+  });
+
+  it("re-fetches on a second press, which a boolean could not", () => {
+    // A flag would be set by the first press and the second would re-run
+    // nothing — on a screen whose failure mode is a connection that comes
+    // back while you are looking at it.
+    assert.match(CODE, /const \[profileReloads, setProfileReloads\] = useState\(0\);/);
+    assert.match(
+      CODE,
+      /\}, \[friends, incomingRequestUserIds, ensureProfilesLoaded, profileReloads\]\);/,
+    );
+    assert.match(CODE, /\}, \[following, ensureProfilesLoaded, profileReloads\]\);/);
+  });
+
+  it("puts the notice ahead of the empty state in both tabs", () => {
+    // Order is the whole fix: `friendProfiles.length === 0` is true in both
+    // states, so whichever branch comes first decides what the user is told.
+    const friendsChain = CODE.indexOf('title={t("profilesUnavailableTitle")}');
+    const friendsEmpty = CODE.indexOf('title={t("emptyFriendsTabTitle")}');
+    assert.ok(friendsChain > 0 && friendsEmpty > friendsChain, "the 👋 empty state answers first");
+
+    const followingNotice = CODE.indexOf('title={t("profilesUnavailableTitle")}', friendsEmpty);
+    const followingEmpty = CODE.indexOf('title={t("emptyFollowingTabTitle")}');
+    assert.ok(
+      followingNotice > 0 && followingEmpty > followingNotice,
+      "the following tab still concludes emptiness from no profiles",
+    );
+  });
+
+  it("says it under a pending request too, rather than falling silent", () => {
+    // The friends half being unreadable is worth saying whether or not a
+    // request renders above it; silence there was the same missing-evidence
+    // reading in a quieter form.
+    assert.match(
+      CODE,
+      /\) : friendsUnresolved \? \(/,
+      "the unresolved branch sits ahead of the request check",
+    );
+  });
+});

@@ -543,6 +543,8 @@ export const de: TranslationMap = {
   exportPdfDone: "PDF fertig",
   exportPdfFailed: "PDF konnte nicht erstellt werden",
   exportPdfPopupBlocked: "Pop-ups erlauben, um das PDF zu öffnen",
+  profilesUnavailableTitle: "Profile konnten nicht geladen werden",
+  profilesUnavailableHint: "Sie sind auf diesem Gerät gespeichert, ihre Details konnten aber nicht geladen werden. Verbindung prüfen und erneut versuchen.",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")}`,
   sharedCollectionSaved: "Zu deinen Freundes-Sammlungen hinzugefügt",

@@ -548,6 +548,8 @@ export const be: TranslationMap = {
   exportPdfDone: "PDF гатовы",
   exportPdfFailed: "Не ўдалося стварыць PDF",
   exportPdfPopupBlocked: "Дазвольце ўсплывальныя вокны, каб адкрыць PDF",
+  profilesUnavailableTitle: "Не ўдалося загрузіць профілі",
+  profilesUnavailableHint: "Яны зберажоны на гэтай прыладзе, але іх даныя не загрузіліся. Праверце злучэнне і спробуйце зноў.",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}`,
   sharedCollectionSaved: "Дададзена ў калекцыі сяброў",
