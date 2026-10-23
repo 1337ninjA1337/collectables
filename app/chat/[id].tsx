@@ -41,6 +41,7 @@ import {
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { useAppAway } from "@/lib/use-app-away";
+import { useAppVisible } from "@/lib/use-app-visible";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { buildChatId } from "@/lib/chat-helpers";
@@ -107,9 +108,27 @@ export default function ChatDetailScreen() {
   const messages = useMemo(() => (chatId ? getMessages(chatId) : []), [chatId, getMessages]);
   const allowed = canMessage(otherUserId);
 
+  /**
+   * A read receipt is a claim that somebody LOOKED at the message.
+   *
+   * This effect is keyed on `messages.length`, and messages arrive on their
+   * own — over the realtime channel, or over the 8s poll below — so a message
+   * that landed while the conversation sat in a hidden tab or a backgrounded
+   * app marked itself read with nobody in front of it. `markRead` is not a
+   * local flag: it writes `lastReadByChat` AND `upsertChatRead`, so the sender
+   * was shown a read receipt the recipient never earned, and the recipient
+   * lost the unread badge that was going to tell them about it.
+   *
+   * `appVisible` is a dependency rather than an early `return` for the half
+   * that makes the gate honest: coming back re-runs this effect and marks read
+   * everything that arrived while they were away, which is the moment they
+   * actually did look.
+   */
+  const appVisible = useAppVisible();
+
   useEffect(() => {
-    if (chatId) markRead(chatId);
-  }, [chatId, messages.length, markRead]);
+    if (chatId && appVisible) markRead(chatId);
+  }, [chatId, messages.length, appVisible, markRead]);
 
   // Fire chat_opened debounced — the dwell-time gate prevents a back/forth
   // navigation flicker from double-counting the conversation. Leaving (or
