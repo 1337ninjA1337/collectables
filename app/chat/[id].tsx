@@ -56,21 +56,11 @@ import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
 const TYPING_DEBOUNCE_MS = 1000;
 const REFRESH_INTERVAL_MS = 8000;
 
-function formatTime(iso: string, locale: string | undefined): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  try {
-    return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
 export default function ChatDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const otherUserId = params.id ?? "";
   const { user } = useAuth();
-  const { t, language } = useI18n();
+  const { t, formatClockTime } = useI18n();
   const { getProfileById, ensureProfilesLoaded, getRelationship } = useSocial();
   const { getMessages, sendMessage, canMessage, markRead, clearChat, refreshFromCloud, realtimeOnline } = useChat();
 
@@ -376,7 +366,7 @@ export default function ChatDetailScreen() {
                       {m.text}
                     </Text>
                   </View>
-                  <Text style={styles.bubbleTime}>{formatTime(m.createdAt, language)}</Text>
+                  <Text style={styles.bubbleTime}>{formatClockTime(m.createdAt)}</Text>
                 </View>
               );
             })

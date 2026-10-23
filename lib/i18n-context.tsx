@@ -46,12 +46,47 @@ const languageOptions: { code: AppLanguage; label: string }[] = [
 // locale string both hit the same cache slot.
 const relativeTimeFormatCache = new Map<string, Intl.RelativeTimeFormat>();
 
+/**
+ * The tag every formatter here falls back to when `Intl` refuses the one it
+ * was given, and `en` for the same reason `baseLocale` is: it is what a
+ * missing key already falls back to.
+ *
+ * Both constructors throw a `RangeError` on a malformed tag — and both of
+ * these functions are called from formatters whose callers may pass a RAW
+ * locale string rather than an `AppLanguage` (the signatures say
+ * `AppLanguage | string`). `formatChatPreviewTimestamp` had no `try` anywhere
+ * in it, so one bad tag was a crash on the screen that lists every
+ * conversation. A time rendered in the fallback locale is worth more than a
+ * screen that does not render.
+ */
+const FALLBACK_BCP47 = getDefaultLocaleForLanguage("en");
+
 function getRelativeTimeFormat(bcp47: string): Intl.RelativeTimeFormat {
   const cached = relativeTimeFormatCache.get(bcp47);
   if (cached) return cached;
-  const formatter = new Intl.RelativeTimeFormat(bcp47, { numeric: "auto" });
+  const formatter = buildWithFallback(
+    bcp47,
+    (tag) => new Intl.RelativeTimeFormat(tag, { numeric: "auto" }),
+  );
   relativeTimeFormatCache.set(bcp47, formatter);
   return formatter;
+}
+
+/**
+ * Build an `Intl` formatter for `bcp47`, or for {@link FALLBACK_BCP47} when
+ * the platform rejects the tag.
+ *
+ * The result is what gets cached, under the key that was ASKED for — so a bad
+ * tag costs one rejected construction for the life of the process rather than
+ * one per render. A cache that stored the failure instead would be the same
+ * thing with nothing to show for it.
+ */
+function buildWithFallback<T>(bcp47: string, build: (tag: string) => T): T {
+  try {
+    return build(bcp47);
+  } catch {
+    return build(FALLBACK_BCP47);
+  }
 }
 
 /**
@@ -108,8 +143,89 @@ export function formatRelativeDate(iso: string, locale: AppLanguage | string = "
 export function formatAbsoluteDate(iso: string, locale: AppLanguage | string = "en"): string {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return iso;
-  const bcp47 = getDefaultLocaleForLanguage(locale);
-  return new Date(then).toLocaleString(bcp47, { dateStyle: "medium", timeStyle: "short" });
+  // Through the cache for the same two reasons as the other two formatters in
+  // this file: `toLocaleString` constructs a `DateTimeFormat` per call, and a
+  // tag the platform rejects threw a `RangeError` straight out of here — onto
+  // a long-press tooltip and an accessibility label, where a wrong-region date
+  // is plainly better than a crash.
+  return getAbsoluteDateFormat(getDefaultLocaleForLanguage(locale)).format(then);
+}
+
+const absoluteDateFormatCache = new Map<string, Intl.DateTimeFormat>();
+
+function getAbsoluteDateFormat(bcp47: string): Intl.DateTimeFormat {
+  const cached = absoluteDateFormatCache.get(bcp47);
+  if (cached) return cached;
+  const formatter = buildWithFallback(
+    bcp47,
+    (tag) => new Intl.DateTimeFormat(tag, { dateStyle: "medium", timeStyle: "short" }),
+  );
+  absoluteDateFormatCache.set(bcp47, formatter);
+  return formatter;
+}
+
+/**
+ * `HH:mm` for a message timestamp, in the one shape every chat surface shows.
+ *
+ * ## The two surfaces disagreed about the same instant
+ *
+ * `formatChatPreviewTimestamp` pins `hour12: false` and resolves the app
+ * language through `getDefaultLocaleForLanguage`; `app/chat/[id].tsx` carried
+ * its own `formatTime` that did neither — it handed `toLocaleTimeString` the
+ * raw `AppLanguage` (`"en"`, not `"en-US"`) and left the clock convention to
+ * the locale. So an English session read `14:05` in the conversation list and
+ * `02:05 PM` in the bubble for the message that list was previewing, and the
+ * other five languages ran on a bare language tag where the rest of the app
+ * uses a tag with a region — the thing `LANGUAGE_LOCALE`'s header says it
+ * exists to avoid.
+ *
+ * One function, so the two surfaces cannot drift again, and so the clock
+ * convention is a decision stated once rather than a property of whichever
+ * locale the user picked.
+ *
+ * ## Why a cached formatter rather than `toLocaleTimeString`
+ *
+ * `toLocaleTimeString` constructs an `Intl.DateTimeFormat` per call, and the
+ * bubble list calls this once per message per render — `text` state lives in
+ * the same component as the list, so a 200-message conversation re-formatted
+ * all 200 on every keystroke in the composer. Same cache, same reasoning and
+ * the same key as `relativeTimeFormatCache`: the RESOLVED tag, so a caller
+ * passing `"en"` and one passing `"en-US"` share a slot.
+ *
+ * ## The empty string, which is a caller's decision
+ *
+ * An unparseable timestamp answers `""`, and the callers differ on what to do
+ * with that: the bubble renders nothing (its own `formatTime` already did) and
+ * the preview falls through to `formatRelativeDate`. A locale tag `Intl`
+ * refuses is NOT that case — {@link buildWithFallback} answers it in the
+ * fallback locale, because a clock in the wrong region's format is worth more
+ * than a bubble with no time in it.
+ */
+export function formatClockTime(iso: string, locale: AppLanguage | string = "en"): string {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return "";
+  return getClockTimeFormat(getDefaultLocaleForLanguage(locale)).format(then);
+}
+
+const clockTimeFormatCache = new Map<string, Intl.DateTimeFormat>();
+
+function getClockTimeFormat(bcp47: string): Intl.DateTimeFormat {
+  const cached = clockTimeFormatCache.get(bcp47);
+  if (cached) return cached;
+  const formatter = buildWithFallback(
+    bcp47,
+    (tag) =>
+      new Intl.DateTimeFormat(tag, {
+        hour: "2-digit",
+        minute: "2-digit",
+        // Stated, not inherited. A clock the list and the bubble agree on is
+        // worth more here than each locale's own 12/24-hour habit, and this is
+        // the convention the preview timestamp has always shown.
+        hour12: false,
+      }),
+  );
+  clockTimeFormatCache.set(bcp47, formatter);
+  return formatter;
 }
 
 const CHAT_PREVIEW_ABSOLUTE_WINDOW_MS = 60 * 60 * 1000;
@@ -129,12 +245,12 @@ export function formatChatPreviewTimestamp(
   if (!Number.isFinite(then)) return iso;
   const diffMs = Date.now() - then;
   if (diffMs >= 0 && diffMs < CHAT_PREVIEW_ABSOLUTE_WINDOW_MS) {
-    const bcp47 = getDefaultLocaleForLanguage(locale);
-    return new Date(then).toLocaleTimeString(bcp47, {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    const clock = formatClockTime(iso, locale);
+    // `if` rather than a bare `return`, because `formatClockTime` answers `""`
+    // for a timestamp it cannot parse — and the relative branch below answers
+    // that case by returning the ISO string, which is what this function has
+    // always promised a caller holding a corrupt row.
+    if (clock) return clock;
   }
   return formatRelativeDate(iso, locale);
 }
@@ -146,6 +262,7 @@ const I18nContext = createContext<{
   t: (key: TranslationKey, params?: TranslationParams) => string;
   formatRelativeDate: (iso: string) => string;
   formatChatPreviewTimestamp: (iso: string) => string;
+  formatClockTime: (iso: string) => string;
   formatAbsoluteDate: (iso: string) => string;
   relativeDateLabel: (prefix: string, when: string) => string;
   languageOptions: { code: AppLanguage; label: string }[];
@@ -239,6 +356,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
       },
       formatRelativeDate: (iso: string) => formatRelativeDate(iso, language),
       formatChatPreviewTimestamp: (iso: string) => formatChatPreviewTimestamp(iso, language),
+      formatClockTime: (iso: string) => formatClockTime(iso, language),
       formatAbsoluteDate: (iso: string) => formatAbsoluteDate(iso, language),
       relativeDateLabel,
       languageOptions,

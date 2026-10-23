@@ -190,7 +190,7 @@ describe("the tree it guards", () => {
     .filter((file) => file.endsWith("-context.tsx"))
     .flatMap((file) => functionFieldsOf(file, readRepoFile(file)));
 
-  it("reads 85 function-valued context fields, 58 of them factory-built", () => {
+  it("reads 86 function-valued context fields, 59 of them factory-built", () => {
     // The subject, taken on 2026-10-01. A provider lifting a function to its
     // own useCallback moves the second number down and is an improvement; both
     // moving at once is the rule losing its reach.
@@ -201,8 +201,18 @@ describe("the tree it guards", () => {
     // rendering rows an admin deleted. It is a `useCallback`, so the first
     // number moved and the second did not, which is the direction that is an
     // improvement rather than a loss of reach.
-    assert.equal(fields.length, 85, "the subject moved — re-read before trusting the negative");
-    assert.equal(fields.filter((f) => f.supply === "factory-built").length, 58);
+    //
+    // 85 until 2026-10-23, when `I18nProvider` began exporting
+    // `formatClockTime` — the `HH:mm` the conversation list and the
+    // conversation had been formatting separately, and disagreeing about. Both
+    // numbers moved by one, which is neither of the cases above: it is a new
+    // field supplied exactly as its three sibling formatters are, an inline
+    // arrow in the provider's `useMemo`. Lifting those four to `useCallback`
+    // would move the second number down by four and is a change nobody has
+    // argued for — the memo's deps are `[language, ready]`, so their identity
+    // is already stable for as long as the language is.
+    assert.equal(fields.length, 86, "the subject moved — re-read before trusting the negative");
+    assert.equal(fields.filter((f) => f.supply === "factory-built").length, 59);
   });
 
   it("finds every effect that depends on one, and all seven are argued", () => {
