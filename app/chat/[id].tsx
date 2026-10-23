@@ -222,10 +222,37 @@ export default function ChatDetailScreen() {
    */
   const sendingRef = useRef(false);
 
+  /**
+   * The ref AND a state, because the guard has two audiences.
+   *
+   * `sendingRef` is read by the second press, which arrives in the same tick as
+   * the first and before any re-render — that is what it is for and a state
+   * cannot do it. But the button stayed bright and pressable for the whole
+   * round trip it was ignoring presses in: on a slow connection the user
+   * presses, nothing moves for a second or two, and the only honest reading of
+   * that interface is that the press did not land. `sending` drives `disabled`
+   * and the dimmed style, so the control says what the guard is doing.
+   *
+   * `mountedRef` is what makes the state safe to set. `sendMessage` awaits a
+   * cloud insert, the user can leave mid-flight, and a `setState` after the
+   * screen is gone is the defect `app/profile/[id].tsx` grew its own
+   * `mountedRef` for — on the same kind of slow connection that makes this
+   * visible at all.
+   */
+  const [sending, setSending] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const canSend = text.trim().length > 0 && !sending;
+
   async function handleSend() {
     if (!text.trim()) return;
     if (sendingRef.current) return;
     sendingRef.current = true;
+    setSending(true);
     if (typingTimerRef.current) {
       clearTimeout(typingTimerRef.current);
       typingTimerRef.current = null;
@@ -242,6 +269,10 @@ export default function ChatDetailScreen() {
       // here is a bug somewhere else, and a button that never works again is
       // the worst way to report one.
       sendingRef.current = false;
+      // The ref is cleared unconditionally and the state only while mounted:
+      // the ref belongs to this closure, the state belongs to a component that
+      // may be gone.
+      if (mountedRef.current) setSending(false);
     }
   }
 
@@ -381,6 +412,18 @@ export default function ChatDetailScreen() {
           </View>
         ) : null}
 
+        {/*
+          One reading for all four props. `disabled`, the style, the icon
+          colour and the a11y state were four copies of `text.trim()`, and the
+          round that added `sending` would otherwise have had to remember all
+          four — which is how a control comes to LOOK enabled while refusing
+          presses, the bug this is fixing one shape of.
+
+          `busy` is beside `disabled` rather than instead of it: a screen
+          reader announcing "dimmed" says the press will not land, and `busy`
+          says why — the message is going out, not that there is nothing to
+          send.
+        */}
         <View style={styles.composer}>
           <MaskedTextInput
             style={styles.input}
@@ -393,17 +436,17 @@ export default function ChatDetailScreen() {
             multiline
           />
           <Pressable
-            style={[styles.sendButton, !text.trim() && styles.sendButtonDisabled]}
+            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
             onPress={handleSend}
-            disabled={!text.trim()}
-            accessibilityState={{ disabled: !text.trim() }}
+            disabled={!canSend}
+            accessibilityState={{ disabled: !canSend, busy: sending }}
             accessibilityLabel={t("chatSend")}
             accessibilityRole="button"
           >
             <Ionicons
               name="send"
               size={18}
-              color={text.trim() ? TEXT_ON_DARK_5 : AMBER_MUTED}
+              color={canSend ? TEXT_ON_DARK_5 : AMBER_MUTED}
               accessibilityElementsHidden
               importantForAccessibility="no"
               aria-hidden

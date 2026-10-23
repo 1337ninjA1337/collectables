@@ -38,7 +38,11 @@ describe("one press, one message", () => {
   });
 
   it("releases the guard in a finally, so a rejection cannot wedge the composer", () => {
-    assert.match(CODE, /\} finally \{\s*sendingRef\.current = false;\s*\}/);
+    assert.match(
+      CODE,
+      /\} finally \{\s*sendingRef\.current = false;\s*if \(mountedRef\.current\) setSending\(false\);\s*\}/,
+      "the ref is what the next press reads, so it is released first and unconditionally",
+    );
   });
 
   it("keeps both entry points, because both are how people send a message", () => {
@@ -48,11 +52,18 @@ describe("one press, one message", () => {
     assert.match(CODE, /onPress=\{handleSend\}/);
   });
 
-  it("uses a ref rather than state for the guard", () => {
+  it("blocks the press on the ref, never on the state", () => {
     // The second press is in the same tick as the first; a `setState` has not
     // re-rendered when it arrives. Same reason as `hasAttemptedShareSaveRef`.
+    //
+    // A `sending` STATE exists since 2026-10-23 — it dims the button for the
+    // round trip the guard spends ignoring presses — and the claim this case
+    // used to make ("no such state exists") was a proxy for the one that
+    // matters: the early return reads the ref. A state in the guard's position
+    // would let a double tap through.
+    assert.match(CODE, /if \(sendingRef\.current\) return;/);
     assert.ok(
-      !/const \[sending, setSending\] = useState/.test(CODE),
+      !/if \(sending\) return;/.test(CODE),
       "state cannot block a press that arrives before the re-render",
     );
   });
@@ -112,5 +123,56 @@ describe("one platform split, in the hook that owns it", () => {
     // The keyboard inset. `AppState` left with the listener; `Platform` stays
     // because iOS needs `padding` and Android does not.
     assert.match(CODE, /behavior=\{Platform\.OS === "ios" \? "padding" : undefined\}/);
+  });
+});
+
+describe("the button says what the guard is doing", () => {
+  // `sendingRef` refuses the second press correctly and invisibly: on a slow
+  // connection the first press clears nothing for a second or two and the
+  // button stays bright, so the only honest reading of the interface is that
+  // the press did not land. The guard was right and the control was lying.
+  it("drives disabled, the style, the icon and the a11y state off one reading", () => {
+    // Four copies of `text.trim()` is how a control comes to LOOK enabled
+    // while refusing presses: the round that adds a second condition has to
+    // remember all four.
+    assert.match(CODE, /const canSend = text\.trim\(\)\.length > 0 && !sending;/);
+    assert.match(CODE, /style=\{\[styles\.sendButton, !canSend && styles\.sendButtonDisabled\]\}/);
+    assert.match(CODE, /disabled=\{!canSend\}/);
+    assert.match(CODE, /color=\{canSend \? TEXT_ON_DARK_5 : AMBER_MUTED\}/);
+  });
+
+  it("announces busy as well as disabled", () => {
+    // "Dimmed" says the press will not land; `busy` says why — the message is
+    // going out, not that there is nothing to send.
+    assert.match(CODE, /accessibilityState=\{\{ disabled: !canSend, busy: sending \}\}/);
+  });
+
+  it("keeps the ref, because a state cannot refuse a press in the same tick", () => {
+    // The state is for the user and the ref is for the second press: a
+    // `setState` has not re-rendered when a double tap or an `onSubmitEditing`
+    // landing on top of its own press arrives.
+    assert.match(CODE, /if \(sendingRef\.current\) return;\s*sendingRef\.current = true;\s*setSending\(true\);/);
+  });
+
+  it("clears the ref unconditionally and the state only while mounted", () => {
+    // `sendMessage` awaits a cloud insert and the user can leave mid-flight. A
+    // `setState` after the screen is gone is the defect `app/profile/[id].tsx`
+    // grew its own `mountedRef` for — on the same slow connection that makes
+    // the dimmed button visible in the first place.
+    assert.match(
+      CODE,
+      /sendingRef\.current = false;\s*if \(mountedRef\.current\) setSending\(false\);/,
+    );
+    assert.match(
+      CODE,
+      /const mountedRef = useRef\(true\);\s*useEffect\(\(\) => \{\s*mountedRef\.current = true;\s*return \(\) => \{ mountedRef\.current = false; \};\s*\}, \[\]\);/,
+    );
+  });
+
+  it("still lets the keyboard's send key through", () => {
+    // Both entry points stay wired; the fix is the visible state, not removing
+    // one of them.
+    assert.match(CODE, /onSubmitEditing=\{handleSend\}/);
+    assert.match(CODE, /onPress=\{handleSend\}/);
   });
 });
