@@ -42,6 +42,7 @@ import {
 } from "@/lib/design-tokens";
 import { useAppAway } from "@/lib/use-app-away";
 import { useAppVisible } from "@/lib/use-app-visible";
+import { useMountedRef } from "@/lib/use-mounted-ref";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { buildChatId } from "@/lib/chat-helpers";
@@ -240,11 +241,7 @@ export default function ChatDetailScreen() {
    * visible at all.
    */
   const [sending, setSending] = useState(false);
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+  const mountedRef = useMountedRef();
 
   const canSend = text.trim().length > 0 && !sending;
 

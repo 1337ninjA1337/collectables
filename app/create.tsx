@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
@@ -30,6 +30,7 @@ import { useEntryCurrencyEffect } from "@/lib/use-entry-currency";
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { useMountedRef } from "@/lib/use-mounted-ref";
 import {
   AMBER_ACCENT,
   AMBER_MUTED_6,
@@ -107,6 +108,8 @@ export default function CreateItemScreen() {
   const [tagInput, setTagInput] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const mountedRef = useMountedRef();
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -216,6 +219,18 @@ export default function CreateItemScreen() {
       return;
     }
 
+    // The ref, and THEN the state. `disabled={saving}` is a prop of the
+    // previous render: a second press arriving in the same tick — a fast
+    // double tap, or a press and its own repeat — passed it and ran the whole
+    // handler again, uploading up to five photos a second time and adding two
+    // identical items — plus a second `item_added` event, so the funnel counts
+    // an item nobody meant to create.
+    //
+    // Same shape and same reason as `sendingRef` in `app/chat/[id].tsx`: a
+    // `setState` has not re-rendered when the second press arrives, so only a
+    // ref can refuse it.
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const uploadedPhotos = photos.length > 0 ? await uploadImages(photos) : [];
@@ -242,7 +257,12 @@ export default function CreateItemScreen() {
 
       router.replace(`/item/${id}`);
     } finally {
-      setSaving(false);
+      savingRef.current = false;
+      // Only while mounted, and this screen's unmount is its OWN last
+      // statement: `router.replace` above takes it down, so the `finally` that
+      // follows was setting state on a component that no longer existed on
+      // every successful save — the ordinary path, not an edge case.
+      if (mountedRef.current) setSaving(false);
     }
   }
 

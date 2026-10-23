@@ -163,10 +163,11 @@ describe("the button says what the guard is doing", () => {
       CODE,
       /sendingRef\.current = false;\s*if \(mountedRef\.current\) setSending\(false\);/,
     );
-    assert.match(
-      CODE,
-      /const mountedRef = useRef\(true\);\s*useEffect\(\(\) => \{\s*mountedRef\.current = true;\s*return \(\) => \{ mountedRef\.current = false; \};\s*\}, \[\]\);/,
-    );
+    // Through `lib/use-mounted-ref.ts` since the two create forms became the
+    // third and fourth copy of the same five lines; `use-mounted-ref.test.ts`
+    // runs the hook and `create-forms-double-submit.test.ts` sweeps for a
+    // screen that writes the assignment by hand again.
+    assert.match(CODE, /const mountedRef = useMountedRef\(\);/);
   });
 
   it("still lets the keyboard's send key through", () => {

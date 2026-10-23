@@ -161,6 +161,10 @@ describe("every fan-out in the app goes through it", () => {
     // `() => true` default, so a slow refresh wrote state onto a screen the
     // user had left. The focus effect passes its own `active` flag.
     assert.match(PROFILE, /await loadItemCounts\(cols, \(\) => mountedRef\.current\);/);
-    assert.match(PROFILE, /return \(\) => \{ mountedRef\.current = false; \};/);
+    // The flag itself is `lib/use-mounted-ref.ts` since the two create forms
+    // became the third and fourth copy of its five lines. The claim here is
+    // that this screen asks the question, not where the answer is written:
+    // `use-mounted-ref.test.ts` runs the hook, including the unmount.
+    assert.match(PROFILE, /const mountedRef = useMountedRef\(\);/);
   });
 });

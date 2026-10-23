@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
@@ -47,6 +47,7 @@ import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectionVisibility } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { useMountedRef } from "@/lib/use-mounted-ref";
 
 export default function CreateCollectionScreen() {
   const { addCollection } = useCollections();
@@ -57,6 +58,8 @@ export default function CreateCollectionScreen() {
   const [description, setDescription] = useState("");
   const [coverPhoto, setCoverPhoto] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const mountedRef = useMountedRef();
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<CollectionVisibility>(
@@ -153,6 +156,18 @@ export default function CreateCollectionScreen() {
       return;
     }
 
+    // The ref, and THEN the state. `disabled={saving}` is a prop of the
+    // previous render: a second press arriving in the same tick — a fast
+    // double tap, or a press and its own repeat — passed it and ran the whole
+    // handler again, uploading the cover twice and creating two collections —
+    // identical in name, description and cover, and the `router.replace` below
+    // then navigates to whichever id came back second.
+    //
+    // Same shape and same reason as `sendingRef` in `app/chat/[id].tsx`: a
+    // `setState` has not re-rendered when the second press arrives, so only a
+    // ref can refuse it.
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const uploadedCover = coverPhoto ? await uploadImage(coverPhoto) : "";
@@ -172,7 +187,12 @@ export default function CreateCollectionScreen() {
 
       router.replace(`/collection/${id}`);
     } finally {
-      setSaving(false);
+      savingRef.current = false;
+      // Only while mounted, and this screen's unmount is its OWN last
+      // statement: `router.replace` above takes it down, so the `finally` that
+      // follows was setting state on a component that no longer existed on
+      // every successful save — the ordinary path, not an edge case.
+      if (mountedRef.current) setSaving(false);
     }
   }
 

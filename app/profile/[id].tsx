@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
@@ -52,6 +52,7 @@ import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByC
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useProfileDrafts } from "@/lib/use-profile-drafts";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
+import { useMountedRef } from "@/lib/use-mounted-ref";
 
 
 export default function ProfileScreen() {
@@ -89,11 +90,7 @@ export default function ProfileScreen() {
   // `() => true` default and wrote state on a screen the user had already left.
   // Slow connections are exactly when a refresh resolves late, which is also
   // exactly when somebody navigates away rather than waiting.
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+  const mountedRef = useMountedRef();
 
   const isSelf = myProfile?.id === params.id;
   const isFriend = friendIds.has(params.id);
@@ -169,7 +166,11 @@ export default function ProfileScreen() {
       setRemoteWishlist(wish);
       await loadItemCounts(cols, () => mountedRef.current);
     } catch {} finally { setRefreshing(false); }
-  }, [params.id, isSelf, isFriend, ensureProfilesLoaded]);
+    // `mountedRef` is the same object every render, so listing it rebuilds
+    // nothing — and leaving it out was a missing dependency to ESLint, which
+    // cannot tell a hook's ref result from any other value a render produced.
+    // Same line, and the same reason, as `lib/use-app-away.ts`' `[awayRef]`.
+  }, [params.id, isSelf, isFriend, ensureProfilesLoaded, mountedRef]);
 
   // Keeps the pull-to-refresh spinner legible when refresh() resolves from
   // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
