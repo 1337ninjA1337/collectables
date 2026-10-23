@@ -542,6 +542,7 @@ export const de: TranslationMap = {
   exportPdfGenerating: "PDF wird erstellt...",
   exportPdfDone: "PDF fertig",
   exportPdfFailed: "PDF konnte nicht erstellt werden",
+  exportPdfPopupBlocked: "Pop-ups erlauben, um das PDF zu öffnen",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")}`,
   sharedCollectionSaved: "Zu deinen Freundes-Sammlungen hinzugefügt",

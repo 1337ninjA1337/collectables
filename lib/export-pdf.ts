@@ -15,26 +15,35 @@ import {
   type ExportLabels,
   type ExportMoney,
 } from "@/lib/export-pdf-html";
+import { printInPopup } from "@/lib/print-popup";
 import { CollectableItem, Collection } from "@/lib/types";
 
 export type { ExportLabels, ExportMoney };
+
+/**
+ * What happened, for the toast at the call site.
+ *
+ * `"popup-blocked"` is not a thrown error because it is not a failure of this
+ * app: the document was built, and the browser declined to open the window to
+ * show it. The call site's `catch` says "could not generate PDF", which would
+ * be a true sentence and the wrong advice — the user has to allow the pop-up,
+ * and nothing was going to tell them that. It returned `void` and ran into
+ * `toast.success` before this.
+ */
+export type ExportOutcome = "done" | "popup-blocked";
 
 export async function exportCollectionToPdf(
   collection: Collection,
   items: CollectableItem[],
   labels: ExportLabels,
   money: ExportMoney,
-): Promise<void> {
+): Promise<ExportOutcome> {
   const html = buildCollectionExportHtml(collection, items, labels, money);
 
   if (Platform.OS === "web") {
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      w.print();
-    }
-    return;
+    // `window.open` bound, because `printInPopup` calls it as a plain function
+    // and a browser rejects an unbound `open` with an illegal-invocation error.
+    return printInPopup(html, (url, target) => window.open(url, target)) ? "done" : "popup-blocked";
   }
 
   const { uri } = await Print.printToFileAsync({ html });
@@ -42,4 +51,5 @@ export async function exportCollectionToPdf(
     mimeType: "application/pdf",
     UTI: "com.adobe.pdf",
   });
+  return "done";
 }

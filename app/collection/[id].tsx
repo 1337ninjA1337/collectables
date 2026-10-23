@@ -823,7 +823,7 @@ export default function CollectionDetailsScreen() {
     const exportTotal = getCollectionTotalCost(collection.id);
     setExporting(true);
     try {
-      await exportCollectionToPdf(collection, allItems, {
+      const outcome = await exportCollectionToPdf(collection, allItems, {
         acquiredHow: t("acquiredHow"),
         acquiredDate: t("acquiredDate"),
         description: t("description"),
@@ -856,7 +856,16 @@ export default function CollectionDetailsScreen() {
         total: exportTotal,
         itemCost: (item) => convertItemCost(item, collection.currency ?? undefined),
       });
-      toast.success(t("exportPdfDone"));
+      // A blocked pop-up is not a thrown error and used to reach the success
+      // toast: the user was told the PDF was ready and got nothing, on the one
+      // platform this repository ships. The advice is specific because the
+      // remedy is — allow the pop-up — and `exportPdfFailed` would have sent
+      // them looking at the collection instead.
+      if (outcome === "popup-blocked") {
+        toast.error(t("exportPdfPopupBlocked"));
+      } else {
+        toast.success(t("exportPdfDone"));
+      }
     } catch {
       toast.error(t("exportPdfFailed"));
     } finally {

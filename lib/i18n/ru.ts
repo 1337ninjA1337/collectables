@@ -325,6 +325,7 @@ export const ru: TranslationMap = {
   exportPdfGenerating: "Генерация PDF...",
   exportPdfDone: "PDF готов",
   exportPdfFailed: "Не удалось создать PDF",
+  exportPdfPopupBlocked: "Разрешите всплывающие окна, чтобы открыть PDF",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}`,
   recentlyAdded: "Недавно добавленные",

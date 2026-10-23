@@ -324,6 +324,7 @@ export const en = {
   exportPdfGenerating: "Generating PDF...",
   exportPdfDone: "PDF ready",
   exportPdfFailed: "Could not generate PDF",
+  exportPdfPopupBlocked: "Allow pop-ups to open the PDF",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
   recentlyAdded: "Recently added",

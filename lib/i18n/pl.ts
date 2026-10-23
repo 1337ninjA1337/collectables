@@ -541,6 +541,7 @@ export const pl: TranslationMap = {
   exportPdfGenerating: "Tworzenie PDF...",
   exportPdfDone: "PDF gotowy",
   exportPdfFailed: "Nie udało się utworzyć PDF",
+  exportPdfPopupBlocked: "Zezwól na wyskakujące okienka, aby otworzyć PDF",
   exportPdfItemCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiot", "przedmioty", "przedmiotów")}`,
   sharedCollectionSaved: "Dodano do kolekcji znajomych",

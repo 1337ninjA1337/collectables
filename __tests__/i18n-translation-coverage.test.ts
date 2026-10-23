@@ -668,7 +668,15 @@ describe("translation floors", () => {
     // stranger's collections. It is not `deleteAccountFailed` (the deletion
     // succeeded, and retrying would hit an account that no longer exists), so
     // it is a sentence of its own: what happened, and what removes the rest.
-    assert.match(report, /en: 556\/556 keys \(100\.0%\)/);
+    // 557 on 2026-10-23: `exportPdfPopupBlocked`. The web export opens the
+    // document in a pop-up, and a blocked one returned from
+    // `exportCollectionToPdf` silently — straight into `exportPdfDone`, so the
+    // user was told the PDF was ready and got nothing, on the one platform
+    // this repository ships and with the commonest browser setting there is.
+    // Not `exportPdfFailed` either: the document was built, the browser
+    // declined to show it, and the remedy is to allow the pop-up — which is
+    // the one thing the generic sentence could not say.
+    assert.match(report, /en: 557\/557 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
