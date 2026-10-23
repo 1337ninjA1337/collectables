@@ -104,6 +104,7 @@ describe("the PDF export prices what it can and drops what it cannot", () => {
     exportPdfItemCount: "Items",
     photosSaved: "Photos",
     totalCostCaveat: "",
+  printedOn: "2 Jan 2026, 03:04",
   };
 
   it("does not put NaN in the printed total", () => {
@@ -118,7 +119,6 @@ describe("the PDF export prices what it can and drops what it cannot", () => {
         total: collectionTotalCost(items, "USD", null),
         itemCost: (i) => convertItemCost(i, "USD", null),
       },
-      new Date("2026-01-01T00:00:00.000Z"),
     );
 
     assert.doesNotMatch(html, /NaN/);
@@ -135,7 +135,6 @@ describe("the PDF export prices what it can and drops what it cannot", () => {
         total: collectionTotalCost(items, "USD", null),
         itemCost: (i) => convertItemCost(i, "USD", null),
       },
-      new Date("2026-01-01T00:00:00.000Z"),
     );
 
     assert.doesNotMatch(html, /Infinity/);

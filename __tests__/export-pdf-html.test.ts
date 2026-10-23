@@ -41,9 +41,9 @@ const LABELS: ExportLabels = {
   // thing than it is claiming. The caveat's own cases are in
   // `export-pdf-money.test.ts`.
   totalCostCaveat: "",
+  printedOn: "2 Jan 2026, 03:04",
 };
 
-const PRINTED_ON = new Date("2026-01-02T03:04:05Z");
 
 const RATES: UsdRates = { USD: 1, EUR: 0.5 };
 
@@ -107,7 +107,6 @@ describe("the collection export document", () => {
       [item({ title: "<img onerror=x>" })],
       LABELS,
       money([]),
-      PRINTED_ON,
     );
     // The only tags in the document are the ones the template wrote. A `<` that
     // survived from user text would be one it did not.
@@ -125,7 +124,6 @@ describe("the collection export document", () => {
       [item({ photos: ['x.png" onerror="alert(1)'] })],
       LABELS,
       money([]),
-      PRINTED_ON,
     );
     assert.ok(!html.includes('onerror="alert(1)"'), "a photo URL escaped its attribute");
     assert.match(html, /<img src="x\.png&quot; onerror=&quot;alert\(1\)"/);
@@ -137,7 +135,6 @@ describe("the collection export document", () => {
       [item({ photos: ["a.png", "b.png"] }), item({ id: "i2", photos: ["c.png"] })],
       LABELS,
       money([]),
-      PRINTED_ON,
     );
     assert.match(html, /<div class="stat-value">2<\/div>\s*<div class="stat-label">Items<\/div>/);
     assert.match(html, /<div class="stat-value">3<\/div>\s*<div class="stat-label">Photos<\/div>/);
@@ -152,7 +149,6 @@ describe("the collection export document", () => {
       freeItems,
       LABELS,
       money(freeItems),
-      PRINTED_ON,
     );
     assert.ok(!free.includes("Total cost"), "a collection with no costs printed a total");
 
@@ -162,14 +158,13 @@ describe("the collection export document", () => {
       paidItems,
       LABELS,
       money(paidItems),
-      PRINTED_ON,
     );
     // "42" before this round, in no currency at all.
     assert.match(paid, /<div class="stat-value">42 USD<\/div>\s*<div class="stat-label">Total cost<\/div>/);
   });
 
   it("prints a field only when the item has one", () => {
-    const bare = buildCollectionExportHtml(collection(), [item()], LABELS, money([]), PRINTED_ON);
+    const bare = buildCollectionExportHtml(collection(), [item()], LABELS, money([]));
     for (const label of ["Acquired how", "Acquired date", "Description", "Variants", "Cost"]) {
       assert.ok(!bare.includes(label), `an empty item printed the \`${label}\` field`);
     }
@@ -187,7 +182,6 @@ describe("the collection export document", () => {
       ],
       LABELS,
       money([item({ cost: 0 })]),
-      PRINTED_ON,
     );
     for (const label of ["Acquired how", "Acquired date", "Description", "Variants", "Cost"]) {
       assert.ok(full.includes(label), `a filled item did not print the \`${label}\` field`);
@@ -198,27 +192,46 @@ describe("the collection export document", () => {
     assert.ok(!full.includes("Total cost"), "a zero cost was summed into a total");
   });
 
-  it("does not read the clock, so the same collection prints the same document", () => {
+  it("reads neither the clock nor the locale, so the same arguments print the same document", () => {
     // The footer used to call `new Date()` inside the builder, which made the
-    // output different on every call and unassertable. The date is a parameter.
+    // output different on every call and unassertable. It then took the date as
+    // a parameter and called `toLocaleDateString()` on it with NO locale, which
+    // made the output depend on the runtime's default instead — the browser's,
+    // in the web export. The stamp is a label now: a string the caller
+    // resolved, so the document is a function of its arguments and nothing else.
     const args: [Collection, CollectableItem[], ExportLabels, ExportMoney] = [
       collection(),
       [item()],
       LABELS,
       money([]),
     ];
-    assert.equal(
-      buildCollectionExportHtml(...args, PRINTED_ON),
-      buildCollectionExportHtml(...args, PRINTED_ON),
-    );
+    assert.equal(buildCollectionExportHtml(...args), buildCollectionExportHtml(...args));
+
+    const [col, items, labels, money_] = args;
     assert.notEqual(
-      buildCollectionExportHtml(...args, PRINTED_ON),
-      buildCollectionExportHtml(...args, new Date("2020-06-07T00:00:00Z")),
+      buildCollectionExportHtml(col, items, labels, money_),
+      buildCollectionExportHtml(col, items, { ...labels, printedOn: "7 June 2020" }, money_),
+      "the footer did not print the stamp it was handed",
     );
   });
 
+  it("prints the stamp the caller resolved, escaped like every other label", () => {
+    // The date reaches the document as user-supplied text now, and nothing in
+    // this template is exempt from escaping just because the app wrote it.
+    const html = buildCollectionExportHtml(collection(), [], { ...LABELS, printedOn: "2 Jan 2026" }, money([]));
+    assert.match(html, /<div class="footer">Collectables — 2 Jan 2026<\/div>/);
+
+    const injected = buildCollectionExportHtml(
+      collection(),
+      [],
+      { ...LABELS, printedOn: '<img onerror="alert(1)">' },
+      money([]),
+    );
+    assert.ok(!injected.includes("<img onerror"), "the stamp opened a tag");
+  });
+
   it("renders an empty collection without an items section", () => {
-    const html = buildCollectionExportHtml(collection(), [], LABELS, money([]), PRINTED_ON);
+    const html = buildCollectionExportHtml(collection(), [], LABELS, money([]));
     assert.ok(!html.includes('class="item"'), "an empty collection rendered an item card");
     assert.match(html, /<div class="stat-value">0<\/div>\s*<div class="stat-label">Items<\/div>/);
   });

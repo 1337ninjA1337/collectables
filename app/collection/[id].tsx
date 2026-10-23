@@ -112,7 +112,7 @@ export default function CollectionDetailsScreen() {
   } = useCollections();
   const { friends, getProfileById, ensureProfilesLoaded } = useSocial();
   const [refreshing, setRefreshing] = useState(false);
-  const { t, language } = useI18n();
+  const { t, language, formatAbsoluteDate } = useI18n();
   const toast = useToast();
   const { isPremium } = usePremium();
   const theme = useAppTheme();
@@ -841,6 +841,12 @@ export default function CollectionDetailsScreen() {
           : exportTotal.skipped > 0
             ? t("exportTotalPartial", { count: exportTotal.skipped })
             : "",
+        // Resolved here for the same reason, one layer further out: the
+        // document is React-free, so it can reach neither the provider's
+        // language nor the BCP-47 tag that language maps to. It used to call
+        // `toLocaleDateString()` with no locale at all, which dated the one
+        // artifact a user keeps in whatever the runtime defaulted to.
+        printedOn: formatAbsoluteDate(new Date().toISOString()),
       }, {
         // The same two answers the summary card and every `<CostBadge>` on
         // this screen are already showing. The export used to sum the raw
@@ -856,7 +862,7 @@ export default function CollectionDetailsScreen() {
     } finally {
       setExporting(false);
     }
-  }, [collection, allItems, getCollectionTotalCost, convertItemCost, t, toast]);
+  }, [collection, allItems, getCollectionTotalCost, convertItemCost, t, formatAbsoluteDate, toast]);
 
   const openEditModal = useCallback(() => {
     if (!collection) return;

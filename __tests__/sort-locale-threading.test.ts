@@ -87,7 +87,10 @@ describe("app/collection/[id].tsx — call-site wiring", () => {
   const src = read("app/collection/[id].tsx");
 
   it("reads `language` off useI18n alongside `t`", () => {
-    assert.match(src, /const\s*\{\s*t,\s*language\s*\}\s*=\s*useI18n\(\);/);
+    // `formatAbsoluteDate` joined the two when the PDF footer's date stopped
+    // being `toLocaleDateString()` with no locale. The claim here is that
+    // `language` is read from the context, not that it is read alone.
+    assert.match(src, /const\s*\{\s*t,\s*language(?:,[^}]*)?\s*\}\s*=\s*useI18n\(\);/);
   });
 
   it("maps the app language to BCP-47 via getDefaultLocaleForLanguage", () => {

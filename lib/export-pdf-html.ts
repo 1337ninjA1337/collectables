@@ -72,6 +72,23 @@ export type ExportLabels = {
    * which is the ordinary case and prints nothing.
    */
   totalCostCaveat: string;
+  /**
+   * The "printed on" stamp in the footer, already formatted.
+   *
+   * It was a `Date` this module called `toLocaleDateString()` on with no
+   * locale, so the one artifact a user KEEPS carried a date in whatever the
+   * runtime defaulted to — on the web export, the browser's — under copy in
+   * the language they picked. A locale-aware date needs
+   * `getDefaultLocaleForLanguage` and the provider's language, and this module
+   * is React-free on purpose (`lib/export-pdf.ts` holds everything that needs
+   * a device), so it cannot reach `lib/i18n-context.tsx` for either.
+   *
+   * So the caller resolves it, for the same reason it resolves
+   * {@link ExportLabels.totalCostCaveat}: this module takes strings. It also
+   * keeps the builder's output a function of its arguments, which is what the
+   * determinism case rests on — the footer used to make every call different.
+   */
+  printedOn: string;
 };
 
 /**
@@ -122,16 +139,17 @@ function formatItemCost(
 /**
  * The whole document for one collection.
  *
- * `printedOn` is a parameter rather than a `new Date()` inside, because a
- * function that reads the clock cannot be asserted against a fixed string —
- * the footer used to make this module's output different on every call.
+ * Nothing here reads the clock or the locale: the footer's date arrives as
+ * {@link ExportLabels.printedOn}, already formatted by the caller. A function
+ * that read either could not be asserted against a fixed string — the footer
+ * used to call `new Date()` inside and made this module's output different on
+ * every call.
  */
 export function buildCollectionExportHtml(
   collection: Collection,
   items: CollectableItem[],
   labels: ExportLabels,
   money: ExportMoney,
-  printedOn: Date = new Date(),
 ): string {
   const totalPhotos = items.reduce((sum, item) => sum + item.photos.length, 0);
 
@@ -219,7 +237,7 @@ export function buildCollectionExportHtml(
     </div>
   </div>
   ${itemsHtml}
-  <div class="footer">Collectables — ${printedOn.toLocaleDateString()}</div>
+  <div class="footer">Collectables — ${escapeHtml(labels.printedOn)}</div>
 </body>
 </html>`;
 }

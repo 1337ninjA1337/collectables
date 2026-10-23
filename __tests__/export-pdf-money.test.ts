@@ -45,9 +45,9 @@ const LABELS: ExportLabels = {
   exportPdfItemCount: "Items",
   photosSaved: "Photos",
   totalCostCaveat: "",
+  printedOn: "2 Jan 2026, 03:04",
 };
 
-const PRINTED_ON = new Date("2026-01-02T03:04:05Z");
 
 const RATES: UsdRates = { USD: 1, EUR: 0.5, GBP: 0.25 };
 
@@ -109,7 +109,6 @@ const render = (
     items,
     LABELS,
     money(items, col, rates, displayCurrency),
-    PRINTED_ON,
   );
 
 describe("the exported total carries a currency", () => {
@@ -278,10 +277,24 @@ describe("the screen hands over what it is already showing", () => {
   });
 
   it("keeps both accessors in the callback's dep list", () => {
+    // `formatAbsoluteDate` joined them when the footer's date stopped being
+    // `toLocaleDateString()` with no locale inside the document: it is a
+    // function off the i18n context, so a language change has to re-make this
+    // callback or an export would stamp the previous language's date.
     assert.match(
       SRC,
-      /\}, \[collection, allItems, getCollectionTotalCost, convertItemCost, t, toast\]\);/,
+      /\}, \[collection, allItems, getCollectionTotalCost, convertItemCost, t, formatAbsoluteDate, toast\]\);/,
     );
+  });
+
+  it("resolves the printed-on stamp through the provider, not in the document", () => {
+    // The document is React-free (`lib/export-pdf.ts` holds everything that
+    // needs a device), so it can reach neither the provider's language nor the
+    // BCP-47 tag that language maps to — and dated the one artifact a user
+    // keeps in whatever the runtime defaulted to. On the web export, the
+    // browser's.
+    assert.match(SRC, /printedOn: formatAbsoluteDate\(new Date\(\)\.toISOString\(\)\),/);
+    assert.match(SRC, /const \{ t, language, formatAbsoluteDate \} = useI18n\(\);/);
   });
 });
 

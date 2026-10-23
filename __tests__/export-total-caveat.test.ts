@@ -48,6 +48,7 @@ const LABELS: ExportLabels = {
   exportPdfItemCount: "Items",
   photosSaved: "Photos",
   totalCostCaveat: "",
+  printedOn: "2 Jan 2026, 03:04",
 };
 
 const collection = (over: Partial<Collection> = {}): Collection => ({
@@ -139,7 +140,6 @@ describe("the document prints the caveat it is handed", () => {
       [item({ cost: 10, costCurrency: "USD" })],
       { ...LABELS, totalCostCaveat: caveat },
       money,
-      new Date("2026-01-02T03:04:05Z"),
     );
 
   const moneyFor = (rates: UsdRates | null): ExportMoney => {
@@ -181,7 +181,6 @@ describe("the document prints the caveat it is handed", () => {
       items,
       { ...LABELS, totalCostCaveat: "Summed without exchange rates." },
       { total: collectionTotalCost(items, "USD", null), itemCost: (i) => convertItemCost(i, "USD", null) },
-      new Date("2026-01-02T03:04:05Z"),
     );
 
     assert.ok(!html.includes("Total cost"));
